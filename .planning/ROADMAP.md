@@ -48,7 +48,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — The saved-password migration behavior removed from the code, the settings page, and the tests, with both e2e tests rewritten
+- [x] 01-03-PLAN.md — The saved-password migration behavior removed from the code, the settings page, and the tests, with both e2e tests rewritten
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

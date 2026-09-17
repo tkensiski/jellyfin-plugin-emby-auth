@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 01
 current_phase_name: Account Creation and Login Security
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-09-17T21:14:27.957Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-09-17T22:19:31.746Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 01 execution started
-state_head: 106c6e151760765f67849220cd5f62c64d41e670
+state_head: 102ee992e1a3d0899a82a56e69c710e0623a67cc
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 01 (Account Creation and Login Security) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-09-17 — Phase 01 execution started
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 01 P01 | 26min | 2 tasks | 4 files |
 | Phase 01 P02 | 19min | 3 tasks | 2 files |
+| Phase 01-account-creation-and-login-security P03 | 25min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Restructured CreateAccountAsync to log exactly one Error entry per failure (save vs. delete), resolving an internal plan inconsistency between the illustrative two-catch shape and the explicit 'exactly one Error entry' acceptance criterion — The delete is attempted at most once and never retried (D-03); logging both failures independently would duplicate the same incident
 - [Phase 01]: RED-phase TDD commits use [Fact(Skip=...)] then unskip in the GREEN commit, because the repo's pre-commit hook blocks any commit that leaves a test failing — Preserves the required test-then-feat commit ordering and CLAUDE.md's no-hook-bypass rule; RED was independently confirmed locally before each Skip
 - [Phase 01]: [Phase 01]: Broke and restored one guard/write per named group (blank-password guard, Emby-status guard, LoginAction.Deny guard, hash write, fingerprint ordering) to prove each new AUTH-03/AUTH-01 test would catch a regression, since these tests cover already-working behavior rather than new code
+- [Phase 01]: D-05 confirmed: deleted MigrationMode.JellyfinPasswordFirst with no compatibility path — Human selected 'proceed' at the checkpoint, accepting that an install still holding the value loses its Emby URL and API key at next load (D-07)
 
 ### Pending Todos
 
@@ -96,6 +98,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17T21:14:27.943Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-09-17T22:19:31.731Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None

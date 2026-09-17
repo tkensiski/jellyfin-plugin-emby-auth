@@ -9,7 +9,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Password and Account Security
 
-- [ ] **AUTH-01**: While a user is on the Emby login method, Emby checks every login, and the saved Jellyfin hash plays no part in accepting it. After each login that Emby accepts, the saved hash is the hash of that password.
+- [x] **AUTH-01**: While a user is on the Emby login method, Emby checks every login, and the saved Jellyfin hash plays no part in accepting it. After each login that Emby accepts, the saved hash is the hash of that password.
 - [ ] **AUTH-02**: The `JellyfinPasswordFirst` migration behavior ("Check the saved Jellyfin password first") no longer exists in the settings, the settings page, the docs, or the tests.
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
@@ -91,7 +91,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Pending |
+| AUTH-01 | Phase 1 | Complete |
 | AUTH-02 | Phase 1 | Pending |
 | AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
