@@ -191,7 +191,7 @@ internal sealed partial class EmbyAuthenticationProvider(
             await userManager.UpdateUserAsync(user).ConfigureAwait(false);
             saved = true;
         }
-        catch (Exception ex) when (ex is DbUpdateException or ResourceNotFoundException)
+        catch (Exception ex)
         {
             LogSaveFailed(logger, ex, embyLogin.Name);
             throw new AuthenticationException(InvalidLogin, ex);

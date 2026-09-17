@@ -42,12 +42,7 @@ public class EmbyAuthenticationProviderTests
             "application/json"),
     };
 
-    // RED, confirmed locally: fails today with the raw InvalidOperationException escaping Authenticate,
-    // because EmbyAuthenticationProvider.cs's catch on the save only admits DbUpdateException and
-    // ResourceNotFoundException. Skipped only for this commit, because the repository's pre-commit hook
-    // requires a fully green suite at every commit; unskipped in the immediately following feat(01-01) commit
-    // that widens the catch.
-    [Fact(Skip = "RED — unskipped when the catch widens in the next commit (AUTH-04)")]
+    [Fact]
     public async Task RefusesTheLogin_WhenTheSaveAfterCreateUserFailsWithAnUnexpectedExceptionType()
     {
         var userManager = new FakeUserManager { UpdateUserThrows = new InvalidOperationException("save failed") };
