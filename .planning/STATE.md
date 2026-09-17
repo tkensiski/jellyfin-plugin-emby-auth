@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v0.9.0.0
 current_phase: 01
 current_phase_name: Account Creation and Login Security
-status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-09-17T22:19:31.746Z"
+status: verifying
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-09-17T22:45:49.931Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 01 execution started
-state_head: 102ee992e1a3d0899a82a56e69c710e0623a67cc
+state_head: 19c75f5c026da93737d12fc6627d846e955d0aeb
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 
 Phase: 01 (Account Creation and Login Security) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-17 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 26min | 2 tasks | 4 files |
 | Phase 01 P02 | 19min | 3 tasks | 2 files |
 | Phase 01-account-creation-and-login-security P03 | 25min | 2 tasks | 6 files |
+| Phase 01 P04 | 20min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -78,6 +79,7 @@ Recent decisions affecting current work:
 - [Phase 01]: RED-phase TDD commits use [Fact(Skip=...)] then unskip in the GREEN commit, because the repo's pre-commit hook blocks any commit that leaves a test failing — Preserves the required test-then-feat commit ordering and CLAUDE.md's no-hook-bypass rule; RED was independently confirmed locally before each Skip
 - [Phase 01]: [Phase 01]: Broke and restored one guard/write per named group (blank-password guard, Emby-status guard, LoginAction.Deny guard, hash write, fingerprint ordering) to prove each new AUTH-03/AUTH-01 test would catch a regression, since these tests cover already-working behavior rather than new code
 - [Phase 01]: D-05 confirmed: deleted MigrationMode.JellyfinPasswordFirst with no compatibility path — Human selected 'proceed' at the checkpoint, accepting that an install still holding the value loses its Emby URL and API key at next load (D-07)
+- [Phase 01]: Phase 01: User-directed scope change at the 01-04 Task 3 checkpoint — removed the settings-page screenshot entirely (README.md and CLAUDE.md references stripped too) instead of retaking it — Avoids re-establishing the screenshot-maintenance rule in CLAUDE.md for a single README image
 
 ### Pending Todos
 
@@ -98,6 +100,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17T22:19:31.731Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-09-17T22:45:49.916Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
