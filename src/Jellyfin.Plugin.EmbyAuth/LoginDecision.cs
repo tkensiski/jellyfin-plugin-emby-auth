@@ -7,8 +7,7 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// </summary>
 /// <param name="Username">The Jellyfin user name.</param>
 /// <param name="AuthenticationProviderId">The login method that the account uses.</param>
-/// <param name="IsAdministrator">Whether the account is a Jellyfin administrator.</param>
-internal sealed record JellyfinAccount(string Username, string AuthenticationProviderId, bool IsAdministrator);
+internal sealed record JellyfinAccount(string Username, string AuthenticationProviderId);
 
 /// <summary>
 /// The result of <see cref="LoginDecision.Decide"/>.
@@ -26,7 +25,7 @@ internal enum LoginAction
 }
 
 /// <summary>
-/// Decides which Jellyfin account an Emby login applies to.
+/// Decides which Jellyfin account an Emby login applies to. The provider refuses administrators before this decision.
 /// </summary>
 internal static class LoginDecision
 {
@@ -50,12 +49,8 @@ internal static class LoginDecision
             return LoginAction.CreateAccount;
         }
 
-        if (typedAccount.IsAdministrator
-            || !string.Equals(typedAccount.AuthenticationProviderId, bridgeProviderId, StringComparison.OrdinalIgnoreCase))
-        {
-            return LoginAction.Deny;
-        }
-
-        return LoginAction.UseAccount;
+        return string.Equals(typedAccount.AuthenticationProviderId, bridgeProviderId, StringComparison.OrdinalIgnoreCase)
+            ? LoginAction.UseAccount
+            : LoginAction.Deny;
     }
 }

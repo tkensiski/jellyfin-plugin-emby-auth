@@ -18,7 +18,7 @@ public class LoginDecisionTests
     [Fact]
     public void UsesAccount_WhenAccountUsesEmbyLoginMethod()
     {
-        var alice = new JellyfinAccount("alice", Bridge, IsAdministrator: false);
+        var alice = new JellyfinAccount("alice", Bridge);
 
         var action = LoginDecision.Decide("alice", alice, "alice", Bridge);
 
@@ -28,7 +28,7 @@ public class LoginDecisionTests
     [Fact]
     public void UsesAccount_WhenNamesDifferOnlyInCase()
     {
-        var alice = new JellyfinAccount("Alice", Bridge, IsAdministrator: false);
+        var alice = new JellyfinAccount("Alice", Bridge);
 
         var action = LoginDecision.Decide("ALICE", alice, "alice", Bridge);
 
@@ -49,7 +49,7 @@ public class LoginDecisionTests
     [Fact]
     public void Denies_WhenEmbyAuthenticatesADifferentUser()
     {
-        var bob = new JellyfinAccount("bob", Bridge, IsAdministrator: false);
+        var bob = new JellyfinAccount("bob", Bridge);
 
         var action = LoginDecision.Decide("bob", bob, "robert", Bridge);
 
@@ -59,19 +59,9 @@ public class LoginDecisionTests
     [Fact]
     public void Denies_WhenAccountUsesAnotherLoginMethod()
     {
-        var carol = new JellyfinAccount("carol", DefaultProvider, IsAdministrator: false);
+        var carol = new JellyfinAccount("carol", DefaultProvider);
 
         var action = LoginDecision.Decide("carol", carol, "carol", Bridge);
-
-        Assert.Equal(LoginAction.Deny, action);
-    }
-
-    [Fact]
-    public void Denies_WhenAccountIsAnAdministrator()
-    {
-        var jack = new JellyfinAccount("jack", Bridge, IsAdministrator: true);
-
-        var action = LoginDecision.Decide("jack", jack, "jack", Bridge);
 
         Assert.Equal(LoginAction.Deny, action);
     }
