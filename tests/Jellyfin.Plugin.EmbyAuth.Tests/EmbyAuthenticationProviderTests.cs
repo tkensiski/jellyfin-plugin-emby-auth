@@ -253,6 +253,126 @@ public class EmbyAuthenticationProviderTests
         await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", existingUser));
     }
 
+    [Fact]
+    public async Task CreatesTheAccount_WithTheEmbyVerifiedHashAndTheEmbyLoginMethod()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+        var expectedHash = new FakeCryptoProvider().CreatePasswordHash("alice-pass").ToString();
+
+        var result = await provider.Authenticate("alice", "alice-pass", null);
+
+        Assert.Equal("alice", result.Username);
+        Assert.Equal("alice", userManager.LastCreatedUser?.Username);
+        Assert.Same(userManager.LastCreatedUser, userManager.LastUpdatedUser);
+        Assert.Equal(expectedHash, userManager.LastUpdatedUser!.Password);
+        Assert.Equal(EmbyAuthenticationProvider.ProviderId, userManager.LastUpdatedUser.AuthenticationProviderId);
+        Assert.True(userManager.LastUpdatedUser.HasPermission(PermissionKind.EnableRemoteAccess));
+    }
+
+    [Fact]
+    public async Task SavesTheHashInTheCallDirectlyAfterCreateUser()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await provider.Authenticate("alice", "alice-pass", null);
+
+        Assert.Equal(["CreateUserAsync", "UpdateUserAsync"], userManager.Calls);
+    }
+
+    [Fact]
+    public async Task CreatesTheAccountOnlyOnce_WhenTheSameEmbyUserLogsInTwice()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await provider.Authenticate("alice", "alice-pass", null);
+        var createdUser = userManager.LastCreatedUser!;
+        await provider.Authenticate("alice", "alice-pass", createdUser);
+
+        Assert.Equal(1, userManager.Calls.Count(call => call == "CreateUserAsync"));
+        Assert.Equal(2, userManager.Calls.Count(call => call == "UpdateUserAsync"));
+    }
+
+    [Fact]
+    public async Task AsksEmbyEveryTime_AndRewritesTheHash_EvenWhenTheSavedHashAlreadyMatches()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out var verifiedPasswordsPath);
+        var savedHash = new FakeCryptoProvider().CreatePasswordHash("alice-pass").ToString();
+        var existingUser = new User("alice", EmbyAuthenticationProvider.ProviderId, "reset-provider");
+        existingUser.AddDefaultPermissions();
+        existingUser.AddDefaultPreferences();
+        existingUser.Password = savedHash;
+        new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(existingUser.Id, savedHash);
+
+        await provider.Authenticate("alice", "alice-pass", existingUser);
+        await provider.Authenticate("alice", "alice-pass", existingUser);
+
+        var authenticateRequests = handler.Requests.Count(request => request.Uri!.AbsolutePath.EndsWith("AuthenticateByName", StringComparison.Ordinal));
+        Assert.Equal(2, authenticateRequests);
+        Assert.Equal(2, userManager.Calls.Count(call => call == "UpdateUserAsync"));
+    }
+
+    [Fact]
+    public async Task RecordsTheVerifiedFingerprint_OnlyAfterTheHashIsSaved_OnSuccess()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out var verifiedPasswordsPath);
+
+        await provider.Authenticate("alice", "alice-pass", null);
+
+        var savedHash = userManager.LastUpdatedUser!.Password;
+        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        Assert.True(freshVerifiedPasswords.Matches(userManager.LastUpdatedUser.Id, savedHash));
+    }
+
+    [Fact]
+    public async Task RecordsTheVerifiedFingerprint_OnlyAfterTheHashIsSaved_WhenTheSaveFails()
+    {
+        var userManager = new FakeUserManager { UpdateUserThrows = new InvalidOperationException("save failed") };
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out var verifiedPasswordsPath);
+
+        await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", null));
+
+        var expectedHash = new FakeCryptoProvider().CreatePasswordHash("alice-pass").ToString();
+        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        Assert.False(freshVerifiedPasswords.Matches(userManager.LastCreatedUser!.Id, expectedHash));
+    }
+
+    [Fact]
+    public async Task AcceptsTheTypedName_WhenItDiffersFromTheEmbyNameOnlyInCase()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        var result = await provider.Authenticate("Alice", "alice-pass", null);
+
+        Assert.Equal("alice", result.Username);
+        Assert.Equal("alice", userManager.LastCreatedUser?.Username);
+    }
+
+    [Fact]
+    public async Task RefusesTheTypedName_WhenItHasATrailingSpace()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice ", "alice-pass", null));
+
+        var request = Assert.Single(handler.Requests);
+        Assert.EndsWith("Users", request.Uri!.AbsolutePath, StringComparison.Ordinal);
+    }
+
     private EmbyAuthenticationProvider CreateProvider(
         StubHttpMessageHandler handler,
         FakeUserManager userManager,
