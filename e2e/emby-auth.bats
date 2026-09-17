@@ -27,17 +27,18 @@ setup_file() {
 	set_password "$EMBY" "$EMBY_TOKEN" "$ALICE_EMBY_ID" alice-pass-1
 
 	local name
-	for name in carol dave erin gina henry ivy jack kate leo; do
+	for name in carol dave erin gina henry ivy jack kate leo mia nora oscar paul quinn; do
 		set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" "$name")" "$name-emby-pass"
 	done
 	create_user "$EMBY" "$EMBY_TOKEN" frank >/dev/null
 	update_policy "$EMBY" "$EMBY_TOKEN" "$(emby_user_id gina)" '.EnableRemoteAccess = false'
+	update_policy "$EMBY" "$EMBY_TOKEN" "$(emby_user_id quinn)" '.EnableRemoteAccess = false'
 	update_policy "$EMBY" "$EMBY_TOKEN" "$(emby_user_id ivy)" '.IsDisabled = true'
 
 	set_password "$JELLYFIN" "$JF_TOKEN" "$(create_user "$JELLYFIN" "$JF_TOKEN" carol)" carol-jf-pass
 
 	# Accounts created before the first login get a random password, then the Emby login method.
-	for name in dave erin henry kate leo; do
+	for name in dave erin henry kate leo nora; do
 		local id
 		id="$(create_user "$JELLYFIN" "$JF_TOKEN" "$name")"
 		set_password "$JELLYFIN" "$JF_TOKEN" "$id" "$name-jf-random"
@@ -196,6 +197,71 @@ policy_field() {
 	[ "$(policy_field leo AuthenticationProviderId)" = "$DEFAULT_PROVIDER" ]
 }
 
+@test "Keep Emby in charge: the user stays on the Emby login method, and Emby decides every login" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "KeepEmbyInCharge"'
+	[ "$(api GET "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$JF_TOKEN" | jq -r .MigrationMode)" = "KeepEmbyInCharge" ]
+
+	run login_status "$JELLYFIN" mia mia-emby-pass
+	[ "$output" = "200" ]
+	[ "$(policy_field mia AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+
+	set_password "$EMBY" "$EMBY_TOKEN" "$(emby_user_id mia)" mia-emby-pass-2
+	run login_status "$JELLYFIN" mia mia-emby-pass
+	[ "$output" = "401" ]
+	run login_status "$JELLYFIN" mia mia-emby-pass-2
+	[ "$output" = "200" ]
+	[ "$(policy_field mia AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+}
+
+@test "the migration task moves only users whose saved password Emby verified" {
+	run run_migration_task "$JF_TOKEN"
+	[ "$output" = "Completed" ]
+
+	[ "$(policy_field mia AuthenticationProviderId)" = "$DEFAULT_PROVIDER" ]
+	[ "$(policy_field nora AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+	[ "$(policy_field erin AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+	[ "$(policy_field jack AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+	run login_status "$JELLYFIN" mia mia-emby-pass-2
+	[ "$output" = "200" ]
+}
+
+@test "Jellyfin password first: the saved password works until Emby accepts a new one" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
+
+	run login_status "$JELLYFIN" oscar oscar-emby-pass
+	[ "$output" = "200" ]
+	[ "$(policy_field oscar AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+
+	set_password "$EMBY" "$EMBY_TOKEN" "$(emby_user_id oscar)" oscar-emby-pass-2
+	run login_status "$JELLYFIN" oscar oscar-emby-pass
+	[ "$output" = "200" ]
+	run login_status "$JELLYFIN" oscar oscar-emby-pass-2
+	[ "$output" = "200" ]
+	run login_status "$JELLYFIN" oscar oscar-emby-pass
+	[ "$output" = "401" ]
+	[ "$(policy_field oscar AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+}
+
+@test "No libraries: a new account gets no library access and copies Emby remote access" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "MoveAfterFirstLogin" | .AccountAccess = "NoLibraries"'
+
+	run login_status "$JELLYFIN" paul paul-emby-pass
+	[ "$output" = "200" ]
+	[ "$(policy_field paul EnableAllFolders)" = "false" ]
+	[ "$(policy_field paul EnabledFolders | jq length)" = "0" ]
+	[ "$(policy_field paul EnableRemoteAccess)" = "true" ]
+}
+
+@test "Jellyfin defaults only: a new account ignores the Emby remote access restriction" {
+	set_plugin_config "$JF_TOKEN" '.AccountAccess = "JellyfinDefaults"'
+
+	run login_status "$JELLYFIN" quinn quinn-emby-pass
+	[ "$output" = "200" ]
+	[ "$(policy_field quinn EnableRemoteAccess)" = "true" ]
+
+	set_plugin_config "$JF_TOKEN" '.AccountAccess = "CopyEmbyRemoteAccess"'
+}
+
 @test "the plugin ends its Emby session after each login" {
 	run api GET "$EMBY/Sessions?DeviceId=jellyfin-plugin-emby-auth" "$EMBY_TOKEN"
 	[ "$status" -eq 0 ]
@@ -218,6 +284,19 @@ policy_field() {
 	[ "$output" = "200" ]
 	run login_status "$JELLYFIN" henry henry-emby-pass
 	[ "$output" = "200" ]
+	run login_status "$JELLYFIN" mia mia-emby-pass-2
+	[ "$output" = "200" ]
+}
+
+@test "while Emby is unreachable, Jellyfin password first accepts only a saved password that Emby verified" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
+
+	run login_status "$JELLYFIN" oscar oscar-emby-pass-2
+	[ "$output" = "200" ]
+	run login_status "$JELLYFIN" nora nora-jf-random
+	[ "$output" = "401" ]
+
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "MoveAfterFirstLogin"'
 }
 
 @test "the Jellyfin log contains no password and no API key" {
@@ -227,7 +306,8 @@ policy_field() {
 	local secret
 	for secret in alice-pass-1 alice-pass-2 wrong-pass jf-admin-pass carol-jf-pass jack-jf-pass kate-jf-pass \
 		carol-emby-pass dave-emby-pass erin-emby-pass gina-emby-pass henry-emby-pass ivy-emby-pass jack-emby-pass \
-		leo-emby-pass dave-jf-random erin-jf-random henry-jf-random kate-jf-random leo-jf-random "$EMBY_API_KEY"; do
+		leo-emby-pass mia-emby-pass mia-emby-pass-2 nora-emby-pass oscar-emby-pass oscar-emby-pass-2 paul-emby-pass quinn-emby-pass \
+		dave-jf-random erin-jf-random henry-jf-random kate-jf-random leo-jf-random nora-jf-random "$EMBY_API_KEY"; do
 		if [[ "$logs" == *"$secret"* ]]; then
 			echo "The Jellyfin log contains the secret '$secret'." >&2
 			return 1

@@ -16,10 +16,17 @@ Line references are to Jellyfin v12.1 (`Jellyfin.Server.Implementations/Users/Us
 - `IUserManager` depends on all login methods. Resolve it from `IServiceProvider` at login time, never in a constructor.
 - After a login, Jellyfin saves only some columns. Save the password hash with `IUserManager.UpdateUserAsync`.
 - After a successful login, `AuthenticateUser` sets the login method of the user to the method that accepted the login. So the provider cannot move the user to Default. `MoveToDefaultLoginMethod` does it on `AuthenticationResultEventArgs`, which `SessionManager` publishes after the login completes.
-- Quick Connect (`SessionManager.AuthenticateDirect`) publishes the same event without a password check. Only users in `VerifiedLogins` move.
+- Quick Connect (`SessionManager.AuthenticateDirect`) publishes the same event without a password check. A user moves only if `EmbyVerifiedPasswords` matches the saved hash.
 - `EventManager` logs and ignores an exception from an event consumer. If the move fails, the login still succeeds.
-- `MoveToDefaultLoginMethod` changes one column with `ExecuteUpdateAsync`, only while the user is on the Emby login method. A full `UpdateUserAsync` there could overwrite concurrent changes, such as an admin disabling the user.
+- `DefaultLoginMethod.MoveAsync` changes one column with `ExecuteUpdateAsync`, only while the user is on the Emby login method and still has the verified hash. A full `UpdateUserAsync` there could overwrite concurrent changes, such as an admin disabling the user.
+- Jellyfin discovers scheduled tasks with `Assembly.GetExportedTypes()` (`ApplicationHost`). So `MoveEmbyUsersToDefaultTask` and every type in its constructor must be public. Other plugin types stay internal.
 - `UserManager.ChangePassword` calls the assigned login method, then saves the user. An empty password means a reset.
+
+## Verified passwords
+
+- `EmbyVerifiedPasswords` stores a SHA-256 fingerprint of each hash that Emby verified, never the hash. Record it only after Emby accepts a login and the hash is saved.
+- Every path that moves a user to Default through the plugin, or that accepts a saved password without Emby, must check `EmbyVerifiedPasswords.Matches`. Otherwise a password that an administrator set on a pre-created account would work.
+- `ChangePassword` with a new password moves the user to Default directly, because the administrator or user chose that password in Jellyfin.
 
 ## Blank passwords
 

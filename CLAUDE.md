@@ -1,6 +1,6 @@
 # Jellyfin Emby Auth
 
-Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks the first Jellyfin login of a user against Emby, saves a Jellyfin password hash, and moves the user to Jellyfin's Default login method. `README.md` describes the behavior and the admin procedures.
+Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins against Emby, saves a Jellyfin password hash, and moves users to Jellyfin's Default login method, at once or when an administrator runs the migration task. `README.md` describes the behavior, the settings, and the admin procedures.
 
 ## Commands
 
@@ -13,11 +13,16 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks the first Jellyfi
 
 - `src/Jellyfin.Plugin.EmbyAuth/`
   - `EmbyAuthenticationProvider.cs` — the login method. Connects the parts below to Jellyfin's `IUserManager`.
-  - `LoginDecision.cs` — the account rules, as a pure function.
+  - `Configuration/PluginConfiguration.cs` — the settings, including the `MigrationMode` and `AccountAccess` enums.
   - `EmbyAuthSettings.cs` — settings validation.
+  - `LoginDecision.cs` — the account rules, as a pure function.
+  - `AccountAccessPolicy.cs` — applies `AccountAccess` to an account.
   - `EmbyClient.cs` — the only code that sends requests to Emby.
   - `EmbyUserDirectory.cs` — the cached Emby user list.
-  - `VerifiedLogins.cs`, `MoveToDefaultLoginMethod.cs` — the move to Default after a login that Emby verified.
+  - `EmbyVerifiedPasswords.cs` — the file of fingerprints of password hashes that Emby verified.
+  - `DefaultLoginMethod.cs` — the single-column move to Default.
+  - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
+  - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
 - `e2e/` — bats tests, Docker Compose file, and the logging proxy for Emby.
 
