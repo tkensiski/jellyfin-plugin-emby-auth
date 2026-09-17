@@ -1,34 +1,35 @@
-# Jellyfin Emby Auth plugin
+# Jellyfin Emby Auth
 
-A Jellyfin authentication provider plugin that moves users from Emby to Jellyfin. It checks the first login against Emby, saves a Jellyfin password hash, then moves the user to the Default login method. See `README.md` for behavior.
+Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks the first Jellyfin login of a user against Emby, saves a Jellyfin password hash, and moves the user to Jellyfin's Default login method. `README.md` describes the behavior and the admin procedures.
+
+## Commands
+
+- `mise install` — install the pinned tools (`.mise.toml`).
+- `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` — build with warnings as errors, then run the unit tests. `--solution` is required because `global.json` selects Microsoft.Testing.Platform.
+- `bats e2e/emby-auth.bats` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker.
+- `prek run` — run the pre-commit checks: `dotnet format`, build and unit tests, shellcheck.
 
 ## Layout
 
-- `src/Jellyfin.Plugin.EmbyAuth/` — the plugin.
-  - `LoginDecision.cs` holds the account rules as a pure function.
-  - `EmbyClient.cs` is the only code that talks to Emby.
-  - `EmbyAuthenticationProvider.cs` connects both to Jellyfin's `IUserManager`.
-  - `MoveToDefaultLoginMethod.cs` moves the user to the Default login method after the login completes.
-- `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests for `LoginDecision` and `EmbyClient`. The tests replace HTTP with a stub `HttpMessageHandler`.
-- `e2e/` — bats tests against real Emby and Jellyfin containers (`compose.yaml`). The tests run in file order and share one pair of servers.
+- `src/Jellyfin.Plugin.EmbyAuth/`
+  - `EmbyAuthenticationProvider.cs` — the login method. Connects the parts below to Jellyfin's `IUserManager`.
+  - `LoginDecision.cs` — the account rules, as a pure function.
+  - `EmbyAuthSettings.cs` — settings validation.
+  - `EmbyClient.cs` — the only code that sends requests to Emby.
+  - `EmbyUserDirectory.cs` — the cached Emby user list.
+  - `VerifiedLogins.cs`, `MoveToDefaultLoginMethod.cs` — the move to Default after a login that Emby verified.
+- `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
+- `e2e/` — bats tests, Docker Compose file, and the logging proxy for Emby.
 
-## Conventions
+## Rules
 
-- `.mise.toml` pins the tools. Package and image versions are exact. Look up the current stable version before a bump.
-- The target Jellyfin version sets `Jellyfin.Controller`/`Jellyfin.Model`, the `jellyfin/jellyfin` image tag, and the target framework together. Change all three at once.
-- Warnings are errors, with `AnalysisMode` `AllEnabledByDefault` on the plugin project. Fix the warning. Suppress a warning only with a `Justification`.
-- Write the test first. Every behavior change needs a unit test, or an e2e test when it depends on Jellyfin or Emby behavior.
-- Log and exception messages must never contain a password. The last test in `e2e/emby-auth.bats` checks the Jellyfin log.
-- `dotnet test` uses Microsoft.Testing.Platform (`global.json`), so pass `--solution`.
-- Run `prek run` before a commit (dotnet format, build and unit tests, shellcheck). Run `bats e2e/emby-auth.bats` for any change to `src/`.
+- Write the test first. Then break the code once and watch the test fail.
+- A change that depends on Jellyfin or Emby behavior needs an end-to-end test. Run `bats e2e/emby-auth.bats` for every change to `src/`.
+- Run `prek run` before each commit.
+- Never put a password or the API key in a log or exception message.
+- Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.
+- Pin exact versions. Look up the current stable version before a bump.
+- A Jellyfin version bump changes three pins together: `Jellyfin.Controller` and `Jellyfin.Model`, the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`, and the target framework.
+- Keep `README.md` accurate when behavior changes.
 
-## Facts the design depends on
-
-- Jellyfin tries every login method for an unknown user name. For a known user, Jellyfin tries only the assigned method (`UserManager.GetAuthenticationProviders`).
-- Jellyfin catches only `AuthenticationException` from a login method (`UserManager.AuthenticateWithProvider`). Any other exception escapes the login request.
-- After a login, Jellyfin saves only some columns. The provider must call `IUserManager.UpdateUserAsync` to save the password hash.
-- After a successful login, `UserManager.AuthenticateUser` sets the login method of the user to the method that accepted the login. So the provider cannot move the user to Default. `MoveToDefaultLoginMethod` does it in the `AuthenticationResultEventArgs` event, which `SessionManager` publishes after the login completes.
-- `EventManager` logs and ignores an exception from an event consumer. If the move fails, the user stays on the Emby login method and the login still succeeds.
-- `MoveToDefaultLoginMethod` moves only a user with a saved password. A move without one would leave a Default account that opens with a blank password.
-- `IUserManager` depends on all login methods. The provider resolves it from `IServiceProvider` at login time, not in its constructor.
-- Emby answers HTTP 400 to a chunked request body. `EmbyClient` sends a body with a `Content-Length`.
+Path-scoped rules add details: `.claude/rules/plugin.md` for `src/` and `tests/`, and `.claude/rules/e2e.md` for `e2e/`.

@@ -6,8 +6,19 @@ services:
     ports:
       - "127.0.0.1:18096:8096"
 
+  # Jellyfin reaches Emby through this proxy, which logs each request body.
+  emby-proxy:
+    image: nginx:1.30.5-alpine
+    depends_on:
+      - emby
+    volumes:
+      - ./emby-proxy.conf:/etc/nginx/nginx.conf:ro
+
   jellyfin:
     image: jellyfin/jellyfin:12.1.20260915-010956
+    environment:
+      # Debug level, so that the log test also sees the exceptions that Jellyfin logs for a refused login.
+      JELLYFIN_Serilog__MinimumLevel__Default: Debug
     ports:
       - "127.0.0.1:28096:8096"
     volumes:
