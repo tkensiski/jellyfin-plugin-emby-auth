@@ -32,7 +32,7 @@ Line references are to Jellyfin v12.1 (`Jellyfin.Server.Implementations/Users/Us
 
 - The Default login method lets anyone log in to an account without a password by sending a blank password (`DefaultAuthenticationProvider`).
 - `CreateUserAsync` commits the new account on the Default login method without a password. The provider computes the hash first, then saves it immediately, and deletes the account if that save fails.
-- Never leave or move a user to Default without a password.
+- Never move a user to Default without a password. Account creation has one accepted exception: `CreateUserAsync` commits the account before the plugin can save a hash. When that save and the cleanup delete both fail, the account stays on Default without a password; the plugin logs the account name at Error and refuses the login.
 
 ## Emby
 
