@@ -1,33 +1,42 @@
-# Jellyfin Emby Auth plugin
+# Jellyfin Emby Auth
 
-This plugin moves users from Emby to Jellyfin without a password reset. It adds a Jellyfin login method named **Emby**, which checks the first Jellyfin login of each user against an Emby server. Then the plugin saves the password in Jellyfin and moves the user to Jellyfin's **Default** login method. After that login, Jellyfin does not need Emby for that user.
+A Jellyfin plugin that moves users from Emby to Jellyfin without a password reset.
 
-**Status:** tested with Jellyfin 12.1.0 and Emby 4.10.0.40 in local containers only. Not tested on a production server. Not published to a plugin repository.
+The plugin adds a Jellyfin login method named **Emby**. On the first Jellyfin login of a user, the plugin checks the password against your Emby server. If Emby accepts it, the plugin saves the password in Jellyfin and moves the user to Jellyfin's **Default** login method. From then on, Jellyfin checks that user's password without Emby. When every user has logged in once, you can shut down Emby and remove the plugin.
 
-## How a login works
+**Status:** tested only in local containers, with Jellyfin 12.1.0 and Emby 4.10.0.40. Not tested on a production server. Not published to a plugin repository.
 
-For a user on the Emby login method, or a user name that has no Jellyfin account:
+## Requirements
 
-1. The plugin refuses the login without contacting Emby if one of these conditions is true:
+- Jellyfin 12.1. The plugin is built against the Jellyfin 12.1.0 packages.
+- An Emby server that Jellyfin can reach over HTTP or HTTPS.
+- An API key for the plugin on that Emby server.
+
+## How it works
+
+The plugin handles a login in two cases: the Jellyfin account uses the Emby login method, or no Jellyfin account has the typed name. Jellyfin handles all other logins as usual.
+
+1. **Checks before Emby.** The plugin refuses the login, and does not contact Emby, if one of these is true:
    - The password is blank.
    - The Jellyfin account is disabled.
-   - No enabled Emby user has exactly the typed name. The match ignores case, and nothing else. The plugin reads the Emby user list with the Emby API key and keeps it for 60 seconds.
-2. Jellyfin sends the user name and password to Emby (`POST /Users/AuthenticateByName`). If Emby refuses the login, or if Jellyfin cannot connect to Emby, Jellyfin refuses the login.
-3. If Emby accepts the login, the plugin ends the Emby session that the login opened. Then it applies these rules:
-   - If the name that Emby returns is not the typed name, ignoring case, Jellyfin refuses the login.
-   - If no Jellyfin account has that name, the plugin creates one. The account gets Jellyfin's default permissions for a new user and is not an administrator. If Emby does not allow the user to connect from outside the local network, the account does not allow remote access either.
-   - If the account is a Jellyfin administrator, or uses a login method other than Emby, Jellyfin refuses the login. Thus an Emby password cannot open an administrator account or an account on another login method.
-   - Otherwise, the plugin uses the account. If Emby does not allow remote access for the user, the plugin turns off remote access on the account. The plugin never turns remote access on.
-4. The plugin saves a Jellyfin password hash on the account.
-5. After Jellyfin completes the login, the plugin moves the user to the Default login method. From then on, Jellyfin checks the saved password and does not contact Emby for that user.
+   - No enabled Emby user has exactly the typed name. The match ignores case and nothing else. The plugin reads the Emby user list with the API key and keeps it for 60 seconds.
+2. **Emby check.** The plugin sends the name and password to Emby (`POST /Users/AuthenticateByName`). If Emby refuses the login or does not answer within 5 seconds, Jellyfin refuses the login. If Emby accepts, the plugin ends the Emby session that the login opened.
+3. **Account rules.** Jellyfin refuses the login if Emby returns a different user name, or if the Jellyfin account is an administrator or uses another login method. Otherwise:
+   - If no Jellyfin account exists, the plugin creates one with Jellyfin's default permissions for a new user. The account is not an administrator. It allows remote access only if Emby allows remote access for the user.
+   - If the account exists, the plugin uses it. If Emby does not allow remote access for the user, the plugin turns off remote access on the account. The plugin never turns remote access on.
+4. **Password copy.** The plugin saves a Jellyfin hash of the password on the account.
+5. **Move to Default.** After Jellyfin completes the login, the plugin moves the user to the Default login method.
 
-A Quick Connect login does not move a user to Default, because Emby does not check a password for it.
+A Quick Connect login does not move a user to Default, because no password was checked.
 
-The plugin does not change accounts that are already on the Default login method.
+For a user on the Emby login method, a password change in Jellyfin works like this:
+
+- **New password:** the plugin saves it and moves the user to Default.
+- **Password reset:** the plugin removes the saved password. The user stays on the Emby login method, so Emby checks the next login.
 
 ## Install
 
-1. Build the plugin:
+1. Build the plugin. The tools are pinned in `.mise.toml`.
 
    ```sh
    mise install
@@ -36,51 +45,68 @@ The plugin does not change accounts that are already on the Default login method
 
 2. Copy `artifacts/plugin/Jellyfin.Plugin.EmbyAuth.dll` to `<jellyfin config>/plugins/EmbyAuth_1.0.0.0/`.
 3. Restart Jellyfin.
-4. Create an API key on the Emby server for the plugin.
-5. In **Dashboard > Plugins > Emby Auth**, set the Emby server URL, for example `http://emby:8096`, and the Emby API key. You can also send the settings to the API: `POST /Plugins/e973e09a-e8b4-40c1-9be2-8e51342de1f9/Configuration` with `{"EmbyServerUrl": "http://emby:8096", "EmbyApiKey": "<key>"}`.
 
-The plugin sends passwords to the Emby server URL. Use `https`, or an address on a private network. The URL must not contain a user name or password.
+## Configure
 
-Jellyfin administrators can read the API key through the plugin settings API.
+1. Create an API key for the plugin on the Emby server.
+2. In Jellyfin, open **Dashboard > Plugins > Emby Auth** and set both settings.
 
-## Create a Jellyfin account before the first login
+| Setting | Value |
+|---|---|
+| Emby server URL | The base URL of Emby as Jellyfin reaches it, for example `http://emby:8096`. Use `https`, or an address on a private network. The URL must not contain a user name or password. |
+| Emby API key | The key from step 1. |
 
-Do this for users who need a Jellyfin account before they log in, for example so that a watch-history sync has an account to write to.
+To configure the plugin through the API, send `POST /Plugins/e973e09a-e8b4-40c1-9be2-8e51342de1f9/Configuration` with `{"EmbyServerUrl": "http://emby:8096", "EmbyApiKey": "<key>"}`.
 
-1. Create the account with a long random password. Do not create it without a password, because Jellyfin lets anyone log in to a Default account that has no password.
-2. Set the login method of the account to **Emby**. Use the user's profile page in the dashboard, or set `AuthenticationProviderId` to `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider` in `POST /Users/{userId}/Policy`.
+If a setting is missing or not valid, the plugin refuses each login that it handles and writes the cause to the Jellyfin log at Error level.
 
-The first login of that user must use the Emby password. The random password does not work.
+## Migrate users
 
-## Shut down Emby
+### Users without a Jellyfin account
 
-1. Find the users who are still on the Emby login method. In `GET /Users`, these users have `Policy.AuthenticationProviderId` set to `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider`.
-2. Ask these users to log in to Jellyfin once while Emby runs. Emby users who have no Jellyfin account yet must also log in once.
-3. For a user who cannot log in before the shutdown, set a password in Jellyfin. The plugin saves the password and moves the user to Default.
-4. Do step 1 again. Then shut down Emby and remove the plugin.
+No action. The first login creates the account.
+
+### Jellyfin accounts that must exist before the first login
+
+For example, a watch-history sync can need an account to write to.
+
+1. Create the account with a long random password. Do not create an account without a password: Jellyfin lets anyone log in to a Default account that has no password.
+2. Set the login method of the account to **Emby** on the user's profile page in the dashboard. Alternatively, set `AuthenticationProviderId` to `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider` in `POST /Users/{userId}/Policy`.
+
+The first login must use the Emby password. The random password does not work.
+
+### Shut down Emby
+
+1. List the users who are still on the Emby login method. In `GET /Users`, their `Policy.AuthenticationProviderId` is `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider`.
+2. Ask those users, and Emby users who have no Jellyfin account, to log in to Jellyfin once while Emby runs.
+3. For a user who cannot log in before the shutdown, set a new password in Jellyfin. The user moves to Default.
+4. Do step 1 again. When the list is empty, shut down Emby and remove the plugin.
+
+## Security notes
+
+- The plugin sends a password to Emby only when the typed name is exactly the name of an enabled Emby user, ignoring case. A name that is not an Emby user name does not reach Emby.
+- The plugin never logs a password or the API key. The end-to-end tests check the Jellyfin log at Debug level.
+- Jellyfin administrators can read the API key through the plugin settings API.
+- Emby checks remote access against the address of the caller, which is the Jellyfin server. The plugin applies Emby's remote access setting to the Jellyfin account instead.
+- The plugin never authenticates a Jellyfin administrator through Emby.
 
 ## Limits
 
 - After the move to Default, a password change on Emby does not change the Jellyfin password.
-- An Emby user who has no password cannot log in through the plugin. Set a password in Jellyfin for this user.
-- The plugin refuses logins with an Emby Connect email address or any other name that is not exactly the Emby user name.
-- A new Emby user can log in through the plugin only after the plugin reads the Emby user list again, up to 60 seconds later. If the plugin cannot read the list, it refuses Emby logins for 30 seconds before it tries again.
+- An Emby user without a password cannot log in through the plugin. Set a password in Jellyfin for that user.
+- Logins with an Emby Connect email address, or any name other than the Emby user name, are refused.
+- A new Emby user can log in only after the plugin reads the Emby user list again, up to 60 seconds later. If the plugin cannot read the list, it refuses Emby logins for 30 seconds, then tries again.
 - Jellyfin counts each refused login toward the lockout limit of the account, if the account has one. This includes logins that fail because Emby is down.
 - If Jellyfin does not allow an Emby user name, the plugin cannot create the account. Rename the user on Emby.
 - In a rare timing case, another session of the user can save an older copy of the account and put the user back on the Emby login method. Step 1 of the Emby shutdown finds these users.
 
-## Tests
+## Development
 
-Unit tests:
+| Task | Command |
+|---|---|
+| Install tools | `mise install` |
+| Build and run unit tests (warnings are errors) | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` |
+| Run end-to-end tests in Docker | `bats e2e/emby-auth.bats` |
+| Run pre-commit checks | `prek run` |
 
-```sh
-dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx
-```
-
-End-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin with Docker. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`. The tests remove the containers after the run:
-
-```sh
-bats e2e/emby-auth.bats
-```
-
-Set `KEEP_E2E=1` to keep the containers after the run.
+The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
