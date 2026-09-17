@@ -1,0 +1,20 @@
+repos:
+-   repo: local
+    hooks:
+    -   id: dotnet-format
+        name: dotnet format
+        entry: mise exec -- dotnet format Jellyfin.Plugin.EmbyAuth.slnx --verify-no-changes
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|slnx|props)$
+    -   id: dotnet-unit-tests
+        name: dotnet build and unit tests (warnings are errors)
+        entry: mise exec -- dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx
+        language: system
+        pass_filenames: false
+        files: \.(cs|csproj|slnx|props|html)$|^global\.json$
+    -   id: shellcheck
+        name: shellcheck
+        entry: mise exec -- shellcheck -x
+        language: system
+        files: ^e2e/.*\.(bash|bats)$

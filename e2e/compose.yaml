@@ -1,0 +1,14 @@
+name: emby-auth-e2e
+
+services:
+  emby:
+    image: emby/embyserver:4.10.0.40
+    ports:
+      - "127.0.0.1:18096:8096"
+
+  jellyfin:
+    image: jellyfin/jellyfin:12.1.20260915-010956
+    ports:
+      - "127.0.0.1:28096:8096"
+    volumes:
+      - ../artifacts/plugin:/config/plugins/EmbyAuth_1.0.0.0
