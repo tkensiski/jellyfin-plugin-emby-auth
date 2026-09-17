@@ -17,12 +17,6 @@ public enum MigrationMode
     /// Emby checks every login. Users stay on the Emby login method until an administrator runs the migration task.
     /// </summary>
     KeepEmbyInCharge,
-
-    /// <summary>
-    /// Jellyfin checks the saved password first. Emby checks the login only if no saved password matches.
-    /// Users stay on the Emby login method until an administrator runs the migration task.
-    /// </summary>
-    JellyfinPasswordFirst,
 }
 
 /// <summary>

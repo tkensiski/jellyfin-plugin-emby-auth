@@ -34,10 +34,10 @@ public class EmbyAuthSettingsTests
     [Fact]
     public void CarriesTheChosenMigrationModeAndAccountAccess()
     {
-        var ok = EmbyAuthSettings.TryCreate(Config(mode: MigrationMode.JellyfinPasswordFirst, access: AccountAccess.NoLibraries), out var settings, out _);
+        var ok = EmbyAuthSettings.TryCreate(Config(mode: MigrationMode.KeepEmbyInCharge, access: AccountAccess.NoLibraries), out var settings, out _);
 
         Assert.True(ok);
-        Assert.Equal(MigrationMode.JellyfinPasswordFirst, settings!.MigrationMode);
+        Assert.Equal(MigrationMode.KeepEmbyInCharge, settings!.MigrationMode);
         Assert.Equal(AccountAccess.NoLibraries, settings.AccountAccess);
     }
 

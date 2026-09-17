@@ -80,14 +80,6 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         var settings = GetSettings();
-        if (settings.MigrationMode == MigrationMode.JellyfinPasswordFirst
-            && resolvedUser?.Password is { } savedHash
-            && verifiedPasswords.Matches(resolvedUser.Id, savedHash)
-            && SavedPasswordMatches(resolvedUser.Username, savedHash, password))
-        {
-            return new ProviderAuthenticationResult { Username = resolvedUser.Username };
-        }
-
         var status = await userDirectory.GetStatusAsync(settings, username, CancellationToken.None).ConfigureAwait(false);
         if (status != EmbyUserStatus.Active)
         {
@@ -153,19 +145,6 @@ internal sealed partial class EmbyAuthenticationProvider(
 
         LogSettingsInvalid(logger, problem);
         throw new AuthenticationException(problem);
-    }
-
-    private bool SavedPasswordMatches(string username, string savedHash, string password)
-    {
-        try
-        {
-            return cryptoProvider.Verify(PasswordHash.Parse(savedHash), password);
-        }
-        catch (Exception ex) when (ex is FormatException or NotSupportedException)
-        {
-            LogSavedPasswordUnreadable(logger, ex, username);
-            return false;
-        }
     }
 
     [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The cleanup delete must never let a second exception replace the login refusal already in flight (D-03); every exception type is logged and swallowed.")]
@@ -248,9 +227,6 @@ internal sealed partial class EmbyAuthenticationProvider(
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "The plugin refused the login for {Username}. Emby accepted the password for Emby user {EmbyUserName}. But the names are different, or the Jellyfin account does not use the Emby login method.")]
     private static partial void LogAccountConflict(ILogger logger, string username, string embyUserName);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Jellyfin cannot read the saved password of user {Username}. The plugin asks Emby instead.")]
-    private static partial void LogSavedPasswordUnreadable(ILogger logger, Exception exception, string username);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin created a Jellyfin account for Emby user {EmbyUserName}. Account access: {AccountAccess}.")]
     private static partial void LogAccountCreated(ILogger logger, string embyUserName, AccountAccess accountAccess);
