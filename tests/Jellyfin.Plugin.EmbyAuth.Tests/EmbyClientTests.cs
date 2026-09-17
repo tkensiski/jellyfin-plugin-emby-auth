@@ -2,44 +2,72 @@ using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
 namespace Jellyfin.Plugin.EmbyAuth.Tests;
 
 public class EmbyClientTests
 {
+    private const string Password = "s3cret-pw";
+    private const string ApiKey = "0123456789abcdef0123456789abcdef";
     private static readonly Uri EmbyUrl = new("http://emby:8096");
+
+    private readonly CapturingLogger<EmbyClient> _logger = new();
 
     private static HttpResponseMessage Json(HttpStatusCode status, string json) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
 
-    private static HttpResponseMessage LoginAccepted(string name = "alice", string token = "emby-token") =>
-        Json(HttpStatusCode.OK, $$"""{"User":{"Name":"{{name}}","Id":"1"},"AccessToken":"{{token}}"}""");
+    private static HttpResponseMessage LoginAccepted(string name = "alice", string token = "emby-token", bool remoteAccess = true)
+    {
+        var remote = remoteAccess ? "true" : "false";
+        return Json(HttpStatusCode.OK, $$$"""{"User":{"Name":"{{{name}}}","Id":"1","Policy":{"EnableRemoteAccess":{{{remote}}}}},"AccessToken":"{{{token}}}"}""");
+    }
 
     private static HttpResponseMessage Status(HttpStatusCode status) => new(status);
 
-    private static EmbyClient CreateClient(StubHttpMessageHandler handler) =>
-        new(new StubHttpClientFactory(handler), NullLogger<EmbyClient>.Instance);
+    private EmbyClient CreateClient(StubHttpMessageHandler handler) =>
+        new(new StubHttpClientFactory(handler), _logger);
 
-    [Fact]
-    public async Task ReturnsEmbyUserName_WhenEmbyAcceptsLogin()
+    private void AssertNoSecretsLogged()
     {
-        var handler = new StubHttpMessageHandler()
-            .Then(() => LoginAccepted(name: "Alice"))
-            .Then(() => Status(HttpStatusCode.NoContent));
-
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
-
-        Assert.Equal("Alice", name);
+        Assert.All(_logger.Entries, entry =>
+        {
+            Assert.DoesNotContain(Password, entry, StringComparison.Ordinal);
+            Assert.DoesNotContain(ApiKey, entry, StringComparison.Ordinal);
+        });
     }
 
     [Fact]
-    public async Task SendsCredentialsToAuthenticateByName()
+    public async Task Login_ReturnsEmbyUserNameAndRemoteAccess_WhenEmbyAcceptsLogin()
+    {
+        var handler = new StubHttpMessageHandler()
+            .Then(() => LoginAccepted(name: "Alice", remoteAccess: false))
+            .Then(() => Status(HttpStatusCode.NoContent));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Equal(new EmbyLogin("Alice", EnableRemoteAccess: false), login);
+    }
+
+    [Fact]
+    public async Task Login_TreatsMissingPolicyAsNoRemoteAccess()
+    {
+        var handler = new StubHttpMessageHandler()
+            .Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":"alice"},"AccessToken":"t"}"""))
+            .Then(() => Status(HttpStatusCode.NoContent));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Equal(new EmbyLogin("alice", EnableRemoteAccess: false), login);
+    }
+
+    [Fact]
+    public async Task Login_SendsCredentialsToAuthenticateByName()
     {
         var handler = new StubHttpMessageHandler()
             .Then(() => LoginAccepted())
@@ -58,13 +86,13 @@ public class EmbyClientTests
     }
 
     [Fact]
-    public async Task SendsLoginBodyWithContentLength_BecauseEmbyRejectsChunkedBodies()
+    public async Task Login_SendsBodyWithContentLength_BecauseEmbyRejectsChunkedBodies()
     {
         var handler = new StubHttpMessageHandler()
             .Then(() => LoginAccepted())
             .Then(() => Status(HttpStatusCode.NoContent));
 
-        await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
         var login = handler.Requests[0];
         Assert.Equal(Encoding.UTF8.GetByteCount(login.Body!), login.ContentLength);
@@ -74,25 +102,25 @@ public class EmbyClientTests
     [InlineData("http://emby:8096/", "http://emby:8096/Users/AuthenticateByName")]
     [InlineData("http://emby:8096/emby", "http://emby:8096/emby/Users/AuthenticateByName")]
     [InlineData("http://emby:8096/emby/", "http://emby:8096/emby/Users/AuthenticateByName")]
-    public async Task KeepsBasePathOfEmbyUrl(string embyUrl, string expectedLoginUrl)
+    public async Task Login_KeepsBasePathOfEmbyUrl(string embyUrl, string expectedLoginUrl)
     {
         var handler = new StubHttpMessageHandler()
             .Then(() => LoginAccepted())
             .Then(() => Status(HttpStatusCode.NoContent));
 
-        await CreateClient(handler).AuthenticateAsync(new Uri(embyUrl), "alice", "pw", CancellationToken.None);
+        await CreateClient(handler).AuthenticateAsync(new Uri(embyUrl), "alice", Password, CancellationToken.None);
 
         Assert.Equal(new Uri(expectedLoginUrl), handler.Requests[0].Uri);
     }
 
     [Fact]
-    public async Task SignsOutOfEmbyAfterLogin()
+    public async Task Login_SignsOutOfEmbyAfterLogin()
     {
         var handler = new StubHttpMessageHandler()
             .Then(() => LoginAccepted(token: "abc123"))
             .Then(() => Status(HttpStatusCode.NoContent));
 
-        await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
         var logout = Assert.Single(handler.Requests.Skip(1));
         Assert.Equal(HttpMethod.Post, logout.Method);
@@ -101,63 +129,141 @@ public class EmbyClientTests
     }
 
     [Fact]
-    public async Task ReturnsEmbyUserName_WhenSignOutFails()
+    public async Task Login_ReturnsLogin_WhenSignOutFails()
     {
         var handler = new StubHttpMessageHandler()
             .Then(() => LoginAccepted())
             .Then(() => Status(HttpStatusCode.InternalServerError));
 
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
-        Assert.Equal("alice", name);
+        Assert.Equal("alice", login?.Name);
     }
 
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
     [InlineData(HttpStatusCode.InternalServerError)]
-    public async Task ReturnsNull_WhenEmbyRejectsLogin(HttpStatusCode status)
+    public async Task Login_ReturnsNull_WhenEmbyRejectsLogin(HttpStatusCode status)
     {
         var handler = new StubHttpMessageHandler().Then(() => Status(status));
 
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "wrong", CancellationToken.None);
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
-        Assert.Null(name);
+        Assert.Null(login);
         Assert.Single(handler.Requests);
+        AssertNoSecretsLogged();
     }
 
     [Fact]
-    public async Task ReturnsNull_WhenEmbyIsUnreachable()
+    public async Task Login_ReturnsNull_WhenEmbyIsUnreachable()
     {
         var handler = new StubHttpMessageHandler().Then(() => throw new HttpRequestException("Connection refused"));
 
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
-        Assert.Null(name);
+        Assert.Null(login);
+        AssertNoSecretsLogged();
     }
 
     [Fact]
-    public async Task ReturnsNull_WhenEmbyTimesOut()
+    public async Task Login_ReturnsNull_WhenEmbyTimesOut()
     {
         var handler = new StubHttpMessageHandler().Then(() => throw new TaskCanceledException("Timed out"));
 
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
-        Assert.Null(name);
+        Assert.Null(login);
     }
 
     [Theory]
     [InlineData("{}")]
     [InlineData("""{"User":{"Name":""},"AccessToken":"t"}""")]
     [InlineData("not json")]
-    public async Task ReturnsNull_WhenEmbyResponseHasNoUserName(string json)
+    public async Task Login_ReturnsNull_WhenEmbyResponseHasNoUserName(string json)
     {
-        var handler = new StubHttpMessageHandler()
-            .Then(() => Json(HttpStatusCode.OK, json))
-            .Then(() => Status(HttpStatusCode.NoContent));
+        var handler = new StubHttpMessageHandler().Then(() => Json(HttpStatusCode.OK, json));
 
-        var name = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", "pw", CancellationToken.None);
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
-        Assert.Null(name);
+        Assert.Null(login);
+        Assert.Single(handler.Requests);
+        AssertNoSecretsLogged();
+    }
+
+    [Fact]
+    public async Task Login_ReturnsNull_WhenEmbyResponseHasAnInvalidCharset()
+    {
+        var handler = new StubHttpMessageHandler().Then(() =>
+        {
+            var response = Json(HttpStatusCode.OK, """{"User":{"Name":"alice"},"AccessToken":"t"}""");
+            response.Content.Headers.ContentType = MediaTypeHeaderValue.Parse("application/json; charset=bogus");
+            return response;
+        });
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Null(login);
+    }
+
+    [Fact]
+    public async Task Users_SendsApiKeyToUsersEndpoint()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Json(HttpStatusCode.OK, "[]"));
+
+        await CreateClient(handler).GetUsersAsync(EmbyUrl, ApiKey, CancellationToken.None);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal(HttpMethod.Get, request.Method);
+        Assert.Equal(new Uri("http://emby:8096/Users"), request.Uri);
+        Assert.Equal(ApiKey, request.EmbyToken);
+    }
+
+    [Fact]
+    public async Task Users_ReturnsNamesAndDisabledState()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Json(
+            HttpStatusCode.OK,
+            """[{"Name":"alice","Policy":{"IsDisabled":false}},{"Name":"ivy","Policy":{"IsDisabled":true}},{"Name":""},{"Policy":{}}]"""));
+
+        var users = await CreateClient(handler).GetUsersAsync(EmbyUrl, ApiKey, CancellationToken.None);
+
+        Assert.Equal([new EmbyUser("alice", IsDisabled: false), new EmbyUser("ivy", IsDisabled: true)], users);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task Users_ReturnsNull_WhenEmbyRejectsRequest(HttpStatusCode status)
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Status(status));
+
+        var users = await CreateClient(handler).GetUsersAsync(EmbyUrl, ApiKey, CancellationToken.None);
+
+        Assert.Null(users);
+        AssertNoSecretsLogged();
+    }
+
+    [Fact]
+    public async Task Users_ReturnsNull_WhenEmbyIsUnreachable()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => throw new HttpRequestException("Connection refused"));
+
+        var users = await CreateClient(handler).GetUsersAsync(EmbyUrl, ApiKey, CancellationToken.None);
+
+        Assert.Null(users);
+        AssertNoSecretsLogged();
+    }
+
+    [Theory]
+    [InlineData("not json")]
+    [InlineData("{}")]
+    public async Task Users_ReturnsNull_WhenResponseIsNotAUserList(string json)
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Json(HttpStatusCode.OK, json));
+
+        var users = await CreateClient(handler).GetUsersAsync(EmbyUrl, ApiKey, CancellationToken.None);
+
+        Assert.Null(users);
     }
 }

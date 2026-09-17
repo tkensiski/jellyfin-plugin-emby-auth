@@ -14,6 +14,11 @@
                         <input id="EmbyServerUrl" name="EmbyServerUrl" type="url" is="emby-input" placeholder="http://emby:8096" />
                         <div class="fieldDescription">The plugin sends the user name and password of each Emby login method login to this server. Use https, or an address on a private network.</div>
                     </div>
+                    <div class="inputContainer">
+                        <label class="inputLabel inputLabelUnfocused" for="EmbyApiKey">Emby API key</label>
+                        <input id="EmbyApiKey" name="EmbyApiKey" type="password" is="emby-input" autocomplete="off" />
+                        <div class="fieldDescription">The plugin uses this key to read the list of Emby users. It sends a password to Emby only for a name that is on this list. Create an API key on the Emby server for this plugin.</div>
+                    </div>
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
@@ -32,6 +37,7 @@
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
+                        document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         Dashboard.hideLoadingMsg();
                     });
                 });
@@ -41,6 +47,7 @@
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
+                        config.EmbyApiKey = document.querySelector('#EmbyApiKey').value;
                         ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
                         });

@@ -13,4 +13,9 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     [SuppressMessage("Design", "CA1056:URI-like properties should not be strings", Justification = "Jellyfin saves plugin settings with XmlSerializer, which cannot serialize System.Uri.")]
     public string EmbyServerUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Gets or sets the Emby API key that the plugin uses to read the list of Emby users.
+    /// </summary>
+    public string EmbyApiKey { get; set; } = string.Empty;
 }

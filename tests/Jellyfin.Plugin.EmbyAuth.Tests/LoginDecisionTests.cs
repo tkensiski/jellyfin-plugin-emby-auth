@@ -1,4 +1,3 @@
-using Jellyfin.Plugin.EmbyAuth;
 using Xunit;
 
 namespace Jellyfin.Plugin.EmbyAuth.Tests;
@@ -11,17 +10,17 @@ public class LoginDecisionTests
     [Fact]
     public void CreatesAccount_WhenNoJellyfinAccountExists()
     {
-        var action = LoginDecision.Decide(typedAccount: null, embyUserName: "alice", embyNameAccount: null, Bridge);
+        var action = LoginDecision.Decide("alice", typedAccount: null, embyUserName: "alice", Bridge);
 
         Assert.Equal(LoginAction.CreateAccount, action);
     }
 
     [Fact]
-    public void UsesAccount_WhenAccountSignsInThroughEmby()
+    public void UsesAccount_WhenAccountUsesEmbyLoginMethod()
     {
-        var alice = new JellyfinAccount("alice", Bridge);
+        var alice = new JellyfinAccount("alice", Bridge, IsAdministrator: false);
 
-        var action = LoginDecision.Decide(alice, "alice", alice, Bridge);
+        var action = LoginDecision.Decide("alice", alice, "alice", Bridge);
 
         Assert.Equal(LoginAction.UseAccount, action);
     }
@@ -29,39 +28,20 @@ public class LoginDecisionTests
     [Fact]
     public void UsesAccount_WhenNamesDifferOnlyInCase()
     {
-        var alice = new JellyfinAccount("Alice", Bridge);
+        var alice = new JellyfinAccount("Alice", Bridge, IsAdministrator: false);
 
-        var action = LoginDecision.Decide(alice, "alice", alice, Bridge);
-
-        Assert.Equal(LoginAction.UseAccount, action);
-    }
-
-    [Fact]
-    public void UsesAccount_WhenTypedNameIsUnknownButEmbyNameSignsInThroughEmby()
-    {
-        var alice = new JellyfinAccount("alice", Bridge);
-
-        var action = LoginDecision.Decide(typedAccount: null, "alice", alice, Bridge);
+        var action = LoginDecision.Decide("ALICE", alice, "alice", Bridge);
 
         Assert.Equal(LoginAction.UseAccount, action);
     }
 
-    [Fact]
-    public void Denies_WhenTypedAccountUsesAnotherLoginMethod()
+    [Theory]
+    [InlineData("alice ")]
+    [InlineData(" alice")]
+    [InlineData("alice@example.com")]
+    public void Denies_WhenTypedNameIsNotExactlyTheEmbyName(string typedName)
     {
-        var carol = new JellyfinAccount("carol", DefaultProvider);
-
-        var action = LoginDecision.Decide(carol, "carol", carol, Bridge);
-
-        Assert.Equal(LoginAction.Deny, action);
-    }
-
-    [Fact]
-    public void Denies_WhenEmbyNameMatchesAccountThatUsesAnotherLoginMethod()
-    {
-        var admin = new JellyfinAccount("admin", DefaultProvider);
-
-        var action = LoginDecision.Decide(typedAccount: null, "admin", admin, Bridge);
+        var action = LoginDecision.Decide(typedName, typedAccount: null, "alice", Bridge);
 
         Assert.Equal(LoginAction.Deny, action);
     }
@@ -69,20 +49,29 @@ public class LoginDecisionTests
     [Fact]
     public void Denies_WhenEmbyAuthenticatesADifferentUser()
     {
-        var bob = new JellyfinAccount("bob", Bridge);
-        var robert = new JellyfinAccount("robert", Bridge);
+        var bob = new JellyfinAccount("bob", Bridge, IsAdministrator: false);
 
-        var action = LoginDecision.Decide(bob, "robert", robert, Bridge);
+        var action = LoginDecision.Decide("bob", bob, "robert", Bridge);
 
         Assert.Equal(LoginAction.Deny, action);
     }
 
     [Fact]
-    public void Denies_WhenEmbyAuthenticatesADifferentUserWithNoAccount()
+    public void Denies_WhenAccountUsesAnotherLoginMethod()
     {
-        var bob = new JellyfinAccount("bob", Bridge);
+        var carol = new JellyfinAccount("carol", DefaultProvider, IsAdministrator: false);
 
-        var action = LoginDecision.Decide(bob, "robert", embyNameAccount: null, Bridge);
+        var action = LoginDecision.Decide("carol", carol, "carol", Bridge);
+
+        Assert.Equal(LoginAction.Deny, action);
+    }
+
+    [Fact]
+    public void Denies_WhenAccountIsAnAdministrator()
+    {
+        var jack = new JellyfinAccount("jack", Bridge, IsAdministrator: true);
+
+        var action = LoginDecision.Decide("jack", jack, "jack", Bridge);
 
         Assert.Equal(LoginAction.Deny, action);
     }

@@ -1,21 +1,28 @@
 using System;
+using System.Linq;
 using System.Threading.Tasks;
+using Jellyfin.Database.Implementations;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Events.Authentication;
-using MediaBrowser.Controller.Library;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.EmbyAuth;
 
 /// <summary>
-/// Moves a user from the Emby login method to the Default login method after a successful login.
+/// Moves a user from the Emby login method to the Default login method after Emby accepted the password of the user.
 /// </summary>
 /// <remarks>
 /// This runs after the login completes, because Jellyfin sets the login method of the user to the method that accepted the login.
+/// It acts only on logins in <see cref="VerifiedLogins"/>, so a Quick Connect login does not move a user.
 /// </remarks>
-/// <param name="userManager">The user manager.</param>
+/// <param name="verifiedLogins">The users whose password Emby accepted.</param>
+/// <param name="dbContextFactory">The Jellyfin database context factory.</param>
 /// <param name="logger">The logger.</param>
-internal sealed partial class MoveToDefaultLoginMethod(IUserManager userManager, ILogger<MoveToDefaultLoginMethod> logger)
+internal sealed partial class MoveToDefaultLoginMethod(
+    VerifiedLogins verifiedLogins,
+    IDbContextFactory<JellyfinDbContext> dbContextFactory,
+    ILogger<MoveToDefaultLoginMethod> logger)
     : IEventConsumer<AuthenticationResultEventArgs>
 {
     /// <summary>
@@ -27,27 +34,27 @@ internal sealed partial class MoveToDefaultLoginMethod(IUserManager userManager,
     public async Task OnEvent(AuthenticationResultEventArgs eventArgs)
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
-        var user = userManager.GetUserById(eventArgs.User.Id);
-        if (user is null
-            || !string.Equals(user.AuthenticationProviderId, EmbyAuthenticationProvider.ProviderId, StringComparison.OrdinalIgnoreCase))
+        var userId = eventArgs.User.Id;
+        if (!verifiedLogins.TryConsume(userId))
         {
             return;
         }
 
-        if (user.Password is null)
+        // Update only this column, and only while the user is still on the Emby login method, so that concurrent changes to the user stay intact.
+        var dbContext = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
+        await using (dbContext.ConfigureAwait(false))
         {
-            LogNoSavedPassword(logger, user.Username);
-            return;
+            var moved = await dbContext.Users
+                .Where(user => user.Id == userId && user.AuthenticationProviderId == EmbyAuthenticationProvider.ProviderId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(user => user.AuthenticationProviderId, DefaultProviderId))
+                .ConfigureAwait(false);
+            if (moved == 1)
+            {
+                LogMovedToDefault(logger, eventArgs.User.Name);
+            }
         }
-
-        user.AuthenticationProviderId = DefaultProviderId;
-        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
-        LogMovedToDefault(logger, user.Username);
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin moved user {Username} to the Default login method. Jellyfin now checks the password of this user without Emby.")]
-    private static partial void LogMovedToDefault(ILogger logger, string username);
-
-    [LoggerMessage(Level = LogLevel.Warning, Message = "User {Username} has no saved password, so the user stays on the Emby login method. Before you shut down Emby, set the login method of this user to Default. Then set a password for the user.")]
-    private static partial void LogNoSavedPassword(ILogger logger, string username);
+    private static partial void LogMovedToDefault(ILogger logger, string? username);
 }

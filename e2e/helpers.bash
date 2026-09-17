@@ -99,9 +99,56 @@ user_by_name() {
 	api GET "$base/Users" "$token" | jq -c --arg n "$name" '.[] | select(.Name == $n)'
 }
 
+# update_policy BASE TOKEN USER_ID JQ_FILTER -> applies JQ_FILTER to the user policy and saves it.
+update_policy() {
+	local base="$1" token="$2" user_id="$3" filter="$4"
+	local policy
+	policy="$(api GET "$base/Users/$user_id" "$token" | jq -c ".Policy | $filter")"
+	api POST "$base/Users/$user_id/Policy" "$token" "$policy" >/dev/null
+}
+
 set_login_method() {
 	local token="$1" user_id="$2" provider="$3"
-	local policy
-	policy="$(api GET "$JELLYFIN/Users/$user_id" "$token" | jq -c --arg p "$provider" '.Policy | .AuthenticationProviderId = $p')"
-	api POST "$JELLYFIN/Users/$user_id/Policy" "$token" "$policy" >/dev/null
+	update_policy "$JELLYFIN" "$token" "$user_id" ".AuthenticationProviderId = \"$provider\""
+}
+
+# create_emby_api_key TOKEN APP_NAME -> prints the new API key.
+create_emby_api_key() {
+	local token="$1" app="$2"
+	api POST "$EMBY/Auth/Keys?App=$app" "$token" >/dev/null
+	api GET "$EMBY/Auth/Keys" "$token" | jq -r --arg a "$app" '.Items[] | select(.AppName == $a) | .AccessToken'
+}
+
+# emby_login_requests NAME -> prints how many login requests for exactly NAME reached Emby through the proxy.
+# It first sends a marker login through the proxy and waits until the marker is in the proxy log,
+# so that the count includes every earlier request. It fails if the marker does not appear.
+emby_login_requests() {
+	local name="$1"
+	local marker="marker-$RANDOM$RANDOM"
+	local logs=""
+	docker compose -f "$COMPOSE_FILE" exec -T emby-proxy \
+		wget -q -O /dev/null --header 'Content-Type: application/json' \
+		--post-data "{\"Username\":\"$marker\",\"Pw\":\"x\"}" http://127.0.0.1:8096/Users/AuthenticateByName >/dev/null 2>&1 || true
+
+	for _ in $(seq 1 20); do
+		logs="$(docker compose -f "$COMPOSE_FILE" logs --no-log-prefix emby-proxy)"
+		if grep -q -F "$marker" <<<"$logs"; then
+			grep -F 'POST /Users/AuthenticateByName' <<<"$logs" | grep -c -F "\\\"Username\\\":\\\"$name\\\"" || true
+			return 0
+		fi
+		sleep 1
+	done
+	echo "The marker request did not appear in the proxy log within 20 seconds." >&2
+	return 1
+}
+
+# quick_connect_status ADMIN_TOKEN USER_ID -> prints the HTTP status of a Quick Connect login that the admin authorizes for the user.
+quick_connect_status() {
+	local token="$1" user_id="$2"
+	local request code secret
+	request="$(api POST "$JELLYFIN/QuickConnect/Initiate" "")"
+	code="$(jq -r .Code <<<"$request")"
+	secret="$(jq -r .Secret <<<"$request")"
+	api POST "$JELLYFIN/QuickConnect/Authorize?code=$code&userId=$user_id" "$token" >/dev/null
+	status POST "$JELLYFIN/Users/AuthenticateWithQuickConnect" "" "$(jq -cn --arg s "$secret" '{Secret: $s}')"
 }
