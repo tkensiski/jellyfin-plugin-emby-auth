@@ -23,6 +23,7 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// <param name="embyClient">The Emby client.</param>
 /// <param name="userDirectory">The cached list of Emby users.</param>
 /// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
+/// <param name="configurationSource">The plugin settings source. Reads the current configuration on each login, so tests can supply settings with no static plugin state.</param>
 /// <param name="logger">The logger.</param>
 internal sealed partial class EmbyAuthenticationProvider(
     IServiceProvider serviceProvider,
@@ -30,6 +31,7 @@ internal sealed partial class EmbyAuthenticationProvider(
     EmbyClient embyClient,
     EmbyUserDirectory userDirectory,
     EmbyVerifiedPasswords verifiedPasswords,
+    Func<PluginConfiguration?> configurationSource,
     ILogger<EmbyAuthenticationProvider> logger)
     : IAuthenticationProvider, IRequiresResolvedUser
 {
@@ -143,7 +145,7 @@ internal sealed partial class EmbyAuthenticationProvider(
 
     private EmbyAuthSettings GetSettings()
     {
-        if (EmbyAuthSettings.TryCreate(EmbyAuthPlugin.Instance?.Configuration, out var settings, out var problem))
+        if (EmbyAuthSettings.TryCreate(configurationSource(), out var settings, out var problem))
         {
             return settings;
         }

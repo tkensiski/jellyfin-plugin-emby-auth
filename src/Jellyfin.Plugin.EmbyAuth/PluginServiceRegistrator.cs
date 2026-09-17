@@ -6,6 +6,7 @@ using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Events.Authentication;
 using MediaBrowser.Controller.Plugins;
+using MediaBrowser.Model.Cryptography;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -31,7 +32,14 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(services => new EmbyVerifiedPasswords(
             Path.Combine(services.GetRequiredService<IApplicationPaths>().PluginConfigurationsPath, VerifiedPasswordsFileName),
             services.GetRequiredService<ILogger<EmbyVerifiedPasswords>>()));
-        serviceCollection.AddSingleton<IAuthenticationProvider, EmbyAuthenticationProvider>();
+        serviceCollection.AddSingleton<IAuthenticationProvider>(services => new EmbyAuthenticationProvider(
+            services,
+            services.GetRequiredService<ICryptoProvider>(),
+            services.GetRequiredService<EmbyClient>(),
+            services.GetRequiredService<EmbyUserDirectory>(),
+            services.GetRequiredService<EmbyVerifiedPasswords>(),
+            () => EmbyAuthPlugin.Instance?.Configuration,
+            services.GetRequiredService<ILogger<EmbyAuthenticationProvider>>()));
         serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, MoveToDefaultLoginMethod>();
     }
 }
