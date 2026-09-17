@@ -5,10 +5,14 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 ## Commands
 
 - `mise install` — install the pinned tools (`.mise.toml`).
-- `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` — build with warnings as errors, then run the unit tests. `--solution` is required because `global.json` selects Microsoft.Testing.Platform.
-- `bats e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
-- `prek run` — run the pre-commit checks: `dotnet format`, build and unit tests, shellcheck.
+- `mise run lint` — check C# formatting, and run shellcheck, shfmt, actionlint, and zizmor.
+- `mise run test` — build with warnings as errors, then run the unit tests.
+- `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
+- `prek run` — run the pre-commit hooks, which call `mise run lint` and `mise run test`.
+- `act pull_request -j <job>` — run a CI job from `.github/workflows/ci.yml` in a container. `.actrc` pins the runner image. The `e2e` job also needs `--bind --container-options "--network host"`.
 - `scripts/dev-env.sh up|status|down` — a demo with Emby and Jellyfin in Docker on ports 18196 and 28196, for manual checks in a browser.
+
+CI (`.github/workflows/ci.yml`) runs one mise task per job, and `ci-success` requires every job. When a CI step changes, change the mise task, not only the workflow.
 
 ## Layout
 
@@ -33,7 +37,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 ## Rules
 
 - Write the test first. Then break the code once and watch the test fail.
-- A change that depends on Jellyfin or Emby behavior needs an end-to-end test. Run `bats e2e` for every change to `src/`.
+- A change that depends on Jellyfin or Emby behavior needs an end-to-end test. Run `mise run e2e` for every change to `src/`.
 - Run `prek run` before each commit.
 - Never put a password or the API key in a log or exception message.
 - Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.
