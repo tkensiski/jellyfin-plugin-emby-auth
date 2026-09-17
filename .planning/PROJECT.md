@@ -22,7 +22,7 @@ Inferred from the code at commit `ecee1ed` (`.planning/codebase/ARCHITECTURE.md`
 - ✓ First login creates the Jellyfin account; the Emby name must match the typed name, and an existing account must use the Emby login method — existing
 - ✓ Jellyfin password hash saved on the account, and a SHA-256 fingerprint of that hash recorded in `Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json` — existing
 - ✓ Every move to Default, and every saved-password login without Emby, checks the fingerprint — existing
-- ✓ Migration behaviors `MoveAfterFirstLogin`, `KeepEmbyInCharge`, and `JellyfinPasswordFirst` — existing
+- ✓ Migration behaviors `MoveAfterFirstLogin` and `KeepEmbyInCharge` — existing (`JellyfinPasswordFirst` also exists today; this milestone removes it, AUTH-02)
 - ✓ Account access choices `CopyEmbyRemoteAccess`, `NoLibraries`, and `JellyfinDefaults` — existing
 - ✓ Password set in Jellyfin moves the user to Default; a password reset keeps the user on the Emby login method — existing
 - ✓ Migration task `EmbyAuthMoveUsersToDefault` moves each user whose saved hash Emby verified — existing
@@ -32,37 +32,16 @@ Inferred from the code at commit `ecee1ed` (`.planning/codebase/ARCHITECTURE.md`
 
 ### Active
 
-Each item comes from `.planning/codebase/CONCERNS.md` (item numbers match the list reviewed on 2026-09-17), except the public install items.
+The full list with IDs is in `.planning/REQUIREMENTS.md` (32 v1 requirements). Summary by group:
 
-**Password rule (applies to every item below):**
-- [ ] A login on the Emby login method succeeds only with a password that Emby verified. An account with no saved Jellyfin password refuses every login until Emby accepts the password.
-
-**Bugs and weak spots:**
-- [ ] (1) A failed write of the fingerprint file is described correctly: the log message, the XML doc, and `docs/how-it-works.md` state that the record stays in memory until Jellyfin restarts, and a test covers the write failure.
-- [ ] (2) `docs/how-it-works.md` points to the shutdown step that finds users who went back to the Emby login method.
-- [ ] (3) An account that the plugin creates never accepts a blank password, including between `CreateUserAsync` and the save of the hash. A failed save or a failed cleanup does not leave an open account and does not return HTTP 500.
-- [ ] (4) A fingerprint file that cannot be read does not lose the records in it, and the administrator can find the cause.
-- [ ] (5) The settings page shows a message when loading or saving the settings fails, and the migration list shows the result of a finished run.
-- [ ] (6) The plugin ends the Emby session whenever Emby returns an access token, including when the login response has no user name.
-
-**Release and tooling:**
-- [ ] (7) A release is published only from a commit that passed lint, unit tests, script tests, and e2e tests.
-- [ ] (8) The Jellyfin version bump rule names every pin, including the test project reference and the `targetAbi` values in `tests/scripts/package.bats`.
-- [ ] (9) Each `zizmor --persona=pedantic` finding is fixed or suppressed with a written reason.
-
-**Test gaps:**
-- [ ] (10) The login method, the migration task, the move to Default, the migration API, and the list of users on the Emby login method have unit tests.
-- [ ] (11) The settings page JavaScript has automated tests.
-- [ ] (12) Concurrent logins and invalid settings on a running server have tests.
-
-**Performance:**
-- [ ] (13-15) A load test measures logins with a slow Emby server, concurrent first logins, user list cache expiry, and fingerprint writes. Each of the three bottlenecks is fixed or documented with the measured numbers.
-
-**Public install:**
-- [ ] The full git history has no secrets, and the repository is public.
-- [ ] One `manifest.json` at a stable URL lists every released version, and the zips stay as GitHub release files.
-- [ ] A Jellyfin administrator adds the manifest URL, installs the plugin from the catalog, and receives updates.
-- [ ] v1.0.0 is tagged and published through the release workflow.
+- [ ] **Password and account security (AUTH-01..05):** while a user is on the Emby login method, Emby checks every login and the saved hash plays no part; `JellyfinPasswordFirst` is removed; account creation follows Jellyfin's own create-then-save pattern with no failure path that returns HTTP 500 or leaves a passwordless Default account; the Emby session always ends when Emby returns a token.
+- [ ] **Verified password records (FPRT-01..03):** a failed write keeps the in-memory record and the docs say so; a failed read never erases records and shows on the settings page.
+- [ ] **Settings page (UI-01..03):** load and save failures show a message; the migration list follows the real task state.
+- [ ] **Documentation (DOCS-01..04):** correct shutdown step reference; manifest URL and catalog steps; tested versions and the `targetAbi` minimum; complete version bump rule.
+- [ ] **Test coverage (TEST-01..06):** unit tests for the untested classes, settings page JavaScript tests, concurrent first logins, invalid settings on a running server.
+- [ ] **Performance (PERF-01..02):** a load test with a separate account pool; each bottleneck fixed or accepted with measured numbers.
+- [ ] **Release and tooling (REL-01..04):** release only for a tagged commit with a passing `ci-success` run; pedantic zizmor findings resolved; gitleaks in lint; per-version changelog.
+- [ ] **Public install (PUB-01..05):** full audit before going public; multi-version manifest on GitHub Pages; public repository with maintainer approval at that time; catalog install and update verified; v1.0.0 published.
 
 ### Out of Scope
 
@@ -70,6 +49,12 @@ Each item comes from `.planning/codebase/CONCERNS.md` (item numbers match the li
 - Submission to the official Jellyfin plugin repository — the chosen route is a self-hosted manifest at a stable URL.
 - A private repository with a separate public release repository — rejected in favor of a public repository with a stable manifest.
 - A manifest that lists only the latest version — rejected, because administrators need a stable URL that keeps every version.
+- A manifest file on a branch served from `raw.githubusercontent.com` — rejected in favor of GitHub Pages.
+- The `JellyfinPasswordFirst` migration behavior — removed: while a user is on the Emby login method, only Emby decides a login.
+- Account creation under a temporary name followed by a rename — rejected in favor of Jellyfin's own create-then-save pattern (`Jellyfin.Api/Controllers/UserController.cs:517-533`, tag `v12.1`).
+- Re-running lint and e2e inside `release.yml` — rejected in favor of checking the CI result of the tagged commit.
+- Signed or attested releases — Jellyfin's install path checks only the MD5 checksum (`.planning/research/FEATURES.md:92`).
+- Automated version bump and changelog tooling — out of proportion for a single maintainer's release cadence (`.planning/research/FEATURES.md:93`).
 - Logins with an Emby Connect email address — a documented limit (`docs/how-it-works.md:36`); no change was requested.
 
 ## Context
@@ -85,8 +70,8 @@ Each item comes from `.planning/codebase/CONCERNS.md` (item numbers match the li
 
 - **Tech stack**: C# on .NET 10, Jellyfin 12.1 packages — a Jellyfin version bump changes the package pins, the e2e image tag, and the target framework together (`CLAUDE.md`).
 - **Security**: Never put a password or the API key in a log or exception message — repository rule, checked by tests.
-- **Security**: Every move to Default and every saved-password login checks `EmbyVerifiedPasswords.Matches` — otherwise a password that an administrator set on a pre-created account would work (`.claude/rules/plugin.md`).
-- **Security**: Never leave or move a user to Default without a password — the Default login method accepts a blank password for such an account.
+- **Security**: Every move to Default checks `EmbyVerifiedPasswords.Matches` — otherwise a password that an administrator set on a pre-created account would work (`.claude/rules/plugin.md`).
+- **Security**: Never leave or move a user to Default without a password — the Default login method accepts a blank password for such an account (`DefaultAuthenticationProvider.cs:61-68`, tag `v12.1`). The one accepted exception is the moment between `CreateUserAsync` and the plugin's next save, which Jellyfin's own user creation also has, because `CreateUserAsync(string name)` is the only create method (`IUserManager.cs:90`).
 - **Quality**: Test first, then break the code once and watch the test fail. A change that depends on Jellyfin or Emby behavior needs an e2e test. Warnings are errors (`CLAUDE.md`).
 - **Versions**: Pin exact versions, and look up the current stable version before a bump (`CLAUDE.md`).
 - **License**: GPL-3.0, because the Jellyfin packages are GPL-3.0-only (`LICENSE`).
@@ -98,9 +83,12 @@ Each item comes from `.planning/codebase/CONCERNS.md` (item numbers match the li
 |----------|-----------|---------|
 | Fix all four issue groups (bugs, release and tooling, test gaps, performance) in one milestone | Maintainer chose all groups for v1.0.0 | — Pending |
 | Done means a tagged v1.0.0 and a public install | Maintainer's completion criteria | — Pending |
-| Only an Emby-verified password logs in; no saved password means refuse until Emby accepts | Maintainer's rule; it is the core value | — Pending |
-| A failed fingerprint write keeps the in-memory record; fix the docs and log, add a test | Emby did verify the password, so the rule holds, and a disk error does not block the migration. Confirm at the requirements review. | — Pending |
-| Public repository with one stable manifest that lists every version | Usual setup for third-party Jellyfin plugins; gives administrators a URL that does not change | — Pending |
+| Only an Emby-verified password logs in; while a user is on the Emby login method, Emby checks every login and the saved hash is updated after each accepted login | Maintainer's rule; it is the core value | — Pending |
+| Remove `JellyfinPasswordFirst` | It accepts a saved hash without asking Emby, which breaks the rule above; the plugin is not public, so no installed configuration depends on it | — Pending |
+| Account creation keeps Jellyfin's create-then-save pattern; every failure is caught and never leaves a passwordless Default account | Jellyfin has no create-with-password call, and its own `POST /Users/New` uses the same two steps; maintainer chose parity over a temporary-name rename | — Pending |
+| A failed fingerprint write keeps the in-memory record; fix the docs and log, add a test | Emby did verify the password, so the rule holds, and a disk error does not block the migration. Confirmed at the requirements review. | — Pending |
+| Public repository with one multi-version manifest on GitHub Pages, published by a separate workflow | Usual setup for third-party Jellyfin plugins; a stable URL; a failed Pages deploy can be re-run without a new release | — Pending |
+| Release checks that the tagged commit has a passing `ci-success` run | Proves the exact commit passed CI without re-running e2e; tags must be pushed on commits that CI ran on | — Pending |
 | Performance work starts with a load test | None of the three bottlenecks is measured | — Pending |
 
 ## Evolution
@@ -121,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after initialization*
+*Last updated: 2026-09-17 after requirements definition*
