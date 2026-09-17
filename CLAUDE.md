@@ -1,15 +1,16 @@
 # Jellyfin Emby Auth
 
-Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks the first Jellyfin login of a user against Emby, saves a Jellyfin password hash, and moves the user to Jellyfin's Default login method. `README.md` describes the behavior and the admin procedures.
+Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins against Emby, saves a Jellyfin password hash, and moves users to Jellyfin's Default login method, at once or when an administrator runs the migration task. `README.md` describes the behavior, the settings, and the admin procedures.
 
 ## Commands
 
 - `mise install` — install the pinned tools (`.mise.toml`).
 - `mise run lint` — check C# formatting, and run shellcheck, shfmt, actionlint, and zizmor.
 - `mise run test` — build with warnings as errors, then run the unit tests.
-- `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker.
+- `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
 - `prek run` — run the pre-commit hooks, which call `mise run lint` and `mise run test`.
 - `act pull_request -j <job>` — run a CI job from `.github/workflows/ci.yml` in a container. `.actrc` pins the runner image. The `e2e` job also needs `--bind --container-options "--network host"`.
+- `scripts/dev-env.sh up|status|down` — a demo with Emby and Jellyfin in Docker on ports 18196 and 28196, for manual checks in a browser.
 
 CI (`.github/workflows/ci.yml`) runs one mise task per job, and `ci-success` requires every job. When a CI step changes, change the mise task, not only the workflow.
 
@@ -17,13 +18,21 @@ CI (`.github/workflows/ci.yml`) runs one mise task per job, and `ci-success` req
 
 - `src/Jellyfin.Plugin.EmbyAuth/`
   - `EmbyAuthenticationProvider.cs` — the login method. Connects the parts below to Jellyfin's `IUserManager`.
-  - `LoginDecision.cs` — the account rules, as a pure function.
+  - `Configuration/PluginConfiguration.cs` — the settings, including the `MigrationMode` and `AccountAccess` enums.
   - `EmbyAuthSettings.cs` — settings validation.
+  - `LoginDecision.cs` — the account rules, as a pure function.
+  - `AccountAccessPolicy.cs` — applies `AccountAccess` to an account.
   - `EmbyClient.cs` — the only code that sends requests to Emby.
   - `EmbyUserDirectory.cs` — the cached Emby user list.
-  - `VerifiedLogins.cs`, `MoveToDefaultLoginMethod.cs` — the move to Default after a login that Emby verified.
+  - `EmbyVerifiedPasswords.cs` — the file of fingerprints of password hashes that Emby verified.
+  - `DefaultLoginMethod.cs` — the single-column move to Default.
+  - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
+  - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
+  - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
+  - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
-- `e2e/` — bats tests, Docker Compose file, and the logging proxy for Emby.
+- `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
+- `scripts/dev-env.sh` — the demo. It uses `e2e/compose.yaml` and `e2e/helpers.bash`.
 
 ## Rules
 

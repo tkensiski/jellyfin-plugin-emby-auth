@@ -1,12 +1,17 @@
 # shellcheck shell=bash
-# Helpers for e2e/emby-auth.bats. Both servers use the same MediaBrowser-style API.
+# Helpers for the e2e tests. Both servers use the same MediaBrowser-style API.
 
-export EMBY=http://127.0.0.1:18096
-export JELLYFIN=http://127.0.0.1:28096
+E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export E2E_DIR
+# compose.yaml publishes Emby and Jellyfin on these host ports. Set them to run next to another copy of the containers.
+export EMBY_PORT="${EMBY_PORT:-18096}"
+export JELLYFIN_PORT="${JELLYFIN_PORT:-28096}"
+export EMBY="http://127.0.0.1:$EMBY_PORT"
+export JELLYFIN="http://127.0.0.1:$JELLYFIN_PORT"
 export EMBY_PROVIDER=Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider
 export DEFAULT_PROVIDER=Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider
 export PLUGIN_ID=e973e09a-e8b4-40c1-9be2-8e51342de1f9
-export COMPOSE_FILE="${BATS_TEST_DIRNAME}/compose.yaml"
+export COMPOSE_FILE="$E2E_DIR/compose.yaml"
 
 auth_header() {
 	local token="${1:-}"
@@ -110,6 +115,72 @@ update_policy() {
 set_login_method() {
 	local token="$1" user_id="$2" provider="$3"
 	update_policy "$JELLYFIN" "$token" "$user_id" ".AuthenticationProviderId = \"$provider\""
+}
+
+emby_user_id() {
+	api GET "$EMBY/Users" "$EMBY_TOKEN" | jq -r --arg n "$1" '.[] | select(.Name == $n) | .Id'
+}
+
+jellyfin_user_id() {
+	user_by_name "$JELLYFIN" "$JF_TOKEN" "$1" | jq -r .Id
+}
+
+# policy_field NAME FIELD -> prints a field of the Jellyfin user policy.
+policy_field() {
+	user_by_name "$JELLYFIN" "$JF_TOKEN" "$1" | jq -r ".Policy.$2"
+}
+
+# precreate_on_emby_method NAME -> creates a Jellyfin account with the password NAME-jf-random on the Emby login method.
+precreate_on_emby_method() {
+	local name="$1" id
+	id="$(create_user "$JELLYFIN" "$JF_TOKEN" "$name")"
+	set_password "$JELLYFIN" "$JF_TOKEN" "$id" "$name-jf-random"
+	set_login_method "$JF_TOKEN" "$id" "$EMBY_PROVIDER"
+}
+
+# precreate_admin_on_emby_method NAME -> creates a Jellyfin administrator with the password NAME-jf-pass on the Emby login method.
+precreate_admin_on_emby_method() {
+	local name="$1" id
+	id="$(create_user "$JELLYFIN" "$JF_TOKEN" "$name")"
+	set_password "$JELLYFIN" "$JF_TOKEN" "$id" "$name-jf-pass"
+	update_policy "$JELLYFIN" "$JF_TOKEN" "$id" ".IsAdministrator = true | .AuthenticationProviderId = \"$EMBY_PROVIDER\""
+}
+
+reset_plugin_config() {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "MoveAfterFirstLogin" | .AccountAccess = "CopyEmbyRemoteAccess"'
+}
+
+# set_plugin_config TOKEN JQ_FILTER -> applies JQ_FILTER to the plugin settings and saves them.
+set_plugin_config() {
+	local token="$1" filter="$2"
+	local config
+	config="$(api GET "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$token" | jq -c "$filter")"
+	api POST "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$token" "$config" >/dev/null
+}
+
+# run_migration_task TOKEN -> runs the plugin's migration task, waits for it to end, and prints its result status.
+run_migration_task() {
+	local token="$1"
+	local task_id before after state
+	task_id="$(api GET "$JELLYFIN/ScheduledTasks" "$token" | jq -r '.[] | select(.Key == "EmbyAuthMoveUsersToDefault") | .Id')"
+	if [[ -z "$task_id" ]]; then
+		echo "Jellyfin has no scheduled task with the key EmbyAuthMoveUsersToDefault." >&2
+		return 1
+	fi
+
+	before="$(api GET "$JELLYFIN/ScheduledTasks/$task_id" "$token" | jq -r '.LastExecutionResult.EndTimeUtc // ""')"
+	api POST "$JELLYFIN/ScheduledTasks/Running/$task_id" "$token" >/dev/null
+	for _ in $(seq 1 30); do
+		sleep 1
+		state="$(api GET "$JELLYFIN/ScheduledTasks/$task_id" "$token")"
+		after="$(jq -r '.LastExecutionResult.EndTimeUtc // ""' <<<"$state")"
+		if [[ "$(jq -r .State <<<"$state")" == "Idle" && -n "$after" && "$after" != "$before" ]]; then
+			jq -r .LastExecutionResult.Status <<<"$state"
+			return 0
+		fi
+	done
+	echo "The migration task did not end within 30 seconds." >&2
+	return 1
 }
 
 # create_emby_api_key TOKEN APP_NAME -> prints the new API key.

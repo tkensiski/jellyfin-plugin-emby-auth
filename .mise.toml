@@ -19,8 +19,8 @@ DOTNET_NOLOGO = "1"
 description = "Check C# formatting, and lint the shell scripts and GitHub workflows"
 run = [
   "dotnet format Jellyfin.Plugin.EmbyAuth.slnx --verify-no-changes",
-  "shellcheck -x e2e/*.bash e2e/*.bats",
-  "shfmt -d e2e",
+  "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh",
+  "shfmt -d e2e scripts",
   "actionlint",
   "zizmor --offline .github/workflows",
 ]

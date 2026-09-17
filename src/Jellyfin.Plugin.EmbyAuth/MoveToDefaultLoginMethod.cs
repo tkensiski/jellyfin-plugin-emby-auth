@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Events.Authentication;
 using Microsoft.EntityFrameworkCore;
@@ -10,51 +12,51 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.EmbyAuth;
 
 /// <summary>
-/// Moves a user from the Emby login method to the Default login method after Emby accepted the password of the user.
+/// In <see cref="MigrationMode.MoveAfterFirstLogin"/>, moves a user to the Default login method after a login, if Emby verified the saved password.
 /// </summary>
 /// <remarks>
 /// This runs after the login completes, because Jellyfin sets the login method of the user to the method that accepted the login.
-/// It acts only on logins in <see cref="VerifiedLogins"/>, so a Quick Connect login does not move a user.
+/// A Quick Connect login triggers the same event. The check against <see cref="EmbyVerifiedPasswords"/> makes sure that only a password that Emby verified moves.
 /// </remarks>
-/// <param name="verifiedLogins">The users whose password Emby accepted.</param>
+/// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
 /// <param name="dbContextFactory">The Jellyfin database context factory.</param>
 /// <param name="logger">The logger.</param>
 internal sealed partial class MoveToDefaultLoginMethod(
-    VerifiedLogins verifiedLogins,
+    EmbyVerifiedPasswords verifiedPasswords,
     IDbContextFactory<JellyfinDbContext> dbContextFactory,
     ILogger<MoveToDefaultLoginMethod> logger)
     : IEventConsumer<AuthenticationResultEventArgs>
 {
-    /// <summary>
-    /// The login method ID of Jellyfin's Default login method.
-    /// </summary>
-    public const string DefaultProviderId = "Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider";
-
     /// <inheritdoc />
     public async Task OnEvent(AuthenticationResultEventArgs eventArgs)
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
-        var userId = eventArgs.User.Id;
-        if (!verifiedLogins.TryConsume(userId))
+        if (EmbyAuthPlugin.Instance?.Configuration.MigrationMode != MigrationMode.MoveAfterFirstLogin)
         {
             return;
         }
 
-        // Update only this column, and only while the user is still on the Emby login method, so that concurrent changes to the user stay intact.
+        var userId = eventArgs.User.Id;
         var dbContext = await dbContextFactory.CreateDbContextAsync().ConfigureAwait(false);
         await using (dbContext.ConfigureAwait(false))
         {
-            var moved = await dbContext.Users
-                .Where(user => user.Id == userId && user.AuthenticationProviderId == EmbyAuthenticationProvider.ProviderId)
-                .ExecuteUpdateAsync(setters => setters.SetProperty(user => user.AuthenticationProviderId, DefaultProviderId))
+            var user = await dbContext.Users
+                .Where(candidate => candidate.Id == userId && candidate.AuthenticationProviderId == EmbyAuthenticationProvider.ProviderId)
+                .Select(candidate => new { candidate.Username, candidate.Password })
+                .FirstOrDefaultAsync()
                 .ConfigureAwait(false);
-            if (moved == 1)
+            if (user?.Password is null || !verifiedPasswords.Matches(userId, user.Password))
             {
-                LogMovedToDefault(logger, eventArgs.User.Name);
+                return;
+            }
+
+            if (await DefaultLoginMethod.MoveAsync(dbContext, userId, user.Password, CancellationToken.None).ConfigureAwait(false))
+            {
+                LogMovedToDefault(logger, user.Username);
             }
         }
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin moved user {Username} to the Default login method. Jellyfin now checks the password of this user without Emby.")]
-    private static partial void LogMovedToDefault(ILogger logger, string? username);
+    private static partial void LogMovedToDefault(ILogger logger, string username);
 }

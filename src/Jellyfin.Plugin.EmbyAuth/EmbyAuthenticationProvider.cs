@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Database.Implementations.Enums;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 using MediaBrowser.Common.Extensions;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Library;
@@ -21,14 +22,14 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// <param name="cryptoProvider">The Jellyfin password hasher.</param>
 /// <param name="embyClient">The Emby client.</param>
 /// <param name="userDirectory">The cached list of Emby users.</param>
-/// <param name="verifiedLogins">The users whose password Emby accepted during a login.</param>
+/// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
 /// <param name="logger">The logger.</param>
 internal sealed partial class EmbyAuthenticationProvider(
     IServiceProvider serviceProvider,
     ICryptoProvider cryptoProvider,
     EmbyClient embyClient,
     EmbyUserDirectory userDirectory,
-    VerifiedLogins verifiedLogins,
+    EmbyVerifiedPasswords verifiedPasswords,
     ILogger<EmbyAuthenticationProvider> logger)
     : IAuthenticationProvider, IRequiresResolvedUser
 {
@@ -45,12 +46,15 @@ internal sealed partial class EmbyAuthenticationProvider(
     /// <inheritdoc />
     public bool IsEnabled => true;
 
-    /// <inheritdoc />
-    public Task<ProviderAuthenticationResult> Authenticate(string username, string password)
-    {
-        var userManager = serviceProvider.GetRequiredService<IUserManager>();
-        return Authenticate(username, password, userManager.GetUserByName(username));
-    }
+    /// <summary>
+    /// Not used. Jellyfin calls <see cref="Authenticate(string, string, User)"/>, because this login method implements <see cref="IRequiresResolvedUser"/>.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <returns>This method does not return.</returns>
+    /// <exception cref="NotSupportedException">Always.</exception>
+    public Task<ProviderAuthenticationResult> Authenticate(string username, string password) =>
+        throw new NotSupportedException("Jellyfin calls the Authenticate overload that has a resolved user.");
 
     /// <inheritdoc />
     public async Task<ProviderAuthenticationResult> Authenticate(string username, string password, User? resolvedUser)
@@ -66,7 +70,21 @@ internal sealed partial class EmbyAuthenticationProvider(
             throw new AuthenticationException(InvalidLogin);
         }
 
+        if (resolvedUser is not null && resolvedUser.HasPermission(PermissionKind.IsAdministrator))
+        {
+            LogAdministratorRefused(logger, resolvedUser.Username);
+            throw new AuthenticationException(InvalidLogin);
+        }
+
         var settings = GetSettings();
+        if (settings.MigrationMode == MigrationMode.JellyfinPasswordFirst
+            && resolvedUser?.Password is { } savedHash
+            && verifiedPasswords.Matches(resolvedUser.Id, savedHash)
+            && SavedPasswordMatches(resolvedUser.Username, savedHash, password))
+        {
+            return new ProviderAuthenticationResult { Username = resolvedUser.Username };
+        }
+
         var status = await userDirectory.GetStatusAsync(settings, username, CancellationToken.None).ConfigureAwait(false);
         if (status != EmbyUserStatus.Active)
         {
@@ -87,10 +105,10 @@ internal sealed partial class EmbyAuthenticationProvider(
         var passwordHash = cryptoProvider.CreatePasswordHash(password).ToString();
         var userManager = serviceProvider.GetRequiredService<IUserManager>();
         var user = action == LoginAction.CreateAccount
-            ? await CreateAccountAsync(userManager, embyLogin, passwordHash).ConfigureAwait(false)
-            : await SavePasswordAsync(userManager, resolvedUser!, embyLogin, passwordHash).ConfigureAwait(false);
+            ? await CreateAccountAsync(userManager, settings, embyLogin, passwordHash).ConfigureAwait(false)
+            : await SavePasswordAsync(userManager, settings, resolvedUser!, embyLogin, passwordHash).ConfigureAwait(false);
 
-        verifiedLogins.Add(user.Id);
+        verifiedPasswords.Record(user.Id, passwordHash);
         return new ProviderAuthenticationResult { Username = user.Username };
     }
 
@@ -115,18 +133,17 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         user.Password = cryptoProvider.CreatePasswordHash(newPassword).ToString();
-        user.AuthenticationProviderId = MoveToDefaultLoginMethod.DefaultProviderId;
+        user.AuthenticationProviderId = DefaultLoginMethod.ProviderId;
         LogPasswordSetInJellyfin(logger, user.Username);
         return Task.CompletedTask;
     }
 
     private static JellyfinAccount? ToAccount(User? user) =>
-        user is null ? null : new JellyfinAccount(user.Username, user.AuthenticationProviderId, user.HasPermission(PermissionKind.IsAdministrator));
+        user is null ? null : new JellyfinAccount(user.Username, user.AuthenticationProviderId);
 
     private EmbyAuthSettings GetSettings()
     {
-        var configuration = EmbyAuthPlugin.Instance?.Configuration;
-        if (EmbyAuthSettings.TryCreate(configuration?.EmbyServerUrl, configuration?.EmbyApiKey, out var settings, out var problem))
+        if (EmbyAuthSettings.TryCreate(EmbyAuthPlugin.Instance?.Configuration, out var settings, out var problem))
         {
             return settings;
         }
@@ -135,7 +152,20 @@ internal sealed partial class EmbyAuthenticationProvider(
         throw new AuthenticationException(problem);
     }
 
-    private async Task<User> CreateAccountAsync(IUserManager userManager, EmbyLogin embyLogin, string passwordHash)
+    private bool SavedPasswordMatches(string username, string savedHash, string password)
+    {
+        try
+        {
+            return cryptoProvider.Verify(PasswordHash.Parse(savedHash), password);
+        }
+        catch (Exception ex) when (ex is FormatException or NotSupportedException)
+        {
+            LogSavedPasswordUnreadable(logger, ex, username);
+            return false;
+        }
+    }
+
+    private async Task<User> CreateAccountAsync(IUserManager userManager, EmbyAuthSettings settings, EmbyLogin embyLogin, string passwordHash)
     {
         User user;
         try
@@ -150,7 +180,7 @@ internal sealed partial class EmbyAuthenticationProvider(
 
         user.AuthenticationProviderId = ProviderId;
         user.Password = passwordHash;
-        user.SetPermission(PermissionKind.EnableRemoteAccess, embyLogin.EnableRemoteAccess);
+        AccountAccessPolicy.ApplyToNewAccount(user, settings.AccountAccess, embyLogin.EnableRemoteAccess);
 
         // Jellyfin commits the new account without a password. If this save fails, delete the account so that no blank password opens it.
         var saved = false;
@@ -172,17 +202,14 @@ internal sealed partial class EmbyAuthenticationProvider(
             }
         }
 
-        LogAccountCreated(logger, user.Username, embyLogin.EnableRemoteAccess);
+        LogAccountCreated(logger, user.Username, settings.AccountAccess);
         return user;
     }
 
-    private async Task<User> SavePasswordAsync(IUserManager userManager, User user, EmbyLogin embyLogin, string passwordHash)
+    private async Task<User> SavePasswordAsync(IUserManager userManager, EmbyAuthSettings settings, User user, EmbyLogin embyLogin, string passwordHash)
     {
         user.Password = passwordHash;
-        if (!embyLogin.EnableRemoteAccess)
-        {
-            user.SetPermission(PermissionKind.EnableRemoteAccess, false);
-        }
+        AccountAccessPolicy.ApplyToExistingAccount(user, settings.AccountAccess, embyLogin.EnableRemoteAccess);
 
         try
         {
@@ -200,14 +227,20 @@ internal sealed partial class EmbyAuthenticationProvider(
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin refused a blank password for {Username}. The Emby login method needs a password.")]
     private static partial void LogBlankPasswordRefused(ILogger logger, string username);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The plugin refused the login for administrator {Username}. Set the login method of an administrator to Default.")]
+    private static partial void LogAdministratorRefused(ILogger logger, string username);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin did not send the password for {Username} to Emby. Emby user status: {Status}.")]
     private static partial void LogPasswordNotSent(ILogger logger, string username, EmbyUserStatus status);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "The plugin refused the login for {Username}. Emby accepted the password for Emby user {EmbyUserName}. But the names are different, the Jellyfin account does not use the Emby login method, or the account is an administrator.")]
+    [LoggerMessage(Level = LogLevel.Warning, Message = "The plugin refused the login for {Username}. Emby accepted the password for Emby user {EmbyUserName}. But the names are different, or the Jellyfin account does not use the Emby login method.")]
     private static partial void LogAccountConflict(ILogger logger, string username, string embyUserName);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "The plugin created a Jellyfin account for Emby user {EmbyUserName}. Remote access: {EnableRemoteAccess}.")]
-    private static partial void LogAccountCreated(ILogger logger, string embyUserName, bool enableRemoteAccess);
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Jellyfin cannot read the saved password of user {Username}. The plugin asks Emby instead.")]
+    private static partial void LogSavedPasswordUnreadable(ILogger logger, Exception exception, string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The plugin created a Jellyfin account for Emby user {EmbyUserName}. Account access: {AccountAccess}.")]
+    private static partial void LogAccountCreated(ILogger logger, string embyUserName, AccountAccess accountAccess);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot create an account for Emby user {EmbyUserName}. If Jellyfin does not allow this user name, rename the user on Emby.")]
     private static partial void LogCreateAccountFailed(ILogger logger, Exception exception, string embyUserName);

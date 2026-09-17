@@ -4,7 +4,7 @@ services:
   emby:
     image: emby/embyserver:4.10.0.40
     ports:
-      - "127.0.0.1:18096:8096"
+      - "127.0.0.1:${EMBY_PORT:-18096}:8096"
 
   # Jellyfin reaches Emby through this proxy, which logs each request body.
   emby-proxy:
@@ -20,6 +20,6 @@ services:
       # Debug level, so that the log test also sees the exceptions that Jellyfin logs for a refused login.
       JELLYFIN_Serilog__MinimumLevel__Default: Debug
     ports:
-      - "127.0.0.1:28096:8096"
+      - "127.0.0.1:${JELLYFIN_PORT:-28096}:8096"
     volumes:
       - ../artifacts/plugin:/config/plugins/EmbyAuth_1.0.0.0
