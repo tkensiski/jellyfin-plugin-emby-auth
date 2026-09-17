@@ -19,15 +19,22 @@ DOTNET_NOLOGO = "1"
 description = "Check C# formatting, and lint the shell scripts and GitHub workflows"
 run = [
   "dotnet format Jellyfin.Plugin.EmbyAuth.slnx --verify-no-changes",
-  "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh",
-  "shfmt -d e2e scripts",
+  "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh tests/scripts/*.bats",
+  "shfmt -d e2e scripts tests/scripts",
   "actionlint",
   "zizmor --offline .github/workflows",
 ]
 
 [tasks.test]
-description = "Build with warnings as errors, then run the unit tests"
-run = "dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx"
+description = "Build with warnings as errors, then run the unit tests and the script tests"
+run = [
+  "dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx",
+  "bats tests/scripts",
+]
+
+[tasks.package]
+description = "Build the release zip and the plugin repository manifest in artifacts/release"
+run = "scripts/package.sh build"
 
 [tasks.e2e]
 description = "Run the end-to-end tests against Emby and Jellyfin containers (needs Docker)"

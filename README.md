@@ -33,15 +33,20 @@ For a user on the Emby login method, a password change in Jellyfin works like th
 
 ## Install
 
-1. Build the plugin. The tools are pinned in `.mise.toml`.
+1. Get the zip `jellyfin-plugin-emby-auth_<version>.zip`:
+   - From a GitHub release of this repository. The repository is private, so you need access to it.
+   - Or build it. The tools are pinned in `.mise.toml`:
 
-   ```sh
-   mise install
-   dotnet publish src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj -c Release -o artifacts/plugin
-   ```
+     ```sh
+     mise install
+     mise run package
+     ```
 
-2. Copy `artifacts/plugin/Jellyfin.Plugin.EmbyAuth.dll` to `<jellyfin config>/plugins/EmbyAuth_1.0.0.0/`.
+     The zip is in `artifacts/release/`.
+2. Unzip it into `<jellyfin config>/plugins/EmbyAuth_<version>/`. The zip holds the plugin DLL and `meta.json`.
 3. Restart Jellyfin.
+
+Each release also has `manifest.json`, a Jellyfin plugin repository manifest with the download URL and MD5 checksum of the zip. Jellyfin downloads a repository manifest and the zip without GitHub credentials, so the manifest works as a repository URL only when the release files are public.
 
 ## Configure
 
@@ -151,8 +156,9 @@ The first login must use the Emby password. The random password does not work, a
 |---|---|
 | Install tools | `mise install` |
 | Check formatting, and lint scripts and workflows | `mise run lint` |
-| Build and run unit tests (warnings are errors) | `mise run test` |
+| Build and run unit tests (warnings are errors), and the script tests | `mise run test` |
 | Run end-to-end tests in Docker | `mise run e2e` |
+| Build the release zip and manifest | `mise run package` |
 | Run pre-commit checks | `prek run` |
 | Run a CI job in a local container | `act pull_request -j lint` (or `-j test`) |
 | Run the CI end-to-end job in a local container | `act pull_request -j e2e --bind --container-options "--network host"` |
@@ -164,3 +170,9 @@ CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull reque
 The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`; set `EMBY_PORT` and `JELLYFIN_PORT` to use other ports. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
 
 The demo uses the same containers, on `127.0.0.1:18196` (Emby) and `127.0.0.1:28196` (Jellyfin), so it can run while the end-to-end tests run. `up` builds the plugin, starts new containers, configures the plugin, and creates demo users with different Emby settings. At the end, `up` shows the URLs, the logins, and what each demo user shows. `down` removes the containers and their data.
+
+### Releases
+
+1. Set `<Version>`, `<AssemblyVersion>`, and `<FileVersion>` in `Directory.Build.props`, and merge the change.
+2. Tag the merge commit `v<version>`, for example `v1.0.0.0`, and push the tag.
+3. `.github/workflows/release.yml` checks that the tag matches the version, runs `mise run test` and `mise run package`, and creates a GitHub release with the zip and `manifest.json`.
