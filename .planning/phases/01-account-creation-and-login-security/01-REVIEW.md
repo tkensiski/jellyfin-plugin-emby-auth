@@ -22,7 +22,15 @@ findings:
   warning: 1
   info: 2
   total: 3
-status: issues
+status: resolved
+resolution:
+  WR-01: fixed in 6f1dcde — two tests added for the CreateUserAsync failure branch
+  IN-01: no change needed — 6f1dcde makes the CHANGELOG sentence accurate as written
+  IN-02: fixed in d929b0a — both failure outcomes now read as logged at Error
+  additional: 6f1dcde widened the CreateUserAsync catch to catch (Exception ex), which
+    the review flagged for visibility but did not score. A DbUpdateException from
+    CreateUserAsync previously escaped Authenticate as an HTTP 500, contradicting
+    D-02 and plan 01-01's must-have. Approved by the user before the fix was applied.
 ---
 
 # Phase 01: Code Review Report
