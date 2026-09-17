@@ -23,7 +23,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Settings Page
 
-- [ ] **UI-01**: When loading the plugin settings fails, the settings page shows a message.
+- [ ] **UI-01**: When loading the plugin settings fails, the settings page shows a message, and a Save after that failed load does not write empty fields over the saved settings.
 - [ ] **UI-02**: When saving the plugin settings fails, the settings page shows a message.
 - [ ] **UI-03**: After **Run migration now**, the migration list shows that the migration runs and updates when the task finishes, instead of reloading once after a fixed 3 seconds.
 
@@ -91,12 +91,44 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| AUTH-05 | Phase 4 | Pending |
+| FPRT-01 | Phase 3 | Pending |
+| FPRT-02 | Phase 2 | Pending |
+| FPRT-03 | Phase 3 | Pending |
+| UI-01 | Phase 2 | Pending |
+| UI-02 | Phase 2 | Pending |
+| UI-03 | Phase 3 | Pending |
+| DOCS-01 | Phase 3 | Pending |
+| DOCS-02 | Phase 6 | Pending |
+| DOCS-03 | Phase 5 | Pending |
+| DOCS-04 | Phase 6 | Pending |
+| TEST-01 | Phase 1 | Pending |
+| TEST-02 | Phase 3 | Pending |
+| TEST-03 | Phase 3 | Pending |
+| TEST-04 | Phase 2 | Pending |
+| TEST-05 | Phase 4 | Pending |
+| TEST-06 | Phase 4 | Pending |
+| PERF-01 | Phase 4 | Pending |
+| PERF-02 | Phase 4 | Pending |
+| REL-01 | Phase 5 | Pending |
+| REL-02 | Phase 5 | Pending |
+| REL-03 | Phase 5 | Pending |
+| REL-04 | Phase 6 | Pending |
+| PUB-01 | Phase 5 | Pending |
+| PUB-02 | Phase 6 | Pending |
+| PUB-03 | Phase 5 | Pending |
+| PUB-04 | Phase 6 | Pending |
+| PUB-05 | Phase 6 | Pending |
 
 **Coverage:**
 - v1 requirements: 32 total
-- Mapped to phases: 0
-- Unmapped: 32 ⚠️
+- Mapped to phases: 32
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-17 after initial definition*
+*Last updated: 2026-09-17 after roadmap creation*
