@@ -14,7 +14,7 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// A scheduled task that finishes the migration: it moves each user on the Emby login method whose saved password Emby verified to the Default login method.
 /// </summary>
 /// <remarks>
-/// The task has no default trigger. An administrator runs it from Dashboard > Scheduled Tasks, or through the scheduled tasks API.
+/// The task has no default trigger. An administrator runs it with "Run migration now" on the plugin settings page, from Dashboard > Advanced > Scheduled Tasks, or through the API.
 /// </remarks>
 public sealed partial class MoveEmbyUsersToDefaultTask : IScheduledTask
 {
@@ -60,19 +60,14 @@ public sealed partial class MoveEmbyUsersToDefaultTask : IScheduledTask
         var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken).ConfigureAwait(false);
         await using (dbContext.ConfigureAwait(false))
         {
-            var candidates = await dbContext.Users
-                .Where(user => user.AuthenticationProviderId == EmbyAuthenticationProvider.ProviderId)
-                .Select(user => new { user.Id, user.Username, user.Password })
-                .ToListAsync(cancellationToken)
-                .ConfigureAwait(false);
+            var candidates = await EmbyLoginMethodUsers.ListAsync(dbContext, _verifiedPasswords, cancellationToken).ConfigureAwait(false);
 
             var moved = 0;
             for (var index = 0; index < candidates.Count; index++)
             {
                 var candidate = candidates[index];
-                if (candidate.Password is not null
-                    && _verifiedPasswords.Matches(candidate.Id, candidate.Password)
-                    && await DefaultLoginMethod.MoveAsync(dbContext, candidate.Id, candidate.Password, cancellationToken).ConfigureAwait(false))
+                if (candidate.ReadyToMove
+                    && await DefaultLoginMethod.MoveAsync(dbContext, candidate.Id, candidate.PasswordHash!, cancellationToken).ConfigureAwait(false))
                 {
                     moved++;
                 }
