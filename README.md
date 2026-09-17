@@ -153,5 +153,9 @@ The first login must use the Emby password. The random password does not work, a
 | Build and run unit tests (warnings are errors) | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` |
 | Run end-to-end tests in Docker | `bats e2e` |
 | Run pre-commit checks | `prek run` |
+| Start a demo in Docker to log in and look around | `scripts/dev-env.sh up` |
+| Show or remove the demo | `scripts/dev-env.sh status` or `scripts/dev-env.sh down` |
 
 The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`; set `EMBY_PORT` and `JELLYFIN_PORT` to use other ports. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
+
+The demo uses the same containers, on `127.0.0.1:18196` (Emby) and `127.0.0.1:28196` (Jellyfin), so it can run while the end-to-end tests run. `up` builds the plugin, starts new containers, configures the plugin, and creates demo users with different Emby settings. At the end, `up` shows the URLs, the logins, and what each demo user shows. `down` removes the containers and their data.
