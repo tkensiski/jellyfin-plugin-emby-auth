@@ -1,24 +1,25 @@
 # Jellyfin Emby Auth plugin
 
-This plugin adds a Jellyfin login method that checks each password against an Emby server. When Emby accepts a password, the plugin saves a copy of it in Jellyfin's own password format.
-
-Use it to run Jellyfin next to Emby with the same logins. Later, you can switch users to Jellyfin's Default login method, and their passwords continue to work.
+This plugin moves users from Emby to Jellyfin without a password reset. It adds a Jellyfin login method named **Emby**, which checks the first Jellyfin login of each user against an Emby server. Then the plugin saves the password in Jellyfin and moves the user to Jellyfin's **Default** login method. After that login, Jellyfin does not need Emby for that user.
 
 **Status:** tested with Jellyfin 12.1.0 and Emby 4.10.0.40 in local containers only. Not tested on a production server. Not published to a plugin repository.
 
 ## How a login works
 
-For a user whose login method is **Emby**, or a user name that has no Jellyfin account:
+For a user on the Emby login method, or a user name that has no Jellyfin account:
 
 1. Jellyfin sends the user name and password to Emby (`POST /Users/AuthenticateByName`).
-2. If Emby refuses the login, or if Jellyfin cannot connect to Emby, Jellyfin refuses the login. The plugin never uses the saved copy of the password instead.
+2. If Emby refuses the login, or if Jellyfin cannot connect to Emby, Jellyfin refuses the login.
 3. If Emby accepts the login, the plugin ends the Emby session that the login opened. Then it finds the Jellyfin account that has the user name Emby returned:
    - If no account exists, the plugin creates one. The account gets Jellyfin's default permissions for a new user and is not an administrator.
    - If the account uses the Emby login method, the plugin uses it.
    - If the account uses a different login method, Jellyfin refuses the login. Thus an Emby password cannot open an account on another login method, for example the Jellyfin administrator account.
 4. The plugin saves a Jellyfin password hash on the account.
+5. After Jellyfin completes the login, the plugin moves the user to the Default login method. From then on, Jellyfin checks the saved password and does not contact Emby for that user.
 
-The plugin does not change accounts on the Default login method. Jellyfin checks their passwords as usual.
+If the Emby account has no password, the plugin does not save a password. The user stays on the Emby login method, and the Jellyfin log tells you to set a password.
+
+The plugin does not change accounts that are already on the Default login method.
 
 ## Install
 
@@ -37,20 +38,23 @@ The plugin sends passwords to this URL. Use `https`, or an address on a private 
 
 ## Move existing Jellyfin accounts to the Emby login method
 
+Do this for Jellyfin accounts that you create before the first login of the user, for example so that a watch-history sync has an account to write to.
+
 Set the login method of the account to **Emby** on the user's profile page in the dashboard. Alternatively, set `AuthenticationProviderId` to `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider` in `POST /Users/{userId}/Policy`.
 
 The next login of that user must use the Emby password. If the Emby account has a password, Jellyfin refuses a blank password.
 
-## Switch users to Jellyfin only
+## Shut down Emby
 
-1. Make sure that each user logged in to Jellyfin at least once while the user was on the Emby login method. A user who did not log in has no saved password. In `GET /Users`, compare the `LastLoginDate` of each user with the date that you set the Emby login method.
-2. Set the login method of each user to **Default**. Alternatively, set `AuthenticationProviderId` to `Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider` in `POST /Users/{userId}/Policy`.
-3. Users log in with the password of their last successful Jellyfin login on the Emby login method.
+1. Find the users who are still on the Emby login method. In `GET /Users`, these users have `Policy.AuthenticationProviderId` set to `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider`.
+2. Ask these users to log in to Jellyfin once while Emby runs. Emby users who have no Jellyfin account yet must also log in once.
+3. For a user who cannot log in before the shutdown, or whose Emby account has no password: set the login method to **Default**, then set a password for the user.
+4. Shut down Emby. You can then remove the plugin.
 
 ## Limits
 
+- After the move to Default, a password change on Emby does not change the Jellyfin password.
 - Jellyfin refuses a password change for a user on the Emby login method. Change the password on Emby, or set the user's login method to Default first.
-- The saved copy of a password changes only when the user logs in to Jellyfin. A password change on Emby does not update the copy until the next Jellyfin login.
 - Jellyfin counts each refused login toward the lockout limit of the account, if the account has one. This includes logins that fail because Emby is down.
 - If Jellyfin does not allow an Emby user name, the plugin cannot create the account. The Jellyfin log tells you to create the account manually.
 - The tests do not cover logins with Emby Connect credentials.

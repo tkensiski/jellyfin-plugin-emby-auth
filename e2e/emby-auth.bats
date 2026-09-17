@@ -29,6 +29,11 @@ setup_file() {
 
 	set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" dave)" dave-pass
 	set_login_method "$JF_TOKEN" "$(create_user "$JELLYFIN" "$JF_TOKEN" dave)" "$EMBY_PROVIDER"
+
+	set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" erin)" erin-pass
+	set_login_method "$JF_TOKEN" "$(create_user "$JELLYFIN" "$JF_TOKEN" erin)" "$EMBY_PROVIDER"
+
+	create_user "$EMBY" "$EMBY_TOKEN" frank >/dev/null
 }
 
 teardown_file() {
@@ -42,17 +47,22 @@ setup() {
 	load helpers
 }
 
+login_method_of() {
+	user_by_name "$JELLYFIN" "$JF_TOKEN" "$1" | jq -r .Policy.AuthenticationProviderId
+}
+
 @test "Jellyfin serves the plugin settings page" {
 	run status GET "$JELLYFIN/web/ConfigurationPage?name=Emby%20Auth" "$JF_TOKEN"
 	[ "$output" = "200" ]
 }
 
-@test "an Emby user logs in to Jellyfin with the Emby password and gets a new account" {
+@test "the first login of an Emby user creates a Jellyfin account on the Default login method" {
 	run login_status "$JELLYFIN" alice alice-pass-1
 	[ "$output" = "200" ]
 
 	alice="$(user_by_name "$JELLYFIN" "$JF_TOKEN" alice)"
-	[ "$(jq -r .Policy.AuthenticationProviderId <<<"$alice")" = "$EMBY_PROVIDER" ]
+	[ "$(jq -r .Policy.AuthenticationProviderId <<<"$alice")" = "$DEFAULT_PROVIDER" ]
+	[ "$(jq -r .HasPassword <<<"$alice")" = "true" ]
 	[ "$(jq -r .Policy.IsAdministrator <<<"$alice")" = "false" ]
 }
 
@@ -61,12 +71,12 @@ setup() {
 	[ "$output" = "401" ]
 }
 
-@test "a password change on Emby applies to the next Jellyfin login" {
+@test "after the first login, Jellyfin checks the password without Emby" {
 	set_password "$EMBY" "$EMBY_TOKEN" "$ALICE_EMBY_ID" alice-pass-2
 
-	run login_status "$JELLYFIN" alice alice-pass-1
-	[ "$output" = "401" ]
 	run login_status "$JELLYFIN" alice alice-pass-2
+	[ "$output" = "401" ]
+	run login_status "$JELLYFIN" alice alice-pass-1
 	[ "$output" = "200" ]
 }
 
@@ -83,33 +93,37 @@ setup() {
 	[ "$output" = "200" ]
 }
 
-@test "an account created before its first login uses the Emby password, not a blank one" {
+@test "an account created before its first login uses the Emby password, then moves to Default" {
 	run login_status "$JELLYFIN" dave ""
 	[ "$output" = "401" ]
+	[ "$(login_method_of dave)" = "$EMBY_PROVIDER" ]
+
+	run login_status "$JELLYFIN" dave dave-pass
+	[ "$output" = "200" ]
+	[ "$(login_method_of dave)" = "$DEFAULT_PROVIDER" ]
+}
+
+@test "a user whose Emby account has no password stays on the Emby login method" {
+	run login_status "$JELLYFIN" frank ""
+	[ "$output" = "200" ]
+	[ "$(login_method_of frank)" = "$EMBY_PROVIDER" ]
+}
+
+@test "while Emby is unreachable, Jellyfin refuses a user who did not log in yet" {
+	docker compose -f "$COMPOSE_FILE" stop emby >&3 2>&1
+
+	run login_status "$JELLYFIN" erin erin-pass
+	[ "$output" = "401" ]
+}
+
+@test "while Emby is unreachable, users who logged in before still log in" {
+	run login_status "$JELLYFIN" alice alice-pass-1
+	[ "$output" = "200" ]
 	run login_status "$JELLYFIN" dave dave-pass
 	[ "$output" = "200" ]
 }
 
-@test "Jellyfin refuses Emby-method logins while Emby is unreachable" {
-	run login_status "$JELLYFIN" alice alice-pass-2
-	[ "$output" = "200" ]
-	docker compose -f "$COMPOSE_FILE" stop emby >&3 2>&1
-
-	run login_status "$JELLYFIN" alice alice-pass-2
-	[ "$output" = "401" ]
-}
-
-@test "after a switch to the Default login method, the saved password works without Emby" {
-	alice_id="$(user_by_name "$JELLYFIN" "$JF_TOKEN" alice | jq -r .Id)"
-	set_login_method "$JF_TOKEN" "$alice_id" "$DEFAULT_PROVIDER"
-
-	run login_status "$JELLYFIN" alice alice-pass-1
-	[ "$output" = "401" ]
-	run login_status "$JELLYFIN" alice alice-pass-2
-	[ "$output" = "200" ]
-}
-
 @test "the Jellyfin log contains no password" {
-	run bash -c "docker compose -f '$COMPOSE_FILE' logs jellyfin 2>&1 | grep -E -c 'alice-pass|carol-pass|dave-pass'"
+	run bash -c "docker compose -f '$COMPOSE_FILE' logs jellyfin 2>&1 | grep -E -c 'alice-pass|carol-pass|dave-pass|erin-pass'"
 	[ "$output" = "0" ]
 }

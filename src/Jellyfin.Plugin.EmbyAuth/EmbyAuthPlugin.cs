@@ -37,7 +37,7 @@ public class EmbyAuthPlugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override Guid Id => Guid.Parse("e973e09a-e8b4-40c1-9be2-8e51342de1f9");
 
     /// <inheritdoc />
-    public override string Description => "Checks Jellyfin logins against an Emby server and keeps a Jellyfin copy of each accepted password.";
+    public override string Description => "Checks the first Jellyfin login of each user against an Emby server. Then saves the password in Jellyfin and moves the user to the Default login method.";
 
     /// <inheritdoc />
     public IEnumerable<PluginPageInfo> GetPages()

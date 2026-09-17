@@ -1,5 +1,7 @@
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Authentication;
+using MediaBrowser.Controller.Events;
+using MediaBrowser.Controller.Events.Authentication;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -15,5 +17,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     {
         serviceCollection.AddSingleton<EmbyClient>();
         serviceCollection.AddSingleton<IAuthenticationProvider, EmbyAuthenticationProvider>();
+        serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, MoveToDefaultLoginMethod>();
     }
 }
