@@ -10,6 +10,7 @@ paths:
 - `setup_suite.bash` starts Emby, `emby-proxy`, and Jellyfin once for all files, configures the plugin, and creates every Emby user. `teardown_suite` removes the containers unless `KEEP_E2E=1`.
 - Each `NN-topic.bats` file creates its own Jellyfin accounts in `setup_file` and resets the plugin settings with `reset_plugin_config`. A file must not depend on another file. Run one file with `bats e2e/NN-topic.bats`.
 - A file that stops a service starts it again in `teardown_file` (see `40-emby-outage.bats`).
+- `scripts/dev-env.sh` also uses `compose.yaml` and `helpers.bash`. After a change to either file, run `scripts/dev-env.sh up` and `down`.
 - `90-jellyfin-log.bats` runs last and checks the whole Jellyfin log.
 
 ## Conventions

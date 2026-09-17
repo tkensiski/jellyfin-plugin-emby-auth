@@ -8,6 +8,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 - `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` — build with warnings as errors, then run the unit tests. `--solution` is required because `global.json` selects Microsoft.Testing.Platform.
 - `bats e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
 - `prek run` — run the pre-commit checks: `dotnet format`, build and unit tests, shellcheck.
+- `scripts/dev-env.sh up|status|down` — a demo with Emby and Jellyfin in Docker on ports 18196 and 28196, for manual checks in a browser.
 
 ## Layout
 
@@ -27,6 +28,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
   - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
 - `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
+- `scripts/dev-env.sh` — the demo. It uses `e2e/compose.yaml` and `e2e/helpers.bash`.
 
 ## Rules
 

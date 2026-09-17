@@ -17,4 +17,4 @@ repos:
         name: shellcheck
         entry: mise exec -- shellcheck -x
         language: system
-        files: ^e2e/.*\.(bash|bats)$
+        files: ^(e2e/.*\.(bash|bats)|scripts/.*\.sh)$
