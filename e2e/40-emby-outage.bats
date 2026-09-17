@@ -9,9 +9,8 @@ setup_file() {
 
 	# tina moves to Default. uma stays on the Emby login method with a saved password that Emby verified.
 	login_token "$JELLYFIN" tina tina-emby-pass >/dev/null
-	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "KeepEmbyInCharge"'
 	login_token "$JELLYFIN" uma uma-emby-pass >/dev/null
-	reset_plugin_config
 
 	docker compose -f "$COMPOSE_FILE" stop emby-proxy emby >&3 2>&1
 }
@@ -40,12 +39,10 @@ setup() {
 	[ "$output" = "200" ]
 }
 
-@test "while Emby is unreachable, Jellyfin password first accepts only a saved password that Emby verified" {
-	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
-
+@test "while Emby is unreachable, a verified saved hash does not open an account" {
 	[ "$(policy_field uma AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
 	run login_status "$JELLYFIN" uma uma-emby-pass
-	[ "$output" = "200" ]
+	[ "$output" = "401" ]
 	run login_status "$JELLYFIN" vic vic-jf-random
 	[ "$output" = "401" ]
 }

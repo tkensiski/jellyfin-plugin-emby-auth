@@ -57,8 +57,8 @@ setup() {
 	[ "$output" = "200" ]
 }
 
-@test "Jellyfin password first: the saved password works until Emby accepts a new one" {
-	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
+@test "Keep Emby in charge: an Emby password change is effective at once and the saved hash follows it" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "KeepEmbyInCharge"'
 
 	run login_status "$JELLYFIN" oscar oscar-emby-pass
 	[ "$output" = "200" ]
@@ -66,11 +66,11 @@ setup() {
 
 	set_password "$EMBY" "$EMBY_TOKEN" "$(emby_user_id oscar)" oscar-emby-pass-2
 	run login_status "$JELLYFIN" oscar oscar-emby-pass
-	[ "$output" = "200" ]
+	[ "$output" = "401" ]
 	run login_status "$JELLYFIN" oscar oscar-emby-pass-2
 	[ "$output" = "200" ]
-	run login_status "$JELLYFIN" oscar oscar-emby-pass
-	[ "$output" = "401" ]
+
+	[ "$(migration_ready_state oscar)" = "true" ]
 	[ "$(policy_field oscar AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
 }
 
