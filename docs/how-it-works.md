@@ -19,7 +19,7 @@ Jellyfin has no login call that creates an account with a password already set: 
 
 The plugin makes the moment as short as it can. It computes the password hash before it creates the account, so the save is the very next call after creation, with nothing else in between.
 
-If that save fails, the plugin deletes the new account and refuses the login. If the delete also fails, the account stays on the Default login method with no password. The plugin logs the account name at Error level in the Jellyfin log, so an administrator can remove the account or give it a password. Jellyfin's own account creation (`POST /Users/New`) has the same window, for the same reason.
+If that save fails, the plugin deletes the new account and refuses the login. If the delete also fails, the account stays on the Default login method with no password. Either way, the plugin logs the account name at Error level in the Jellyfin log, so an administrator can remove the account or give it a password. Jellyfin's own account creation (`POST /Users/New`) has the same window, for the same reason.
 
 ## Password changes
 
