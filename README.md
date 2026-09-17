@@ -76,7 +76,21 @@ If a setting is missing or not valid, the plugin refuses each login that it hand
 | Keep Emby in charge until the migration task runs | `KeepEmbyInCharge` | Emby, on every login. A password change on Emby applies to the next login. | When you run the migration task |
 | Check the saved Jellyfin password first, then Emby | `JellyfinPasswordFirst` | Jellyfin, if the saved password matches. Otherwise Emby. Users log in while Emby is down. After a password change on Emby, the old password works until the user logs in with the new one. | When you run the migration task |
 
-The migration task is **Move Emby users to the Default login method**, in **Dashboard > Scheduled Tasks**, under **Emby Auth**. It has no schedule. It moves each user on the Emby login method whose saved password Emby verified. It does not move other users, for example an account that has only a password that an administrator set. You can run it with any migration behavior.
+### Run the migration
+
+The **Migration** section at the bottom of **Dashboard > Plugins > Emby Auth** lists each user on the Emby login method:
+
+- **ready**: Emby verified the saved password. The next migration run moves the user to the Default login method.
+- **needs one login while Emby runs**: the user has not logged in to Jellyfin through Emby, or the password was reset. An administrator can also set a new password in Jellyfin, which moves the user at once.
+
+**Run migration now** moves every ready user. It starts the scheduled task **Move Emby users to the Default login method**, which is also in **Dashboard > Advanced > Scheduled Tasks**, under **Emby Auth**. The task has no schedule. You can run it with any migration behavior. It never contacts Emby, and it does not create accounts: a Jellyfin account for an Emby user appears at that user's first login.
+
+The same actions are in the API. Both need an administrator token:
+
+| Request | Result |
+|---|---|
+| `GET /EmbyAuth/Migration` | `{"Users": [{"Name": "dave", "ReadyToMove": false}]}` for the users on the Emby login method |
+| `POST /EmbyAuth/Migration/Run` | Starts the migration task, unless it already runs. Returns `204`. |
 
 ### Account access
 
@@ -107,11 +121,10 @@ The first login must use the Emby password. The random password does not work, a
 
 ### Shut down Emby
 
-1. If the migration behavior is not **Move each user to Jellyfin after the first login**, run the migration task.
-2. List the users who are still on the Emby login method. In `GET /Users`, their `Policy.AuthenticationProviderId` is `Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider`. The Jellyfin log also names them after each run of the migration task.
-3. Ask those users, and Emby users who have no Jellyfin account, to log in to Jellyfin once while Emby runs. Then do step 1 again.
-4. For a user who cannot log in before the shutdown, set a new password in Jellyfin. The user moves to Default.
-5. Do step 2 again. When the list is empty, shut down Emby and remove the plugin.
+1. In the **Migration** section of the plugin settings, select **Run migration now**.
+2. Ask each user in the list who is not ready, and each Emby user who has no Jellyfin account, to log in to Jellyfin once while Emby runs. Then do step 1 again.
+3. For a user who cannot log in before the shutdown, set a new password in Jellyfin. The user moves to Default.
+4. When the list says that no users are on the Emby login method, shut down Emby and remove the plugin.
 
 ## Security notes
 
@@ -141,4 +154,4 @@ The first login must use the Emby password. The random password does not work, a
 | Run end-to-end tests in Docker | `bats e2e` |
 | Run pre-commit checks | `prek run` |
 
-The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
+The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`; set `EMBY_PORT` and `JELLYFIN_PORT` to use other ports. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.

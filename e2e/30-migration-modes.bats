@@ -6,6 +6,15 @@ setup_file() {
 	reset_plugin_config
 	precreate_on_emby_method nora
 	precreate_admin_on_emby_method rex
+	set_password "$JELLYFIN" "$JF_TOKEN" "$(create_user "$JELLYFIN" "$JF_TOKEN" xena)" xena-jf-pass
+}
+
+wes_is_on_default() {
+	[[ "$(policy_field wes AuthenticationProviderId)" == "$DEFAULT_PROVIDER" ]]
+}
+
+migration_ready_state() {
+	api GET "$JELLYFIN/EmbyAuth/Migration" "$JF_TOKEN" | jq -r --arg n "$1" '.Users[] | select(.Name == $n) | .ReadyToMove'
 }
 
 teardown_file() {
@@ -81,4 +90,31 @@ setup() {
 	run login_status "$JELLYFIN" quinn quinn-emby-pass
 	[ "$output" = "200" ]
 	[ "$(policy_field quinn EnableRemoteAccess)" = "true" ]
+}
+
+@test "the migration status shows who is ready to move, and only an administrator can use the migration API" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "KeepEmbyInCharge" | .AccountAccess = "CopyEmbyRemoteAccess"'
+	run login_status "$JELLYFIN" wes wes-emby-pass
+	[ "$output" = "200" ]
+
+	[ "$(migration_ready_state wes)" = "true" ]
+	[ "$(migration_ready_state nora)" = "false" ]
+	[ "$(migration_ready_state rex)" = "false" ]
+
+	xena_token="$(login_token "$JELLYFIN" xena xena-jf-pass)"
+	run status GET "$JELLYFIN/EmbyAuth/Migration" "$xena_token"
+	[ "$output" = "403" ]
+	run status POST "$JELLYFIN/EmbyAuth/Migration/Run" "$xena_token"
+	[ "$output" = "403" ]
+	[ "$(policy_field wes AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+}
+
+@test "Run migration moves the users who are ready and keeps the others" {
+	run status POST "$JELLYFIN/EmbyAuth/Migration/Run" "$JF_TOKEN"
+	[ "$output" = "204" ]
+
+	wait_until "The move of wes to Default" wes_is_on_default
+	[ "$(policy_field nora AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+	[ -z "$(migration_ready_state wes)" ]
+	[ "$(migration_ready_state nora)" = "false" ]
 }

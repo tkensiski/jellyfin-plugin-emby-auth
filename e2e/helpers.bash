@@ -3,8 +3,11 @@
 
 E2E_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export E2E_DIR
-export EMBY=http://127.0.0.1:18096
-export JELLYFIN=http://127.0.0.1:28096
+# compose.yaml publishes Emby and Jellyfin on these host ports. Set them to run next to another copy of the containers.
+export EMBY_PORT="${EMBY_PORT:-18096}"
+export JELLYFIN_PORT="${JELLYFIN_PORT:-28096}"
+export EMBY="http://127.0.0.1:$EMBY_PORT"
+export JELLYFIN="http://127.0.0.1:$JELLYFIN_PORT"
 export EMBY_PROVIDER=Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider
 export DEFAULT_PROVIDER=Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider
 export PLUGIN_ID=e973e09a-e8b4-40c1-9be2-8e51342de1f9

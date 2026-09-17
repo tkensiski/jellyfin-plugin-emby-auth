@@ -20,6 +20,7 @@ paths:
 - Use `emby_login_requests NAME` to prove whether a login reached Emby. The helper reads the `emby-proxy` log. It first sends a marker request and waits for it, so the count includes all earlier requests.
 - Do not use the Emby activity log for a "did not reach Emby" check. Emby writes entries after a delay, so the check passes before the entry exists.
 - Jellyfin runs at Debug level (`JELLYFIN_Serilog__MinimumLevel__Default` in `compose.yaml`), so the log check also sees the exceptions that Jellyfin logs for refused logins.
+- `EMBY_PORT` and `JELLYFIN_PORT` (default 18096 and 28096) set the host ports in `compose.yaml` and `helpers.bash`. Set both to run the tests while another copy of the containers uses the default ports.
 - Scripts must pass `shellcheck -x` and `shfmt -d`. Inside a test, use `if [[ ... ]]; then ...; return 1; fi` instead of a bare `[[ ... ]]` in a loop.
 
 ## Server facts

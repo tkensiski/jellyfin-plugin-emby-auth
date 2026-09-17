@@ -26,7 +26,7 @@
                             <option value="KeepEmbyInCharge">Keep Emby in charge until the migration task runs</option>
                             <option value="JellyfinPasswordFirst">Check the saved Jellyfin password first, then Emby</option>
                         </select>
-                        <div class="fieldDescription">With the second and third choice, users stay on the Emby login method. To finish the migration, run the task "Move Emby users to the Default login method" in Dashboard &gt; Scheduled Tasks.</div>
+                        <div class="fieldDescription">With the second and third choice, users stay on the Emby login method until you run the migration. Use "Run migration now" below.</div>
                     </div>
                     <div class="selectContainer">
                         <label class="selectLabel" for="AccountAccess">Account access</label>
@@ -43,12 +43,41 @@
                         </button>
                     </div>
                 </form>
+
+                <div class="verticalSection">
+                    <h2 class="sectionTitle">Migration</h2>
+                    <p id="EmbyAuthMigrationSummary"></p>
+                    <ul id="EmbyAuthMigrationUsers"></ul>
+                    <button is="emby-button" type="button" id="EmbyAuthRunMigration" class="raised block emby-button">
+                        <span>Run migration now</span>
+                    </button>
+                    <div class="fieldDescription">Moves each user marked "ready" to the Default login method. A user who is not ready must log in to Jellyfin once while Emby runs, or needs a new password that you set in Jellyfin. The migration also runs as the task "Move Emby users to the Default login method" in Dashboard &gt; Advanced &gt; Scheduled Tasks.</div>
+                </div>
             </div>
         </div>
         <script type="text/javascript">
             var EmbyAuthConfig = {
                 pluginUniqueId: 'e973e09a-e8b4-40c1-9be2-8e51342de1f9'
             };
+
+            function loadEmbyAuthMigration() {
+                var summary = document.querySelector('#EmbyAuthMigrationSummary');
+                var list = document.querySelector('#EmbyAuthMigrationUsers');
+                return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
+                    var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
+                    summary.textContent = status.Users.length === 0
+                        ? 'No users are on the Emby login method.'
+                        : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.';
+                    list.replaceChildren();
+                    status.Users.forEach(function (user) {
+                        var item = document.createElement('li');
+                        item.textContent = user.Name + ': ' + (user.ReadyToMove ? 'ready' : 'needs one login while Emby runs');
+                        list.appendChild(item);
+                    });
+                }).catch(function () {
+                    summary.textContent = 'Jellyfin cannot read the migration status. See the Jellyfin log.';
+                });
+            }
 
             document.querySelector('#EmbyAuthConfigPage')
                 .addEventListener('pageshow', function () {
@@ -58,7 +87,20 @@
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
                         document.querySelector('#AccountAccess').value = config.AccountAccess;
+                        return loadEmbyAuthMigration();
+                    }).finally(function () {
                         Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#EmbyAuthRunMigration')
+                .addEventListener('click', function () {
+                    var summary = document.querySelector('#EmbyAuthMigrationSummary');
+                    ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('EmbyAuth/Migration/Run') }).then(function () {
+                        summary.textContent = 'The migration runs. This list updates in a few seconds.';
+                        setTimeout(loadEmbyAuthMigration, 3000);
+                    }).catch(function () {
+                        summary.textContent = 'Jellyfin did not start the migration. See the Jellyfin log.';
                     });
                 });
 

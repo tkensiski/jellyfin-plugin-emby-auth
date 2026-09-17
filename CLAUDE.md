@@ -23,6 +23,8 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
   - `DefaultLoginMethod.cs` — the single-column move to Default.
   - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
   - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
+  - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
+  - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
 - `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
 

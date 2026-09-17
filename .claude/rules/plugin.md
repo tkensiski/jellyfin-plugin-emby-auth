@@ -43,6 +43,13 @@ Line references are to Jellyfin v12.1 (`Jellyfin.Server.Implementations/Users/Us
 - Emby 4.10.0.40 accepted a typed name with a trailing space for the user without the space (measured in the code review). So the plugin requires the exact Emby user name, ignoring case only, before it sends a password.
 - `POST /Sessions/Logout` with the session token ends the session and revokes the token.
 
+## API and settings page
+
+- Every plugin API controller uses `[Authorize(Policy = Policies.RequiresElevation)]` (`MediaBrowser.Common.Api`), so only administrators can call it. Keep an e2e test that a regular user gets 403.
+- The settings page calls the plugin API with `ApiClient.getJSON(ApiClient.getUrl(...))` and `ApiClient.ajax(...)`. Jellyfin serializes the responses with PascalCase property names.
+- Build page content from user names with `textContent`, never `innerHTML`.
+- In Jellyfin 12.1, the scheduled tasks page is **Dashboard > Advanced > Scheduled Tasks**.
+
 ## Settings
 
 - Jellyfin saves plugin settings with `XmlSerializer`, which cannot serialize `System.Uri`. Keep URL settings as strings, and validate them in `EmbyAuthSettings`.
