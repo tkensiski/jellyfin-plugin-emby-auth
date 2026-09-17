@@ -6,10 +6,10 @@ repos:
         entry: mise run lint
         language: system
         pass_filenames: false
-        files: \.(cs|csproj|slnx|props|bash|bats|ya?ml)$|^\.mise\.toml$
+        files: \.(cs|csproj|slnx|props|sh|bash|bats|ya?ml)$|^\.mise\.toml$
     -   id: test
-        name: mise run test (build with warnings as errors, unit tests)
+        name: mise run test (build with warnings as errors, unit tests, script tests)
         entry: mise run test
         language: system
         pass_filenames: false
-        files: \.(cs|csproj|slnx|props|html)$|^global\.json$|^\.mise\.toml$
+        files: \.(cs|csproj|slnx|props|html)$|^global\.json$|^\.mise\.toml$|^scripts/|^tests/scripts/

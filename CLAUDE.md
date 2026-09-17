@@ -6,12 +6,15 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks the first Jellyfi
 
 - `mise install` — install the pinned tools (`.mise.toml`).
 - `mise run lint` — check C# formatting, and run shellcheck, shfmt, actionlint, and zizmor.
-- `mise run test` — build with warnings as errors, then run the unit tests.
+- `mise run test` — build with warnings as errors, then run the unit tests and the `scripts/package.sh` tests (`tests/scripts/`).
 - `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker.
+- `mise run package` — build `artifacts/release/jellyfin-plugin-emby-auth_<version>.zip` and `manifest.json` with `scripts/package.sh build`.
 - `prek run` — run the pre-commit hooks, which call `mise run lint` and `mise run test`.
 - `act pull_request -j <job>` — run a CI job from `.github/workflows/ci.yml` in a container. `.actrc` pins the runner image. The `e2e` job also needs `--bind --container-options "--network host"`.
 
 CI (`.github/workflows/ci.yml`) runs one mise task per job, and `ci-success` requires every job. When a CI step changes, change the mise task, not only the workflow.
+
+A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package.sh check-tag`, `mise run test`, `mise run package`, then `gh release create`. The version comes from `Directory.Build.props`. Jellyfin reads the zip checksum as MD5.
 
 ## Layout
 

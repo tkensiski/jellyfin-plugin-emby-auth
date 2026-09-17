@@ -1,0 +1,48 @@
+name: Release
+
+# Runs when a version tag is pushed. The build steps are mise tasks, so `mise run test` and
+# `mise run package` reproduce them locally. Only the last step, which creates the GitHub release, needs GitHub.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          # A release must not restore a cache that another workflow could have written.
+          cache: false
+
+      - name: Check that the tag matches the plugin version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: scripts/package.sh check-tag "$TAG"
+
+      - name: Build and run unit tests
+        run: mise run test
+
+      - name: Build the release zip and manifest
+        run: mise run package
+
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" artifacts/release/*.zip artifacts/release/manifest.json --verify-tag --title "$TAG" --generate-notes
