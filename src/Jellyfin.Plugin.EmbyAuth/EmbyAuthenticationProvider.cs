@@ -95,15 +95,26 @@ internal sealed partial class EmbyAuthenticationProvider(
     }
 
     /// <summary>
-    /// Saves a password that an administrator or the user sets in Jellyfin, and moves the user to the Default login method.
+    /// Handles a password that an administrator or the user sets in Jellyfin.
     /// </summary>
+    /// <remarks>
+    /// A new password is saved, and the user moves to the Default login method.
+    /// A password reset removes the saved password, and the user stays on the Emby login method, because a Default account without a password opens with a blank password.
+    /// </remarks>
     /// <param name="user">The user. Jellyfin saves the changes after this method returns.</param>
-    /// <param name="newPassword">The new password, or an empty string to remove the password.</param>
+    /// <param name="newPassword">The new password, or an empty string for a password reset.</param>
     /// <returns>A completed task.</returns>
     public Task ChangePassword(User user, string newPassword)
     {
         ArgumentNullException.ThrowIfNull(user);
-        user.Password = string.IsNullOrEmpty(newPassword) ? null : cryptoProvider.CreatePasswordHash(newPassword).ToString();
+        if (string.IsNullOrEmpty(newPassword))
+        {
+            user.Password = null;
+            LogPasswordReset(logger, user.Username);
+            return Task.CompletedTask;
+        }
+
+        user.Password = cryptoProvider.CreatePasswordHash(newPassword).ToString();
         user.AuthenticationProviderId = MoveToDefaultLoginMethod.DefaultProviderId;
         LogPasswordSetInJellyfin(logger, user.Username);
         return Task.CompletedTask;
@@ -209,4 +220,7 @@ internal sealed partial class EmbyAuthenticationProvider(
 
     [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user now uses the Default login method.")]
     private static partial void LogPasswordSetInJellyfin(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "The password of user {Username} was reset in Jellyfin. The user stays on the Emby login method, so Emby checks the next login.")]
+    private static partial void LogPasswordReset(ILogger logger, string username);
 }

@@ -27,7 +27,7 @@ setup_file() {
 	set_password "$EMBY" "$EMBY_TOKEN" "$ALICE_EMBY_ID" alice-pass-1
 
 	local name
-	for name in carol dave erin gina henry ivy jack kate; do
+	for name in carol dave erin gina henry ivy jack kate leo; do
 		set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" "$name")" "$name-emby-pass"
 	done
 	create_user "$EMBY" "$EMBY_TOKEN" frank >/dev/null
@@ -37,7 +37,7 @@ setup_file() {
 	set_password "$JELLYFIN" "$JF_TOKEN" "$(create_user "$JELLYFIN" "$JF_TOKEN" carol)" carol-jf-pass
 
 	# Accounts created before the first login get a random password, then the Emby login method.
-	for name in dave erin henry kate; do
+	for name in dave erin henry kate leo; do
 		local id
 		id="$(create_user "$JELLYFIN" "$JF_TOKEN" "$name")"
 		set_password "$JELLYFIN" "$JF_TOKEN" "$id" "$name-jf-random"
@@ -182,6 +182,20 @@ policy_field() {
 	[ "$output" = "200" ]
 }
 
+@test "a password reset in Jellyfin keeps the user on the Emby login method and does not allow a blank password" {
+	leo_id="$(user_by_name "$JELLYFIN" "$JF_TOKEN" leo | jq -r .Id)"
+
+	run status POST "$JELLYFIN/Users/$leo_id/Password" "$JF_TOKEN" '{"ResetPassword":true}'
+	[ "$output" = "204" ]
+	[ "$(policy_field leo AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
+	run login_status "$JELLYFIN" leo ""
+	[ "$output" = "401" ]
+
+	run login_status "$JELLYFIN" leo leo-emby-pass
+	[ "$output" = "200" ]
+	[ "$(policy_field leo AuthenticationProviderId)" = "$DEFAULT_PROVIDER" ]
+}
+
 @test "the plugin ends its Emby session after each login" {
 	run api GET "$EMBY/Sessions?DeviceId=jellyfin-plugin-emby-auth" "$EMBY_TOKEN"
 	[ "$status" -eq 0 ]
@@ -213,7 +227,7 @@ policy_field() {
 	local secret
 	for secret in alice-pass-1 alice-pass-2 wrong-pass jf-admin-pass carol-jf-pass jack-jf-pass kate-jf-pass \
 		carol-emby-pass dave-emby-pass erin-emby-pass gina-emby-pass henry-emby-pass ivy-emby-pass jack-emby-pass \
-		dave-jf-random erin-jf-random henry-jf-random kate-jf-random "$EMBY_API_KEY"; do
+		leo-emby-pass dave-jf-random erin-jf-random henry-jf-random kate-jf-random leo-jf-random "$EMBY_API_KEY"; do
 		if [[ "$logs" == *"$secret"* ]]; then
 			echo "The Jellyfin log contains the secret '$secret'." >&2
 			return 1
