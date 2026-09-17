@@ -14,6 +14,14 @@ The plugin adds a Jellyfin login method named **Emby**. It handles a login in tw
 
 A Quick Connect login does not check a password, so it never moves a user to Default.
 
+### The account-creation window
+
+Jellyfin has no login call that creates an account with a password already set: `IUserManager.CreateUserAsync` takes only a name. So step 5's account creation happens in two calls. The plugin creates the account, then saves the Emby-verified hash and the Emby login method in the very next call. Between those two calls, the new account exists on the Default login method with no password. During that moment, a blank password on the Default login method would open the account.
+
+The plugin makes the moment as short as it can. It computes the password hash before it creates the account, so the save is the very next call after creation, with nothing else in between.
+
+If that save fails, the plugin deletes the new account and refuses the login. If the delete also fails, the account stays on the Default login method with no password. The plugin logs the account name at Error level in the Jellyfin log, so an administrator can remove the account or give it a password. Jellyfin's own account creation (`POST /Users/New`) has the same window, for the same reason.
+
 ## Password changes
 
 For a user on the Emby login method, a password change in Jellyfin works like this:
@@ -31,6 +39,7 @@ For a user on the Emby login method, a password change in Jellyfin works like th
 
 ## Limits
 
+- A new account has a brief moment on the Default login method with no password before the plugin saves the Emby-verified hash. See [The account-creation window](#the-account-creation-window).
 - After a user moves to Default, a password change on Emby does not change the Jellyfin password.
 - An Emby user without a password cannot log in through the plugin. Set a password in Jellyfin for that user.
 - Logins with an Emby Connect email address, or any name other than the Emby user name, are refused.
