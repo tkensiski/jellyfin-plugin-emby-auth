@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 01
 current_phase_name: Account Creation and Login Security
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-09-17T20:09:50.242Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-09-17T20:53:50.941Z"
 last_activity: 2026-09-17
-last_activity_desc: Roadmap created
-state_head: 33170a403fc3c4de011d10d9134d75cdcde78b0b
+last_activity_desc: Phase 01 execution started
+state_head: cd95bcd2801e9179cd14b32d24e272b7e98484ed
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-17)
 
 **Core value:** A user moves from Emby to Jellyfin without a password reset, and no password that Emby did not verify ever opens an account.
-**Current focus:** Phase 1: Account Creation and Login Security
+**Current focus:** Phase 01 — Account Creation and Login Security
 
 ## Current Position
 
-Phase: 01 (Account Creation and Login Security) — READY TO EXECUTE
-Plan: 0 of TBD in current phase
+Phase: 01 (Account Creation and Login Security) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-09-17 — Roadmap created
+Last activity: 2026-09-17 — Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 01 P01 | 26min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -67,6 +72,8 @@ Recent decisions affecting current work:
 - Roadmap: PUB-04 gets its second catalog version from a rehearsal release, version 0.9.0.0, before version 1.0.0.0 (Phase 6).
 - Roadmap: The release tags follow the existing `v<version>` rule (`docs/development.md:30`), so PUB-05 publishes tag `v1.0.0.0`.
 - Roadmap: The Pages manifest comes after the repository is public (Phase 6), because Jellyfin downloads the manifest and the zip without GitHub credentials (`.planning/codebase/CONCERNS.md:133`).
+- [Phase 01]: Restructured CreateAccountAsync to log exactly one Error entry per failure (save vs. delete), resolving an internal plan inconsistency between the illustrative two-catch shape and the explicit 'exactly one Error entry' acceptance criterion — The delete is attempted at most once and never retried (D-03); logging both failures independently would duplicate the same incident
+- [Phase 01]: RED-phase TDD commits use [Fact(Skip=...)] then unskip in the GREEN commit, because the repo's pre-commit hook blocks any commit that leaves a test failing — Preserves the required test-then-feat commit ordering and CLAUDE.md's no-hook-bypass rule; RED was independently confirmed locally before each Skip
 
 ### Pending Todos
 
@@ -87,6 +94,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17T18:19:44.327Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-account-creation-and-login-security/01-CONTEXT.md
+Last session: 2026-09-17T20:53:50.927Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None
