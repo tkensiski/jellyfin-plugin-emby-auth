@@ -11,7 +11,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 - [ ] **AUTH-01**: While a user is on the Emby login method, Emby checks every login, and the saved Jellyfin hash plays no part in accepting it. After each login that Emby accepts, the saved hash is the hash of that password.
 - [ ] **AUTH-02**: The `JellyfinPasswordFirst` migration behavior ("Check the saved Jellyfin password first") no longer exists in the settings, the settings page, the docs, or the tests.
-- [ ] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
+- [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
 - [ ] **AUTH-05**: The plugin ends the Emby session whenever Emby returns an access token, including a login response that has no user name.
 
@@ -36,7 +36,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Test Coverage
 
-- [ ] **TEST-01**: Unit tests cover `EmbyAuthenticationProvider`: account checks, the Emby login, account creation and update, and every failure path in AUTH-04.
+- [x] **TEST-01**: Unit tests cover `EmbyAuthenticationProvider`: account checks, the Emby login, account creation and update, and every failure path in AUTH-04.
 - [ ] **TEST-02**: Unit tests cover `MoveToDefaultLoginMethod`, `DefaultLoginMethod`, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`.
 - [ ] **TEST-03**: Unit tests cover `EmbyAuthController`: the migration status, the run request, and the task state.
 - [ ] **TEST-04**: Automated tests run the settings page JavaScript: load, save, their error messages, the migration list, and **Run migration now**.
@@ -93,7 +93,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | AUTH-01 | Phase 1 | Pending |
 | AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
 | AUTH-05 | Phase 4 | Pending |
 | FPRT-01 | Phase 3 | Pending |
@@ -106,7 +106,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-02 | Phase 6 | Pending |
 | DOCS-03 | Phase 5 | Pending |
 | DOCS-04 | Phase 6 | Pending |
-| TEST-01 | Phase 1 | Pending |
+| TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 3 | Pending |
 | TEST-03 | Phase 3 | Pending |
 | TEST-04 | Phase 2 | Pending |

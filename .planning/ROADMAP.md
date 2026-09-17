@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. A search of `src/`, `tests/`, `e2e/`, `docs/`, and `README.md` finds no `JellyfinPasswordFirst` and no "Check the saved Jellyfin password first" option.
   5. `dotnet test` runs unit tests for `EmbyAuthenticationProvider` that cover the account checks, the Emby login, account creation and update, and every failure path in criterion 1. Each fix has a test that failed before the fix.
 
-**Plans**: 1/4 plans executed
+**Plans**: 2/4 plans executed
 
 Plans:
 **Wave 1**
@@ -44,7 +44,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Full TEST-01 coverage, the AUTH-03 save-directly-after-create ordering, and the account-creation window documented
+- [x] 01-02-PLAN.md — Full TEST-01 coverage, the AUTH-03 save-directly-after-create ordering, and the account-creation window documented
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -139,7 +139,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Account Creation and Login Security | 1/4 | In Progress|  |
+| 1. Account Creation and Login Security | 2/4 | In Progress|  |
 | 2. Safe Failures for the Fingerprint File and Settings | 0/TBD | Not started | - |
 | 3. Migration Status | 0/TBD | Not started | - |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |

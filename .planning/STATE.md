@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 01
 current_phase_name: Account Creation and Login Security
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-09-17T20:53:50.941Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-09-17T21:14:27.957Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 01 execution started
-state_head: cd95bcd2801e9179cd14b32d24e272b7e98484ed
+state_head: 106c6e151760765f67849220cd5f62c64d41e670
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 01 (Account Creation and Login Security) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-09-17 — Phase 01 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 01 P01 | 26min | 2 tasks | 4 files |
+| Phase 01 P02 | 19min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,7 @@ Recent decisions affecting current work:
 - Roadmap: The Pages manifest comes after the repository is public (Phase 6), because Jellyfin downloads the manifest and the zip without GitHub credentials (`.planning/codebase/CONCERNS.md:133`).
 - [Phase 01]: Restructured CreateAccountAsync to log exactly one Error entry per failure (save vs. delete), resolving an internal plan inconsistency between the illustrative two-catch shape and the explicit 'exactly one Error entry' acceptance criterion — The delete is attempted at most once and never retried (D-03); logging both failures independently would duplicate the same incident
 - [Phase 01]: RED-phase TDD commits use [Fact(Skip=...)] then unskip in the GREEN commit, because the repo's pre-commit hook blocks any commit that leaves a test failing — Preserves the required test-then-feat commit ordering and CLAUDE.md's no-hook-bypass rule; RED was independently confirmed locally before each Skip
+- [Phase 01]: [Phase 01]: Broke and restored one guard/write per named group (blank-password guard, Emby-status guard, LoginAction.Deny guard, hash write, fingerprint ordering) to prove each new AUTH-03/AUTH-01 test would catch a regression, since these tests cover already-working behavior rather than new code
 
 ### Pending Todos
 
@@ -94,6 +96,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-17T20:53:50.927Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-09-17T21:14:27.943Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
