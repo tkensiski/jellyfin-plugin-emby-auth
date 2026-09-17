@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 
 namespace Jellyfin.Plugin.EmbyAuth;
 
@@ -8,46 +9,69 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// </summary>
 /// <param name="ServerUrl">The base URL of the Emby server.</param>
 /// <param name="ApiKey">The Emby API key.</param>
-internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey)
+/// <param name="MigrationMode">How the plugin moves users from Emby to Jellyfin.</param>
+/// <param name="AccountAccess">The access that the plugin gives to Jellyfin accounts.</param>
+internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey, MigrationMode MigrationMode, AccountAccess AccountAccess)
 {
     /// <summary>
     /// Validates the configured settings.
     /// </summary>
-    /// <param name="serverUrl">The configured Emby server URL.</param>
-    /// <param name="apiKey">The configured Emby API key.</param>
+    /// <param name="configuration">The plugin configuration, or <c>null</c> if the plugin is not loaded.</param>
     /// <param name="settings">The settings, if they are valid.</param>
     /// <param name="problem">A message that describes the problem, if the settings are not valid. The message never repeats the configured values.</param>
     /// <returns><c>true</c> if the settings are valid.</returns>
-    public static bool TryCreate(string? serverUrl, string? apiKey, [NotNullWhen(true)] out EmbyAuthSettings? settings, [NotNullWhen(false)] out string? problem)
+    public static bool TryCreate(PluginConfiguration? configuration, [NotNullWhen(true)] out EmbyAuthSettings? settings, [NotNullWhen(false)] out string? problem)
     {
         settings = null;
-        if (string.IsNullOrWhiteSpace(serverUrl))
+        problem = FindProblem(configuration, out var url);
+        if (problem is not null)
         {
-            problem = "The Emby server URL is not set.";
             return false;
         }
 
-        if (!Uri.TryCreate(serverUrl.Trim(), UriKind.Absolute, out var url)
+        settings = new EmbyAuthSettings(url!, configuration!.EmbyApiKey.Trim(), configuration.MigrationMode, configuration.AccountAccess);
+        return true;
+    }
+
+    private static string? FindProblem(PluginConfiguration? configuration, out Uri? url)
+    {
+        url = null;
+        if (configuration is null)
+        {
+            return "The plugin settings are not loaded.";
+        }
+
+        if (string.IsNullOrWhiteSpace(configuration.EmbyServerUrl))
+        {
+            return "The Emby server URL is not set.";
+        }
+
+        if (!Uri.TryCreate(configuration.EmbyServerUrl.Trim(), UriKind.Absolute, out url)
             || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
         {
-            problem = "The Emby server URL is not a valid http or https URL.";
-            return false;
+            return "The Emby server URL is not a valid http or https URL.";
         }
 
         if (url.UserInfo.Length > 0)
         {
-            problem = "The Emby server URL must not contain a user name or password.";
-            return false;
+            return "The Emby server URL must not contain a user name or password.";
         }
 
-        if (string.IsNullOrWhiteSpace(apiKey))
+        if (string.IsNullOrWhiteSpace(configuration.EmbyApiKey))
         {
-            problem = "The Emby API key is not set.";
-            return false;
+            return "The Emby API key is not set.";
         }
 
-        settings = new EmbyAuthSettings(url, apiKey.Trim());
-        problem = null;
-        return true;
+        if (!Enum.IsDefined(configuration.MigrationMode))
+        {
+            return "The migration behavior setting is not valid.";
+        }
+
+        if (!Enum.IsDefined(configuration.AccountAccess))
+        {
+            return "The account access setting is not valid.";
+        }
+
+        return null;
     }
 }

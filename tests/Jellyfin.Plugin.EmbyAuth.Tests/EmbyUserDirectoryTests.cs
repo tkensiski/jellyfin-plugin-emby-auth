@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -11,7 +12,8 @@ namespace Jellyfin.Plugin.EmbyAuth.Tests;
 
 public class EmbyUserDirectoryTests
 {
-    private static readonly EmbyAuthSettings Settings = new(new Uri("http://emby:8096"), "key-1");
+    private static readonly EmbyAuthSettings Settings =
+        new(new Uri("http://emby:8096"), "key-1", MigrationMode.MoveAfterFirstLogin, AccountAccess.CopyEmbyRemoteAccess);
 
     private readonly ManualTimeProvider _clock = new();
 
@@ -93,6 +95,18 @@ public class EmbyUserDirectoryTests
 
         Assert.Equal(2, handler.Requests.Count);
         Assert.Equal("key-2", handler.Requests[1].EmbyToken);
+    }
+
+    [Fact]
+    public async Task KeepsCachedList_WhenOnlyTheMigrationSettingsChange()
+    {
+        var handler = new StubHttpMessageHandler().Then(UserList);
+        var directory = CreateDirectory(handler);
+
+        await directory.GetStatusAsync(Settings, "alice", CancellationToken.None);
+        await directory.GetStatusAsync(Settings with { MigrationMode = MigrationMode.KeepEmbyInCharge, AccountAccess = AccountAccess.NoLibraries }, "alice", CancellationToken.None);
+
+        Assert.Single(handler.Requests);
     }
 
     [Fact]
