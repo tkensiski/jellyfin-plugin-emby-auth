@@ -5,18 +5,17 @@ The plugin adds a Jellyfin login method named **Emby**. It handles a login in tw
 ## Login steps
 
 1. **Account checks.** The plugin refuses the login, and does not contact Emby, if the password is blank, or if the Jellyfin account is disabled or is an administrator.
-2. **Saved password (only with "Check the saved Jellyfin password first").** If Emby verified the saved password of the account earlier, and the typed password matches it, Jellyfin accepts the login. The plugin does not contact Emby, so this works even if the Emby user was since disabled or deleted.
-3. **Emby user list.** The plugin refuses the login, and does not send the password to Emby, if no enabled Emby user has exactly the typed name. The match ignores case and nothing else. The plugin reads the Emby user list with the API key and keeps it for 60 seconds.
-4. **Emby check.** The plugin sends the name and password to Emby (`POST /Users/AuthenticateByName`). If Emby refuses the login or does not answer within 5 seconds, Jellyfin refuses the login. If Emby accepts, the plugin ends the Emby session that the login opened.
-5. **Account rules.** Jellyfin refuses the login if Emby returns a different user name, or if the Jellyfin account uses another login method. If no Jellyfin account exists, the plugin creates one. The [Account access](settings.md#account-access) setting decides the access of the new account.
-6. **Password copy.** The plugin saves a Jellyfin hash of the password on the account. It also records a fingerprint of that hash, so that it can later tell a password that Emby verified from a password that an administrator set.
-7. **Move to Default.** The [Migration behavior](settings.md#migration-behavior) setting decides when the user moves to the Default login method.
+2. **Emby user list.** The plugin refuses the login, and does not send the password to Emby, if no enabled Emby user has exactly the typed name. The match ignores case and nothing else. The plugin reads the Emby user list with the API key and keeps it for 60 seconds.
+3. **Emby check.** The plugin sends the name and password to Emby (`POST /Users/AuthenticateByName`). If Emby refuses the login or does not answer within 5 seconds, Jellyfin refuses the login. If Emby accepts, the plugin ends the Emby session that the login opened.
+4. **Account rules.** Jellyfin refuses the login if Emby returns a different user name, or if the Jellyfin account uses another login method. If no Jellyfin account exists, the plugin creates one. The [Account access](settings.md#account-access) setting decides the access of the new account.
+5. **Password copy.** The plugin saves a Jellyfin hash of the password on the account. It also records a fingerprint of that hash, so that it can later tell a password that Emby verified from a password that an administrator set.
+6. **Move to Default.** The [Migration behavior](settings.md#migration-behavior) setting decides when the user moves to the Default login method.
 
 A Quick Connect login does not check a password, so it never moves a user to Default.
 
 ### The account-creation window
 
-Jellyfin has no login call that creates an account with a password already set: `IUserManager.CreateUserAsync` takes only a name. So step 5's account creation happens in two calls. The plugin creates the account, then saves the Emby-verified hash and the Emby login method in the very next call. Between those two calls, the new account exists on the Default login method with no password. During that moment, a blank password on the Default login method would open the account.
+Jellyfin has no login call that creates an account with a password already set: `IUserManager.CreateUserAsync` takes only a name. So step 4's account creation happens in two calls. The plugin creates the account, then saves the Emby-verified hash and the Emby login method in the very next call. Between those two calls, the new account exists on the Default login method with no password. During that moment, a blank password on the Default login method would open the account.
 
 The plugin makes the moment as short as it can. It computes the password hash before it creates the account, so the save is the very next call after creation, with nothing else in between.
 

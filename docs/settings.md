@@ -30,7 +30,6 @@ Send `POST /Plugins/e973e09a-e8b4-40c1-9be2-8e51342de1f9/Configuration` with an 
 |---|---|---|---|
 | Move each user to Jellyfin after the first login | `MoveAfterFirstLogin` | Emby, once | Right after the first login that Emby accepts |
 | Keep Emby in charge until the migration task runs | `KeepEmbyInCharge` | Emby, on every login. A password change on Emby applies to the next login. | When you [run the migration](migration.md#run-the-migration) |
-| Check the saved Jellyfin password first, then Emby | `JellyfinPasswordFirst` | Jellyfin, if the saved password matches. Otherwise Emby. Users log in while Emby is down. After a password change on Emby, the old password works until the user logs in with the new one. | When you [run the migration](migration.md#run-the-migration) |
 
 ## Account access
 
