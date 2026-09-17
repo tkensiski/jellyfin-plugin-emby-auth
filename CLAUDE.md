@@ -6,7 +6,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 
 - `mise install` — install the pinned tools (`.mise.toml`).
 - `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` — build with warnings as errors, then run the unit tests. `--solution` is required because `global.json` selects Microsoft.Testing.Platform.
-- `bats e2e/emby-auth.bats` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker.
+- `bats e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
 - `prek run` — run the pre-commit checks: `dotnet format`, build and unit tests, shellcheck.
 
 ## Layout
@@ -24,12 +24,12 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
   - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
   - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
-- `e2e/` — bats tests, Docker Compose file, and the logging proxy for Emby.
+- `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
 
 ## Rules
 
 - Write the test first. Then break the code once and watch the test fail.
-- A change that depends on Jellyfin or Emby behavior needs an end-to-end test. Run `bats e2e/emby-auth.bats` for every change to `src/`.
+- A change that depends on Jellyfin or Emby behavior needs an end-to-end test. Run `bats e2e` for every change to `src/`.
 - Run `prek run` before each commit.
 - Never put a password or the API key in a log or exception message.
 - Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.

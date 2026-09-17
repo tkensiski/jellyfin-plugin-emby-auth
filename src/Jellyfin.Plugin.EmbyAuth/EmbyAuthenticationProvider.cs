@@ -46,12 +46,15 @@ internal sealed partial class EmbyAuthenticationProvider(
     /// <inheritdoc />
     public bool IsEnabled => true;
 
-    /// <inheritdoc />
-    public Task<ProviderAuthenticationResult> Authenticate(string username, string password)
-    {
-        var userManager = serviceProvider.GetRequiredService<IUserManager>();
-        return Authenticate(username, password, userManager.GetUserByName(username));
-    }
+    /// <summary>
+    /// Not used. Jellyfin calls <see cref="Authenticate(string, string, User)"/>, because this login method implements <see cref="IRequiresResolvedUser"/>.
+    /// </summary>
+    /// <param name="username">The user name.</param>
+    /// <param name="password">The password.</param>
+    /// <returns>This method does not return.</returns>
+    /// <exception cref="NotSupportedException">Always.</exception>
+    public Task<ProviderAuthenticationResult> Authenticate(string username, string password) =>
+        throw new NotSupportedException("Jellyfin calls the Authenticate overload that has a resolved user.");
 
     /// <inheritdoc />
     public async Task<ProviderAuthenticationResult> Authenticate(string username, string password, User? resolvedUser)
@@ -136,7 +139,7 @@ internal sealed partial class EmbyAuthenticationProvider(
     }
 
     private static JellyfinAccount? ToAccount(User? user) =>
-        user is null ? null : new JellyfinAccount(user.Username, user.AuthenticationProviderId, user.HasPermission(PermissionKind.IsAdministrator));
+        user is null ? null : new JellyfinAccount(user.Username, user.AuthenticationProviderId);
 
     private EmbyAuthSettings GetSettings()
     {
