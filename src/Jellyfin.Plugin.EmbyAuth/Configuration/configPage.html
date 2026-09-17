@@ -5,7 +5,7 @@
     <title>Emby Auth</title>
 </head>
 <body>
-    <div id="EmbyAuthConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+    <div id="EmbyAuthConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
         <div data-role="content">
             <div class="content-primary">
                 <form id="EmbyAuthConfigForm">
@@ -18,6 +18,24 @@
                         <label class="inputLabel inputLabelUnfocused" for="EmbyApiKey">Emby API key</label>
                         <input id="EmbyApiKey" name="EmbyApiKey" type="password" is="emby-input" autocomplete="off" />
                         <div class="fieldDescription">The plugin uses this key to read the list of Emby users. It sends a password to Emby only for a name that is on this list. Create an API key on the Emby server for this plugin.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="MigrationMode">Migration behavior</label>
+                        <select is="emby-select" id="MigrationMode" name="MigrationMode" class="emby-select-withcolor emby-select">
+                            <option value="MoveAfterFirstLogin">Move each user to Jellyfin after the first login</option>
+                            <option value="KeepEmbyInCharge">Keep Emby in charge until the migration task runs</option>
+                            <option value="JellyfinPasswordFirst">Check the saved Jellyfin password first, then Emby</option>
+                        </select>
+                        <div class="fieldDescription">With the second and third choice, users stay on the Emby login method. To finish the migration, run the task "Move Emby users to the Default login method" in Dashboard &gt; Scheduled Tasks.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="AccountAccess">Account access</label>
+                        <select is="emby-select" id="AccountAccess" name="AccountAccess" class="emby-select-withcolor emby-select">
+                            <option value="CopyEmbyRemoteAccess">Jellyfin defaults, with Emby's remote access setting</option>
+                            <option value="NoLibraries">No libraries until an administrator grants them, with Emby's remote access setting</option>
+                            <option value="JellyfinDefaults">Jellyfin defaults only</option>
+                        </select>
+                        <div class="fieldDescription">Sets the access of accounts that the plugin creates. Except with "Jellyfin defaults only", an existing account also loses remote access when Emby does not allow it.</div>
                     </div>
                     <div>
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
@@ -38,6 +56,8 @@
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
+                        document.querySelector('#MigrationMode').value = config.MigrationMode;
+                        document.querySelector('#AccountAccess').value = config.AccountAccess;
                         Dashboard.hideLoadingMsg();
                     });
                 });
@@ -48,6 +68,8 @@
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
                         config.EmbyApiKey = document.querySelector('#EmbyApiKey').value;
+                        config.MigrationMode = document.querySelector('#MigrationMode').value;
+                        config.AccountAccess = document.querySelector('#AccountAccess').value;
                         ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
                         });

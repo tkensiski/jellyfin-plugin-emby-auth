@@ -57,10 +57,10 @@ internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvi
         ArgumentNullException.ThrowIfNull(settings);
         var snapshot = _snapshot;
         var now = timeProvider.GetUtcNow();
-        if (snapshot is null || snapshot.Settings != settings || now >= snapshot.ValidUntil)
+        if (snapshot is null || snapshot.ServerUrl != settings.ServerUrl || snapshot.ApiKey != settings.ApiKey || now >= snapshot.ValidUntil)
         {
             var users = await embyClient.GetUsersAsync(settings.ServerUrl, settings.ApiKey, cancellationToken).ConfigureAwait(false);
-            snapshot = new Snapshot(settings, users, now + (users is null ? RetryDelay : CacheDuration));
+            snapshot = new Snapshot(settings.ServerUrl, settings.ApiKey, users, now + (users is null ? RetryDelay : CacheDuration));
             _snapshot = snapshot;
             if (users is null)
             {
@@ -85,5 +85,5 @@ internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvi
     [LoggerMessage(Level = LogLevel.Warning, Message = "Jellyfin cannot read the list of Emby users. The plugin refuses logins on the Emby login method for {RetrySeconds} seconds. Then it tries again.")]
     private static partial void LogUserListUnavailable(ILogger logger, double retrySeconds);
 
-    private sealed record Snapshot(EmbyAuthSettings Settings, IReadOnlyList<EmbyUser>? Users, DateTimeOffset ValidUntil);
+    private sealed record Snapshot(Uri ServerUrl, string ApiKey, IReadOnlyList<EmbyUser>? Users, DateTimeOffset ValidUntil);
 }

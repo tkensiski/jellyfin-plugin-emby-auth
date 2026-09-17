@@ -112,6 +112,39 @@ set_login_method() {
 	update_policy "$JELLYFIN" "$token" "$user_id" ".AuthenticationProviderId = \"$provider\""
 }
 
+# set_plugin_config TOKEN JQ_FILTER -> applies JQ_FILTER to the plugin settings and saves them.
+set_plugin_config() {
+	local token="$1" filter="$2"
+	local config
+	config="$(api GET "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$token" | jq -c "$filter")"
+	api POST "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$token" "$config" >/dev/null
+}
+
+# run_migration_task TOKEN -> runs the plugin's migration task, waits for it to end, and prints its result status.
+run_migration_task() {
+	local token="$1"
+	local task_id before after state
+	task_id="$(api GET "$JELLYFIN/ScheduledTasks" "$token" | jq -r '.[] | select(.Key == "EmbyAuthMoveUsersToDefault") | .Id')"
+	if [[ -z "$task_id" ]]; then
+		echo "Jellyfin has no scheduled task with the key EmbyAuthMoveUsersToDefault." >&2
+		return 1
+	fi
+
+	before="$(api GET "$JELLYFIN/ScheduledTasks/$task_id" "$token" | jq -r '.LastExecutionResult.EndTimeUtc // ""')"
+	api POST "$JELLYFIN/ScheduledTasks/Running/$task_id" "$token" >/dev/null
+	for _ in $(seq 1 30); do
+		sleep 1
+		state="$(api GET "$JELLYFIN/ScheduledTasks/$task_id" "$token")"
+		after="$(jq -r '.LastExecutionResult.EndTimeUtc // ""' <<<"$state")"
+		if [[ "$(jq -r .State <<<"$state")" == "Idle" && -n "$after" && "$after" != "$before" ]]; then
+			jq -r .LastExecutionResult.Status <<<"$state"
+			return 0
+		fi
+	done
+	echo "The migration task did not end within 30 seconds." >&2
+	return 1
+}
+
 # create_emby_api_key TOKEN APP_NAME -> prints the new API key.
 create_emby_api_key() {
 	local token="$1" app="$2"
