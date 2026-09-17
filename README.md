@@ -159,7 +159,7 @@ The first login must use the Emby password. The random password does not work, a
 | Start a demo in Docker to log in and look around | `scripts/dev-env.sh up` |
 | Show or remove the demo | `scripts/dev-env.sh status` or `scripts/dev-env.sh down` |
 
-CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so the first three commands match CI.
+CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so a local run of these three tasks matches CI.
 
 The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`; set `EMBY_PORT` and `JELLYFIN_PORT` to use other ports. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
 
