@@ -194,6 +194,32 @@ public class EmbyAuthenticationProviderTests
     }
 
     [Fact]
+    public async Task RefusesTheLogin_WhenCreateUserFailsBecauseJellyfinRejectsTheName()
+    {
+        var userManager = new FakeUserManager { CreateUserThrows = new ArgumentException("bad name") };
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", null));
+
+        Assert.Equal(["CreateUserAsync"], userManager.Calls);
+        Assert.DoesNotContain("DeleteUserAsync", userManager.Calls);
+    }
+
+    [Fact]
+    public async Task RefusesTheLogin_WhenCreateUserFailsWithAnUnexpectedExceptionType()
+    {
+        var userManager = new FakeUserManager { CreateUserThrows = new DbUpdateException("infrastructure failure") };
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", null));
+
+        Assert.Equal(["CreateUserAsync"], userManager.Calls);
+        Assert.DoesNotContain("DeleteUserAsync", userManager.Calls);
+    }
+
+    [Fact]
     public async Task RefusesTheLogin_WhenTheSaveAfterCreateUserFailsWithAnUnexpectedExceptionType()
     {
         var userManager = new FakeUserManager { UpdateUserThrows = new InvalidOperationException("save failed") };

@@ -155,7 +155,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         {
             user = await userManager.CreateUserAsync(embyLogin.Name).ConfigureAwait(false);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
             LogCreateAccountFailed(logger, ex, embyLogin.Name);
             throw new AuthenticationException(InvalidLogin, ex);
