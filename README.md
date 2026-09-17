@@ -105,8 +105,13 @@ The first login must use the Emby password. The random password does not work.
 | Task | Command |
 |---|---|
 | Install tools | `mise install` |
-| Build and run unit tests (warnings are errors) | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` |
-| Run end-to-end tests in Docker | `bats e2e/emby-auth.bats` |
+| Check formatting, and lint scripts and workflows | `mise run lint` |
+| Build and run unit tests (warnings are errors) | `mise run test` |
+| Run end-to-end tests in Docker | `mise run e2e` |
 | Run pre-commit checks | `prek run` |
+| Run a CI job in a local container | `act pull_request -j lint` (or `-j test`) |
+| Run the CI end-to-end job in a local container | `act pull_request -j e2e --bind --container-options "--network host"` |
+
+CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so the commands above match CI.
 
 The end-to-end tests start Emby, an nginx proxy that logs the requests to Emby, and Jellyfin. Emby and Jellyfin listen on `127.0.0.1:18096` and `127.0.0.1:28096`. The tests remove the containers after the run. Set `KEEP_E2E=1` to keep them.
