@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data;
@@ -167,6 +168,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
     }
 
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The cleanup delete must never let a second exception replace the login refusal already in flight (D-03); every exception type is logged and swallowed.")]
     private async Task<User> CreateAccountAsync(IUserManager userManager, EmbyAuthSettings settings, EmbyLogin embyLogin, string passwordHash)
     {
         User user;
@@ -185,23 +187,32 @@ internal sealed partial class EmbyAuthenticationProvider(
         AccountAccessPolicy.ApplyToNewAccount(user, settings.AccountAccess, embyLogin.EnableRemoteAccess);
 
         // Jellyfin commits the new account without a password. If this save fails, delete the account so that no blank password opens it.
-        var saved = false;
+        Exception? saveFailure = null;
         try
         {
             await userManager.UpdateUserAsync(user).ConfigureAwait(false);
-            saved = true;
         }
         catch (Exception ex)
         {
-            LogSaveFailed(logger, ex, embyLogin.Name);
-            throw new AuthenticationException(InvalidLogin, ex);
+            saveFailure = ex;
         }
-        finally
+
+        if (saveFailure is not null)
         {
-            if (!saved)
+            // The delete is attempted exactly once and never retried (D-03). Whichever of the two failures is
+            // the last word gets the one Error log: the save failure if the cleanup delete succeeds, or the
+            // delete failure if it does not, because that is the more actionable message for an administrator.
+            try
             {
                 await userManager.DeleteUserAsync(user.Id).ConfigureAwait(false);
+                LogSaveFailed(logger, saveFailure, embyLogin.Name);
             }
+            catch (Exception deleteEx)
+            {
+                LogDeleteFailed(logger, deleteEx, embyLogin.Name);
+            }
+
+            throw new AuthenticationException(InvalidLogin, saveFailure);
         }
 
         LogAccountCreated(logger, user.Username, settings.AccountAccess);
@@ -217,7 +228,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         {
             await userManager.UpdateUserAsync(user).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is DbUpdateException or ResourceNotFoundException)
+        catch (Exception ex)
         {
             LogSaveFailed(logger, ex, user.Username);
             throw new AuthenticationException(InvalidLogin, ex);
@@ -249,6 +260,9 @@ internal sealed partial class EmbyAuthenticationProvider(
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot save the password for user {Username}. The plugin refused the login.")]
     private static partial void LogSaveFailed(ILogger logger, Exception exception, string username);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot delete the half-made account for Emby user {EmbyUserName} after a failed save. The account may still exist on the Default login method with no password. Remove it or give it a password.")]
+    private static partial void LogDeleteFailed(ILogger logger, Exception exception, string embyUserName);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Emby Auth plugin refuses all logins on the Emby login method. {Problem} Set it in Dashboard > Plugins > Emby Auth.")]
     private static partial void LogSettingsInvalid(ILogger logger, string problem);

@@ -71,11 +71,7 @@ public class EmbyAuthenticationProviderTests
         Assert.Equal(userManager.LastCreatedUser?.Id, userManager.LastDeletedId);
     }
 
-    // RED, confirmed locally: the cleanup DeleteUserAsync sits in a finally with no surrounding
-    // try/catch, so its ResourceNotFoundException replaces the AuthenticationException on the way
-    // out. Skipped only for this commit (see the previous test's comment); unskipped in the next
-    // commit that guards the cleanup delete.
-    [Fact(Skip = "RED — unskipped when the cleanup delete is guarded in the next commit (AUTH-04)")]
+    [Fact]
     public async Task RefusesTheLogin_WhenTheSaveAndTheCleanupDeleteBothFail()
     {
         var userManager = new FakeUserManager
@@ -98,10 +94,7 @@ public class EmbyAuthenticationProviderTests
         Assert.DoesNotContain(logger.Entries, entry => entry.Contains(typedPassword, StringComparison.Ordinal) || entry.Contains(savedHash, StringComparison.Ordinal));
     }
 
-    // RED, confirmed locally: SavePasswordAsync's catch has the same narrow filter as
-    // CreateAccountAsync had before the previous plan's fix. Skipped only for this commit;
-    // unskipped in the next commit that widens this catch too.
-    [Fact(Skip = "RED — unskipped when SavePasswordAsync's catch widens in the next commit (AUTH-04)")]
+    [Fact]
     public async Task RefusesTheLogin_WhenSavingThePasswordOfAnExistingAccountFailsWithAnUnexpectedExceptionType()
     {
         var userManager = new FakeUserManager { UpdateUserThrows = new InvalidOperationException("save failed") };
