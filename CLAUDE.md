@@ -1,6 +1,6 @@
 # Jellyfin Emby Auth
 
-Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins against Emby, saves a Jellyfin password hash, and moves users to Jellyfin's Default login method, at once or when an administrator runs the migration task. `README.md` describes the behavior, the settings, and the admin procedures.
+Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins against Emby, saves a Jellyfin password hash, and moves users to Jellyfin's Default login method, at once or when an administrator runs the migration task. `README.md` is the short introduction (install, configure, migrate). `docs/` has the details: `how-it-works.md`, `settings.md`, `migration.md`, and `development.md`.
 
 ## Commands
 
@@ -36,6 +36,7 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
 - `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
 - `scripts/dev-env.sh` — the demo. It uses `e2e/compose.yaml` and `e2e/helpers.bash`.
+- `docs/` — user and developer documentation. `docs/images/settings-page.png` is the README screenshot, taken from the demo.
 
 ## Rules
 
@@ -46,6 +47,6 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
 - Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.
 - Pin exact versions. Look up the current stable version before a bump.
 - A Jellyfin version bump changes three pins together: `Jellyfin.Controller` and `Jellyfin.Model`, the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`, and the target framework.
-- Keep `README.md` accurate when behavior changes.
+- Keep `README.md` and `docs/` accurate when behavior changes. Keep the README short, and put details in `docs/`. When the settings page changes, take a new screenshot.
 
 Path-scoped rules add details: `.claude/rules/plugin.md` for `src/` and `tests/`, and `.claude/rules/e2e.md` for `e2e/`.
