@@ -1,10 +1,11 @@
 ---
 phase: 01-account-creation-and-login-security
 verified: 2026-09-17T23:00:00Z
-status: human_needed
+status: passed
 score: 5/5 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
+human_verification_result: passed — signed off by the maintainer in 01-UAT.md; all five elements confirmed present and the wording does not overstate the plugin's control over the window
 human_verification:
   - test: "Read the account-creation-window section of docs/how-it-works.md (the paragraphs starting \"Jellyfin has no login call that creates an account with a password already set...\" through \"...has the same window, for the same reason.\") and confirm it: (1) names the window between the account-creation call and the hash save, (2) says the account has no usable password during it and that the Default login method would accept a blank password then, (3) names the cause as Jellyfin having no create-with-password call, (4) describes the cleanup delete and what happens when that delete also fails, and (5) does not claim the window is eliminated."
     expected: "All five elements are present and the wording does not overstate the plugin's control over the window."

@@ -1,19 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 01-account-creation-and-login-security
 source: [01-VERIFICATION.md]
 started: 2026-09-17T00:00:00Z
-updated: 2026-09-17T00:00:00Z
+updated: 2026-09-17T01:00:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: docs/how-it-works.md account-creation-window prose accuracy
-expected: |
-  All five elements are present and the wording does not overstate the plugin's
-  control over the window.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -29,14 +24,14 @@ Read the account-creation-window section of `docs/how-it-works.md` (lines 16-22,
 
 expected: All five elements are present and the wording does not overstate the plugin's control over the window.
 why_human: This is a prose-accuracy judgment call, not a fact a grep can settle. Plan 01-02 Task 3 carried this exact check as a deferred `<human-check>` block (`workflow.human_verify_mode=end-of-phase`), and `01-VALIDATION.md` lists it under "Manual-Only Verifications" with sign-off still pending.
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 1
-passed: 0
+passed: 1
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
 blocked: 0
 
