@@ -3,18 +3,17 @@ status: testing
 phase: 02-safe-failures-for-the-fingerprint-file-and-settings
 source: [02-VERIFICATION.md]
 started: 2026-09-19T08:06:56Z
-updated: 2026-09-19T08:06:56Z
+updated: 2026-09-19T08:22:36Z
 ---
 
 ## Current Test
 
-number: 1
-name: Message legibility in a real Jellyfin dashboard
+number: 2
+name: Fingerprint-file documentation reads as actionable
 expected: |
-  Both failure messages read as clear instructions to an administrator, not developer
-  diagnostics, and each points to the Jellyfin log. Save is visibly unavailable after a failed
-  load. Neither the Emby URL nor the API key appears in either message. The loading indicator
-  does not stay up after a failed save.
+  An administrator can act on the read bullet — it states what the plugin does while the file is
+  unreadable, what it does not do to the file, and that the situation clears on its own. The
+  write bullet reads as it did before this phase.
 awaiting: user response
 
 ## Tests
@@ -36,7 +35,27 @@ why_human: |
   well to a person in the real dashboard chrome is a judgment a test cannot make. Deferred from
   02-02-PLAN.md Task 3's <human-check> block under workflow.human_verify_mode=end-of-phase.
 source: 02-02-PLAN.md Task 3
-result: [pending]
+result: issue
+reported: "I would move the save turned off below the save button so it looks like its part of it
+  rather than the migration section" / "agreed it would be better to more than disable what the
+  button does and make it look like its actually disabled" / "same for part b, it does as you
+  said... but as before bad placement and the button should get deactivated"
+severity: minor
+observed: |
+  Both messages say what they promise, and neither exposes the Emby URL or the API key. The
+  wording passes. The placement and the button state do not.
+
+  Part A, failed load. The message text matches configPage.html:93 exactly and the load did fail —
+  both settings fields stayed empty. The disable works: selecting Save sends no request. Two
+  presentation defects, both confirmed by the tester in a real dashboard:
+    1. The message renders in the Migration section, about a screen below the Save control it
+       describes. The tester did not find it unaided.
+    2. Save keeps its enabled blue styling while disabled, so it reads as live next to a visibly
+       grey "Run migration now". Selecting it does nothing and says nothing.
+
+  Part B, failed save. The message appears and the loading indicator clears, as specified. The
+  same two defects repeat: the message lands in the Migration section rather than with the Save
+  control, and Save is never deactivated around the save attempt.
 
 ### 2. Fingerprint-file documentation reads as actionable
 
@@ -56,15 +75,28 @@ result: [pending]
 
 total: 2
 passed: 0
-issues: 0
-pending: 2
+issues: 1
+pending: 1
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-No gaps block this phase's goal. Two warning-level findings from 02-REVIEW.md are carried forward
-for awareness, not as blockers:
+- gap_id: G-02-1
+  truth: "After a failed settings load, an administrator sees the failure message with the Save
+    control it describes, and Save reads as unavailable."
+  status: failed
+  reason: "User reported: I would move the save turned off below the save button so it looks like
+    its part of it rather than the migration section. And: agreed it would be better to more than
+    disable what the button does and make it look like its actually disabled."
+  severity: minor
+  test: 1
+  artifacts: []
+  missing: []
+
+### Carried forward from 02-REVIEW.md
+
+Two warning-level findings, for awareness, not as blockers:
 
 - **WR-01** — `EmbyVerifiedPasswords.Record()` mutates its cache before the disk write, so on a
   write failure `Matches()` can still return true for that login before a restart. This

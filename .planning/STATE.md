@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 Phase: 02 (Safe Failures for the Fingerprint File and Settings) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
-Last activity: 2026-09-18 — Phase 02 execution started
+Last activity: 2026-09-19 — Completed quick task 260919-208: Move settings failure message next to Save and show Save as disabled
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -100,6 +100,12 @@ None yet.
 
 - [Phase 1]: AUTH-04 when the save and the cleanup delete both fail, for example in a correlated database failure. Phase 1 planning must show how the plugin still leaves no enabled Default account without a password, because a further database write can fail too.
 - Research flags for phase planning (`.planning/research/SUMMARY.md:88`): `pageshow` under jsdom (Phase 2), the fault-injection tool for the load test (Phase 4), the assumption that tags are pushed from `main` behind the CI gate (Phase 5), Pages action SHAs (Phase 6).
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260919-208 | Move settings failure message next to Save and show Save as disabled | 2026-09-19 | 1f47767 | [260919-208-move-settings-failure-message-next-to-sa](./quick/260919-208-move-settings-failure-message-next-to-sa/) |
 
 ## Deferred Items
 
