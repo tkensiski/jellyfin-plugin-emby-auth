@@ -14,6 +14,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
 - [ ] **AUTH-05**: The plugin ends the Emby session whenever Emby returns an access token, including a login response that has no user name.
+- [ ] **AUTH-06**: The plugin never leaves an empty saved password on an account it manages. A password reset writes a random password hash instead of removing the password, so that a later move to another login method cannot leave an account that a blank password opens. The saved hash plays no part in an Emby login method login (AUTH-01), so the user still signs in through Emby. The migration list names any account on the Emby login method that still has no saved password, because an administrator can create one that the plugin never touched.
 
 ### Verified Password Records
 
@@ -101,6 +102,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
 | AUTH-05 | Phase 4 | Pending |
+| AUTH-06 | Phase 3 | Pending |
 | FPRT-01 | Phase 3 | Pending |
 | FPRT-02 | Phase 2 | Pending |
 | FPRT-03 | Phase 3 | Pending |
@@ -133,10 +135,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 
-- v1 requirements: 34 total
-- Mapped to phases: 34
+- v1 requirements: 35 total
+- Mapped to phases: 35
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-18 — MIGR-01 and MIGR-02 added after the JellyfinSecurity compatibility test*
+*Last updated: 2026-09-18 — MIGR-01, MIGR-02, and AUTH-06 added after the JellyfinSecurity compatibility test*
