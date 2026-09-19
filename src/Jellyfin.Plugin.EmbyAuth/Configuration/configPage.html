@@ -6,6 +6,12 @@
 </head>
 <body>
     <div id="EmbyAuthConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+        <style>
+            #EmbyAuthConfigPage .button-submit[disabled] {
+                opacity: 0.38;
+                cursor: default;
+            }
+        </style>
         <div data-role="content">
             <div class="content-primary">
                 <form id="EmbyAuthConfigForm">
@@ -40,6 +46,7 @@
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
                         </button>
+                        <p id="EmbyAuthSettingsStatus" role="status"></p>
                     </div>
                 </form>
 
@@ -78,11 +85,17 @@
                 });
             }
 
+            function clearEmbyAuthMigration() {
+                document.querySelector('#EmbyAuthMigrationSummary').textContent = '';
+                document.querySelector('#EmbyAuthMigrationUsers').replaceChildren();
+            }
+
             document.querySelector('#EmbyAuthConfigPage')
                 .addEventListener('pageshow', function () {
-                    var summary = document.querySelector('#EmbyAuthMigrationSummary');
+                    var status = document.querySelector('#EmbyAuthSettingsStatus');
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
+                        status.textContent = '';
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
@@ -90,8 +103,9 @@
                         document.querySelector('.button-submit').disabled = false;
                         return loadEmbyAuthMigration();
                     }).catch(function () {
-                        summary.textContent = 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
+                        status.textContent = 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
                         document.querySelector('.button-submit').disabled = true;
+                        clearEmbyAuthMigration();
                     }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });
@@ -110,7 +124,9 @@
 
             document.querySelector('#EmbyAuthConfigForm')
                 .addEventListener('submit', function (e) {
-                    var summary = document.querySelector('#EmbyAuthMigrationSummary');
+                    var status = document.querySelector('#EmbyAuthSettingsStatus');
+                    status.textContent = '';
+                    document.querySelector('.button-submit').disabled = true;
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
@@ -119,9 +135,10 @@
                         config.AccountAccess = document.querySelector('#AccountAccess').value;
                         return ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
+                            document.querySelector('.button-submit').disabled = false;
                         });
                     }).catch(function () {
-                        summary.textContent = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
+                        status.textContent = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
                     }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });

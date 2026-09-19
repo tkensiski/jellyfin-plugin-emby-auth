@@ -179,6 +179,30 @@ function listItemTexts(document) {
 }
 
 /**
+ * Returns the settings-level status element that sits with the Save button.
+ *
+ * @param {Document} document - the page's document.
+ * @returns {Element} the `#EmbyAuthSettingsStatus` element.
+ */
+function settingsStatus(document) {
+  return document.querySelector('#EmbyAuthSettingsStatus');
+}
+
+/**
+ * Reads the CSS rules the page's own `<style>` elements declare.
+ *
+ * jsdom loads no dashboard stylesheet, so this is how a test can assert on a
+ * rule the page ships, by reading the CSSOM jsdom parses from an inline
+ * `<style>` element.
+ *
+ * @param {Document} document - the page's document.
+ * @returns {CSSRule[]} every rule declared by a `<style>` element on the page, in document order.
+ */
+function pageStyleRules(document) {
+  return Array.from(document.styleSheets).flatMap((sheet) => Array.from(sheet.cssRules));
+}
+
+/**
  * Awaits three macrotask boundaries, so promise chains queued by a dispatched
  * event have settled before an assertion reads the resulting DOM state.
  *
@@ -249,4 +273,6 @@ module.exports = {
   clickSave,
   clickRunMigration,
   listItemTexts,
+  settingsStatus,
+  pageStyleRules,
 };

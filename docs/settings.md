@@ -11,7 +11,7 @@ Open **Dashboard > Plugins > Emby Auth** in Jellyfin.
 
 If a setting is missing or not valid, the plugin refuses each login that it handles and writes the cause to the Jellyfin log at Error level.
 
-If Jellyfin cannot load the settings, the page shows a message and turns Save off, so that empty fields cannot replace the saved settings. Save turns back on when the settings load, which happens when you open the page again after the cause is fixed. If Jellyfin cannot save the settings, the page shows a message. Both messages point to the Jellyfin log, and neither message repeats the Emby server URL or the API key, because the URL can contain a user name and password.
+If Jellyfin cannot load the settings, the page shows a message under Save and turns Save off, so that empty fields cannot replace the saved settings. Save turns back on when the settings load, which happens when you open the page again after the cause is fixed. If Jellyfin cannot save the settings, the page shows a message under Save, and Save stays off until you open the page again. Both messages point to the Jellyfin log, and neither message repeats the Emby server URL or the API key, because the URL can contain a user name and password.
 
 ## Set the settings through the API
 

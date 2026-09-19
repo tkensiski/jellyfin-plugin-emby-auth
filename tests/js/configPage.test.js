@@ -10,7 +10,13 @@ const {
   clickSave,
   clickRunMigration,
   listItemTexts,
+  settingsStatus,
+  pageStyleRules,
 } = require('./testHelpers');
+
+const LOAD_FAILURE_MESSAGE =
+  'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
+const SAVE_FAILURE_MESSAGE = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
 
 test('a failed settings load shows a message on the page', async () => {
   const { document, window } = buildDom({ getConfigFails: true });
@@ -18,9 +24,10 @@ test('a failed settings load shows a message on the page', async () => {
   firePageshow(document, window);
   await flush();
 
-  assert.match(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    /cannot load the plugin settings/,
+  assert.equal(settingsStatus(document).textContent, LOAD_FAILURE_MESSAGE);
+  assert.equal(
+    document.querySelector('#EmbyAuthMigrationSummary').textContent.includes('plugin settings'),
+    false,
   );
   assert.equal(document.querySelector('.button-submit').disabled, true);
 });
@@ -87,10 +94,10 @@ test('the load-failure message repeats neither the configured URL nor the API ke
   firePageshow(document, window);
   await flush();
 
-  const summary = document.querySelector('#EmbyAuthMigrationSummary');
-  assert.equal(summary.children.length, 0);
-  assert.equal(summary.textContent.includes('sup3rsecret'), false);
-  assert.equal(summary.textContent.includes(apiKeySentinel), false);
+  const status = settingsStatus(document);
+  assert.equal(status.children.length, 0);
+  assert.equal(status.textContent.includes('sup3rsecret'), false);
+  assert.equal(status.textContent.includes(apiKeySentinel), false);
 });
 
 test('a failed configuration update shows a message', async () => {
@@ -100,10 +107,7 @@ test('a failed configuration update shows a message', async () => {
   fireSubmit(document, window);
   await flush();
 
-  assert.match(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    /cannot save the plugin settings/,
-  );
+  assert.equal(settingsStatus(document).textContent, SAVE_FAILURE_MESSAGE);
   assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
 });
 
@@ -117,10 +121,7 @@ test('a failed re-fetch during save shows the same message', async () => {
   fireSubmit(document, window);
   await flush();
 
-  assert.match(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    /cannot save the plugin settings/,
-  );
+  assert.match(settingsStatus(document).textContent, /cannot save the plugin settings/);
   assert.deepEqual(api.updateCalls, []);
   assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
 });
@@ -137,10 +138,10 @@ test('the save-failure message repeats neither the configured URL nor the API ke
   fireSubmit(document, window);
   await flush();
 
-  const summary = document.querySelector('#EmbyAuthMigrationSummary');
-  assert.equal(summary.children.length, 0);
-  assert.equal(summary.textContent.includes('sup3rsecret'), false);
-  assert.equal(summary.textContent.includes(apiKeySentinel), false);
+  const status = settingsStatus(document);
+  assert.equal(status.children.length, 0);
+  assert.equal(status.textContent.includes('sup3rsecret'), false);
+  assert.equal(status.textContent.includes(apiKeySentinel), false);
   assert.ok(dashboard.hideLoadingCalls >= 1);
 });
 
@@ -285,4 +286,118 @@ test('a failed Run migration now shows its message', async (t) => {
     document.querySelector('#EmbyAuthMigrationSummary').textContent,
     /did not start the migration/,
   );
+});
+
+test('the settings status sits with the Save control', () => {
+  const { document, window } = buildDom({});
+
+  const status = settingsStatus(document);
+  const form = document.querySelector('#EmbyAuthConfigForm');
+  const verticalSection = document.querySelector('.verticalSection');
+  const saveButton = document.querySelector('.button-submit');
+
+  assert.ok(status, 'expected #EmbyAuthSettingsStatus to exist');
+  assert.equal(form.contains(status), true);
+  assert.equal(verticalSection.contains(status), false);
+  assert.equal(
+    Boolean(
+      // eslint-disable-next-line no-bitwise
+      saveButton.compareDocumentPosition(status) & window.Node.DOCUMENT_POSITION_FOLLOWING,
+    ),
+    true,
+  );
+});
+
+test('a disabled Save is marked and dimmed', async () => {
+  const { document, window } = buildDom({ getConfigFails: true });
+
+  firePageshow(document, window);
+  await flush();
+
+  const saveButton = document.querySelector('.button-submit');
+  assert.equal(saveButton.hasAttribute('disabled'), true);
+
+  const disabledRule = pageStyleRules(document).find(
+    (rule) => rule.selectorText && rule.selectorText.includes('.button-submit[disabled]'),
+  );
+  assert.ok(disabledRule, 'expected a page style rule targeting .button-submit[disabled]');
+
+  const opacity = Number.parseFloat(disabledRule.style.opacity);
+  assert.ok(opacity > 0 && opacity < 1);
+  assert.equal(disabledRule.style.cursor, 'default');
+});
+
+test('a successful load clears a stale settings failure', async () => {
+  const { document, window, api } = buildDom({ getConfigFails: true });
+
+  firePageshow(document, window);
+  await flush();
+  assert.equal(settingsStatus(document).textContent, LOAD_FAILURE_MESSAGE);
+
+  api.getConfigFails = false;
+  firePageshow(document, window);
+  await flush();
+
+  assert.equal(settingsStatus(document).textContent, '');
+  assert.equal(document.querySelector('.button-submit').disabled, false);
+});
+
+test('attempting a save disables Save at once', async () => {
+  const { document, window } = buildDom({});
+
+  firePageshow(document, window);
+  await flush();
+
+  fireSubmit(document, window);
+  assert.equal(document.querySelector('.button-submit').disabled, true);
+
+  await flush();
+});
+
+test('Save stays off after a failed save', async () => {
+  const { document, window, api } = buildDom({ updateConfigFails: true });
+
+  fireSubmit(document, window);
+  await flush();
+  assert.equal(document.querySelector('.button-submit').disabled, true);
+
+  const callsBefore = api.updateCalls.length;
+  clickSave(document);
+  clickSave(document);
+  await flush();
+
+  assert.equal(api.updateCalls.length, callsBefore);
+});
+
+test('a successful save turns Save back on', async () => {
+  const { document, window, api, dashboard } = buildDom({});
+
+  firePageshow(document, window);
+  await flush();
+  fireSubmit(document, window);
+  await flush();
+
+  assert.equal(api.updateCalls.length, 1);
+  assert.equal(dashboard.updateResults.length, 1);
+  assert.equal(document.querySelector('.button-submit').disabled, false);
+});
+
+test('a failed load clears the migration list', async () => {
+  const users = [
+    { Name: 'alice', ReadyToMove: true },
+    { Name: 'bob', ReadyToMove: false },
+    { Name: 'carol', ReadyToMove: true },
+  ];
+  const { document, window, api } = buildDom({ users });
+
+  firePageshow(document, window);
+  await flush();
+  assert.equal(listItemTexts(document).length, 3);
+
+  api.getConfigFails = true;
+  firePageshow(document, window);
+  await flush();
+
+  assert.equal(listItemTexts(document).length, 0);
+  assert.equal(document.querySelector('#EmbyAuthMigrationSummary').textContent, '');
 });
