@@ -25,7 +25,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 ### Settings Page
 
 - [x] **UI-01**: When loading the plugin settings fails, the settings page shows a message, and a Save after that failed load does not write empty fields over the saved settings.
-- [ ] **UI-02**: When saving the plugin settings fails, the settings page shows a message.
+- [x] **UI-02**: When saving the plugin settings fails, the settings page shows a message.
 - [ ] **UI-03**: After **Run migration now**, the migration list shows that the migration runs and updates when the task finishes, instead of reloading once after a fixed 3 seconds.
 
 ### Migration Target
@@ -46,7 +46,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **TEST-01**: Unit tests cover `EmbyAuthenticationProvider`: account checks, the Emby login, account creation and update, and every failure path in AUTH-04.
 - [ ] **TEST-02**: Unit tests cover `MoveToDefaultLoginMethod`, `DefaultLoginMethod`, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`.
 - [ ] **TEST-03**: Unit tests cover `EmbyAuthController`: the migration status, the run request, and the task state.
-- [ ] **TEST-04**: Automated tests run the settings page JavaScript: load, save, their error messages, the migration list, and **Run migration now**.
+- [x] **TEST-04**: Automated tests run the settings page JavaScript: load, save, their error messages, the migration list, and **Run migration now**.
 - [ ] **TEST-05**: A test covers concurrent first logins through Jellyfin.
 - [ ] **TEST-06**: An e2e test covers invalid settings on a running server: logins on the Emby login method are refused, and the Jellyfin log names the problem at Error level.
 
@@ -108,7 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FPRT-02 | Phase 2 | Pending |
 | FPRT-03 | Phase 3 | Pending |
 | UI-01 | Phase 2 | Complete |
-| UI-02 | Phase 2 | Pending |
+| UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 3 | Pending |
 | MIGR-01 | Phase 3 | Pending |
 | MIGR-02 | Phase 3 | Pending |
@@ -120,7 +120,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 3 | Pending |
 | TEST-03 | Phase 3 | Pending |
-| TEST-04 | Phase 2 | Pending |
+| TEST-04 | Phase 2 | Complete |
 | TEST-05 | Phase 4 | Pending |
 | TEST-06 | Phase 4 | Pending |
 | PERF-01 | Phase 4 | Pending |

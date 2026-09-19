@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 02
 current_phase_name: Safe Failures for the Fingerprint File and Settings
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-09-19T07:15:38.492Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-19T07:38:01.056Z"
 last_activity: 2026-09-18
 last_activity_desc: Phase 02 execution started
-state_head: 187a135a30ed435e6a9ea7d4d0753cc0e68933cc
+state_head: 43ff594cab89a23e8d5a4bcf5c2e5ced31359662
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 ## Current Position
 
 Phase: 02 (Safe Failures for the Fingerprint File and Settings) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-09-18 — Phase 02 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-account-creation-and-login-security P03 | 25min | 2 tasks | 6 files |
 | Phase 01 P04 | 20min | 3 tasks | 6 files |
 | Phase 02 P01 | 22min | 2 tasks | 8 files |
+| Phase 02 P02 | 20min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,9 @@ Recent decisions affecting current work:
 - [Phase 01]: Phase 01: User-directed scope change at the 01-04 Task 3 checkpoint — removed the settings-page screenshot entirely (README.md and CLAUDE.md references stripped too) instead of retaking it — Avoids re-establishing the screenshot-maintenance rule in CLAUDE.md for a single README image
 - [Phase 02]: Approved jsdom@28.1.0 at the Task 1 legitimacy checkpoint (2026-09-19) — SUS/too-new verdict reflected the latest dist-tag (30.1.0), not the seven-month-old 28.1.0 pin; no postinstall script at any version, canonical jsdom/jsdom repo, test-only dependency never shipped
 - [Phase 02]: Three of Task 3's four new tests proven by remove-and-restore against Task 2's already-working fix, rather than an artificial pre-implementation red — Following Phase 01's established precedent for tests that cover already-working behavior rather than new code
+- [Phase 02]: getConfigFailsFromCall (call-count-aware config failure flag) added to the ApiClient stub instead of a second stub factory, so a single test can let the pageshow fetch succeed while the submit handler's own re-fetch rejects
+- [Phase 02]: docs/settings.md's Save-off sentence avoids markdown bold around "Save" so the plain-text acceptance-criteria regex matches the literal file content
+- [Phase 02]: Task 2's ten new settings-page tests used break-then-restore rather than RED-first, since they cover already-working migration-list and Run-migration-now behavior — per this plan's tdd_discipline section and 02-01's established precedent
 
 ### Pending Todos
 
@@ -103,6 +107,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-19T07:15:38.440Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-09-19T07:38:01.007Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
