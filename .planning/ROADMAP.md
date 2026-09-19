@@ -2,7 +2,7 @@
 
 ## Overview
 
-This roadmap takes the working plugin to a public first release. The security fixes come first: account creation that leaves no open account, and logins that only Emby decides. Next, the fingerprint file and the settings page stop losing data when a read or a request fails. Then the migration status, the Emby traffic, and the load test get their fixes and tests. The last two phases make the repository safe to publish, then publish one manifest and version 1.0.0.0 so that any Jellyfin 12.1 administrator can install and update the plugin from the catalog.
+This roadmap takes the working plugin to a public first release. The security fixes come first: account creation that leaves no open account, and logins that only Emby decides. Next, the fingerprint file and the settings page stop losing data when a read or a request fails. Then the migration status and the migration target, the Emby traffic, and the load test get their fixes and tests. The last two phases make the repository safe to publish, then publish one manifest and version 1.0.0.0 so that any Jellyfin 12.1 administrator can install and update the plugin from the catalog.
 
 ## Phases
 
@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Account Creation and Login Security** - Account creation leaves no open account, and only Emby decides a login on the Emby login method (completed 2026-09-17)
 - [ ] **Phase 2: Safe Failures for the Fingerprint File and Settings** - An unreadable fingerprint file keeps its records, and the settings page reports load and save failures
-- [ ] **Phase 3: Migration Status** - The Migration section shows the real task state and fingerprint file problems, and the migration code has unit tests
+- [ ] **Phase 3: Migration Status and Target** - The Migration section shows the real task state and fingerprint file problems, the login method that users move to is a setting, and the migration code has unit tests
 - [ ] **Phase 4: Emby Traffic Under Load and Failure** - Emby sessions always end, concurrent and misconfigured logins have tests, and the load test measures each bottleneck
 - [ ] **Phase 5: Public Repository** - Releases require a passing CI run, the history has no secrets, and the maintainer approves the switch to public
 - [ ] **Phase 6: Catalog Install and First Public Release** - An administrator installs and updates the plugin from the manifest URL, and version 1.0.0.0 is published
@@ -71,18 +71,21 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 
-### Phase 3: Migration Status
+### Phase 3: Migration Status and Target
 
-**Goal**: The Migration section of the settings page shows what the migration task and the fingerprint file actually do, and the migration code has unit tests against an SQLite in-memory `JellyfinDbContext`. The database test seam and the `ITaskManager` fake come before the fixes.
+**Goal**: The Migration section of the settings page shows what the migration task and the fingerprint file actually do, the login method that users move to becomes a setting instead of a fixed value, and the migration code has unit tests against an SQLite in-memory `JellyfinDbContext`. The database test seam and the `ITaskManager` fake come before the fixes.
 **Depends on**: Phase 2
-**Requirements**: FPRT-01, FPRT-03, UI-03, TEST-02, TEST-03, DOCS-01
+**Requirements**: FPRT-01, FPRT-03, UI-03, MIGR-01, MIGR-02, TEST-02, TEST-03, DOCS-01
 **Success Criteria** (what must be TRUE):
 
   1. When Jellyfin cannot read the fingerprint file, the Migration section tells the administrator and points to the Jellyfin log.
   2. After **Run migration now**, the migration list shows that the migration runs and updates when the task finishes, also for a run that takes longer than 3 seconds. One change to the `GET /EmbyAuth/Migration` response carries both the read failure and the task state.
   3. When Jellyfin cannot write the fingerprint file, the log message, the XML doc, and `docs/how-it-works.md` say that the record stays in memory until Jellyfin restarts, and a unit test covers the write failure.
   4. `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
-  5. `dotnet test` runs unit tests for `MoveToDefaultLoginMethod`, `DefaultLoginMethod`, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`, and for `EmbyAuthController`: the migration status, the run request, and the task state.
+  5. `dotnet test` runs unit tests for the move classes, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`, and for `EmbyAuthController`: the migration status, the run request, and the task state.
+  6. An administrator chooses the login method that users move to. The settings page offers only the login methods that Jellyfin reports as enabled, and a value that is not one of them is refused with a message. Every move uses the chosen method, including the move after a password that an administrator sets in Jellyfin. The class and task names no longer say "Default".
+  7. An e2e test moves a user to a second login method that is not Jellyfin's Default, and that user then logs in with the password that Emby verified.
+  8. A unit test fails if `EmbyAuthenticationProvider` becomes public, and a comment on the class says why it stays internal.
 
 **Plans**: TBD
 **UI hint**: yes
@@ -141,7 +144,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 0/TBD | Not started | - |
-| 3. Migration Status | 0/TBD | Not started | - |
+| 3. Migration Status and Target | 0/TBD | Not started | - |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |

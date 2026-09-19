@@ -90,6 +90,8 @@ The full list with IDs is in `.planning/REQUIREMENTS.md` (32 v1 requirements). S
 | Public repository with one multi-version manifest on GitHub Pages, published by a separate workflow | Usual setup for third-party Jellyfin plugins; a stable URL; a failed Pages deploy can be re-run without a new release | — Pending |
 | Release checks that the tagged commit has a passing `ci-success` run | Proves the exact commit passed CI without re-running e2e; tags must be pushed on commits that CI ran on | — Pending |
 | Performance work starts with a load test | None of the three bottlenecks is measured | — Pending |
+| The login method that users move to becomes a setting, so a server can end on a login method other than Jellyfin's Default | Measured on 2026-09-18: a user whose account holds an Emby-verified hash logs in through JellyfinSecurity's `TwoFactorAuthProvider`, which checks the hash through Jellyfin's Default provider and sends nothing to Emby. An unenrolled user is not challenged. So Emby login method → another provider is a working end state | — Pending (MIGR-01, Phase 3) |
+| `EmbyAuthenticationProvider` stays `internal` | `GetExports<IAuthenticationProvider>()` returns public types only (`ApplicationHost.cs:768`). A public class would join the scan that JellyfinSecurity uses to pick the provider it forwards passwords to, which could send a password to Emby for a user this plugin does not serve | — Pending (MIGR-02, Phase 3) |
 
 ## Evolution
 

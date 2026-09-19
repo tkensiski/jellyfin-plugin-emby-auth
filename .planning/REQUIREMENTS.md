@@ -27,6 +27,11 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [ ] **UI-02**: When saving the plugin settings fails, the settings page shows a message.
 - [ ] **UI-03**: After **Run migration now**, the migration list shows that the migration runs and updates when the task finishes, instead of reloading once after a fixed 3 seconds.
 
+### Migration Target
+
+- [ ] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses this setting, including the move after a password that an administrator sets in Jellyfin.
+- [ ] **MIGR-02**: `EmbyAuthenticationProvider` stays `internal`. A public class enters the `GetExports<IAuthenticationProvider>()` scan that another plugin can run, which can send a password to Emby for a user that this plugin does not serve. A unit test fails if the class becomes public.
+
 ### Documentation
 
 - [ ] **DOCS-01**: `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
@@ -102,6 +107,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-01 | Phase 2 | Pending |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 3 | Pending |
+| MIGR-01 | Phase 3 | Pending |
+| MIGR-02 | Phase 3 | Pending |
 | DOCS-01 | Phase 3 | Pending |
 | DOCS-02 | Phase 6 | Pending |
 | DOCS-03 | Phase 5 | Pending |
@@ -126,10 +133,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 
-- v1 requirements: 32 total
-- Mapped to phases: 32
+- v1 requirements: 34 total
+- Mapped to phases: 34
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-17 after roadmap creation*
+*Last updated: 2026-09-18 — MIGR-01 and MIGR-02 added after the JellyfinSecurity compatibility test*
