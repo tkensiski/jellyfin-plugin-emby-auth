@@ -24,7 +24,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Settings Page
 
-- [ ] **UI-01**: When loading the plugin settings fails, the settings page shows a message, and a Save after that failed load does not write empty fields over the saved settings.
+- [x] **UI-01**: When loading the plugin settings fails, the settings page shows a message, and a Save after that failed load does not write empty fields over the saved settings.
 - [ ] **UI-02**: When saving the plugin settings fails, the settings page shows a message.
 - [ ] **UI-03**: After **Run migration now**, the migration list shows that the migration runs and updates when the task finishes, instead of reloading once after a fixed 3 seconds.
 
@@ -107,7 +107,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FPRT-01 | Phase 3 | Pending |
 | FPRT-02 | Phase 2 | Pending |
 | FPRT-03 | Phase 3 | Pending |
-| UI-01 | Phase 2 | Pending |
+| UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 3 | Pending |
 | MIGR-01 | Phase 3 | Pending |
