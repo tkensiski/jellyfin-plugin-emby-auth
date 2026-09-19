@@ -1,17 +1,17 @@
 ---
 gsd_state_version: 1.0
 milestone: v0.9.0.0
-current_phase: 02
-current_phase_name: Safe Failures for the Fingerprint File and Settings
-status: verifying
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-19T07:48:00.481Z"
-last_activity: 2026-09-18
-last_activity_desc: Phase 02 execution started
-state_head: 20ba50221b3c20092e9e06b7711e231232dcfd99
+current_phase: 3
+current_phase_name: Migration Status and Target
+status: planning
+stopped_at: Phase 02 complete, ready to plan Phase 3
+last_updated: "2026-09-19T20:58:47.524Z"
+last_activity: 2026-09-19
+last_activity_desc: Phase 02 complete, transitioned to Phase 3
+state_head: ade25f6c5ea404e00ba3806fb84c5196e9aa1fe1
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
   completed_plans: 7
 ---
@@ -20,25 +20,25 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-09-17)
+See: .planning/PROJECT.md (updated 2026-09-19)
 
 **Core value:** A user moves from Emby to Jellyfin without a password reset, and no password that Emby did not verify ever opens an account.
-**Current focus:** Phase 02 — Safe Failures for the Fingerprint File and Settings
+**Current focus:** Phase 3 — Migration Status and Target
 
 ## Current Position
 
-Phase: 02 (Safe Failures for the Fingerprint File and Settings) — EXECUTING
-Plan: 3 of 3
-Status: Phase complete — ready for verification
-Last activity: 2026-09-19 — Completed quick task 260919-inm: Add a warning icon to the four failure messages on the settings page
+Phase: 3 — Migration Status and Target
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-09-19 — Phase 02 complete, transitioned to Phase 3
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 4
+- Total plans completed: 7
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -47,6 +47,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 4 | - | - |
+| 02 | 3 | - | - |
 
 **Recent Trend:**
 
@@ -98,8 +99,9 @@ None yet.
 
 ### Blockers/Concerns
 
-- [Phase 1]: AUTH-04 when the save and the cleanup delete both fail, for example in a correlated database failure. Phase 1 planning must show how the plugin still leaves no enabled Default account without a password, because a further database write can fail too.
-- Research flags for phase planning (`.planning/research/SUMMARY.md:88`): `pageshow` under jsdom (Phase 2), the fault-injection tool for the load test (Phase 4), the assumption that tags are pushed from `main` behind the CI gate (Phase 5), Pages action SHAs (Phase 6).
+- Research flags for phase planning (`.planning/research/SUMMARY.md:88`): the fault-injection tool for the load test (Phase 4), the assumption that tags are pushed from `main` behind the CI gate (Phase 5), Pages action SHAs (Phase 6). The `pageshow`-under-jsdom flag is resolved — Phase 2 shipped the suite.
+- [Phase 3]: **FPRT-01 must fix a stated-behavior mismatch, not only add a guarantee.** `EmbyVerifiedPasswords.Record()` assigns into the cache at `EmbyVerifiedPasswords.cs:58` before the write at `:62-63`, and `Load()` returns the `_fingerprints` field by reference, so a failed write leaves the cache holding a record the disk does not. `MoveToDefaultLoginMethod` then reads that cache (`MoveToDefaultLoginMethod.cs:48`) after the login, so in `MoveAfterFirstLogin` mode the user **is** moved to Default despite the write failure. Two shipped sentences say the opposite: the log message at `EmbyVerifiedPasswords.cs:128` and `docs/how-it-works.md:49`. Not a privilege escalation — Emby verified that password moments earlier — but Phase 3 must either correct both sentences or move the cache mutation after a successful write. Traced and recorded as O-1 in `02-SECURITY.md`; carried from WR-01 in `02-REVIEW.md`.
+- [Phase 2, minor]: `tests/js/package.json:4` declares `jsdom` under `dependencies` rather than `devDependencies`. No security effect — the package is `private: true`, test-only, and never ships — but the classification contradicts `02-01-SUMMARY.md:20`.
 
 ### Quick Tasks Completed
 
@@ -118,6 +120,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-19T07:48:00.436Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-19T20:58:47Z
+Stopped at: Phase 02 complete — UAT 2/2 passed, Nyquist-compliant, threats_open 0. Ready to plan Phase 3.
 Resume file: None

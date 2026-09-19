@@ -14,7 +14,7 @@ This roadmap takes the working plugin to a public first release. The security fi
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Account Creation and Login Security** - Account creation leaves no open account, and only Emby decides a login on the Emby login method (completed 2026-09-17)
-- [ ] **Phase 2: Safe Failures for the Fingerprint File and Settings** - An unreadable fingerprint file keeps its records, and the settings page reports load and save failures
+- [x] **Phase 2: Safe Failures for the Fingerprint File and Settings** - An unreadable fingerprint file keeps its records, and the settings page reports load and save failures (completed 2026-09-19)
 - [ ] **Phase 3: Migration Status and Target** - The Migration section shows the real task state and fingerprint file problems, the login method that users move to is a setting, and the migration code has unit tests
 - [ ] **Phase 4: Emby Traffic Under Load and Failure** - Emby sessions always end, concurrent and misconfigured logins have tests, and the load test measures each bottleneck
 - [ ] **Phase 5: Public Repository** - Releases require a passing CI run, the history has no secrets, and the maintainer approves the switch to public
@@ -156,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
-| 2. Safe Failures for the Fingerprint File and Settings | 3/3 | In Progress|  |
+| 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 0/TBD | Not started | - |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |

@@ -30,15 +30,24 @@ Inferred from the code at commit `ecee1ed` (`.planning/codebase/ARCHITECTURE.md`
 - ✓ No password or API key in any log message, checked by unit tests and the e2e log test — existing
 - ✓ CI runs lint, unit tests, script tests, and e2e tests on pull requests and on pushes to `main`; a `v*` tag builds a release zip and `manifest.json` — existing
 
+Shipped in this milestone. Status of record is the traceability table in `.planning/REQUIREMENTS.md`.
+
+- ✓ **AUTH-01, AUTH-02, AUTH-03, AUTH-04** — Phase 1
+- ✓ **TEST-01** — Phase 1
+- ✓ **FPRT-02**: a failed read of the fingerprint file never causes a later record to replace the file and erase the records in it — Phase 2
+- ✓ **UI-01**: a failed settings load shows a message, and a Save after that failed load does not write empty fields over the saved settings — Phase 2
+- ✓ **UI-02**: a failed settings save shows a message — Phase 2
+- ✓ **TEST-04**: automated tests run the settings page JavaScript — load, save, their error messages, the migration list, and **Run migration now** — Phase 2
+
 ### Active
 
 The full list with IDs is in `.planning/REQUIREMENTS.md` (32 v1 requirements). Summary by group:
 
-- [ ] **Password and account security (AUTH-01..05):** while a user is on the Emby login method, Emby checks every login and the saved hash plays no part; `JellyfinPasswordFirst` is removed; account creation follows Jellyfin's own create-then-save pattern with no failure path that returns HTTP 500 or leaves a passwordless Default account; the Emby session always ends when Emby returns a token.
-- [ ] **Verified password records (FPRT-01..03):** a failed write keeps the in-memory record and the docs say so; a failed read never erases records and shows on the settings page.
-- [ ] **Settings page (UI-01..03):** load and save failures show a message; the migration list follows the real task state.
+- [ ] **Password and account security (AUTH-05):** the Emby session always ends when Emby returns a token. AUTH-01..04 shipped in Phase 1.
+- [ ] **Verified password records (FPRT-01, FPRT-03):** a failed write keeps the in-memory record and the docs say so; a failed read shows on the settings page. FPRT-02 shipped in Phase 2.
+- [ ] **Settings page (UI-03):** the migration list follows the real task state. UI-01 and UI-02 shipped in Phase 2.
 - [ ] **Documentation (DOCS-01..04):** correct shutdown step reference; manifest URL and catalog steps; tested versions and the `targetAbi` minimum; complete version bump rule.
-- [ ] **Test coverage (TEST-01..06):** unit tests for the untested classes, settings page JavaScript tests, concurrent first logins, invalid settings on a running server.
+- [ ] **Test coverage (TEST-02, TEST-03, TEST-05, TEST-06):** concurrent first logins, invalid settings on a running server. TEST-01 shipped in Phase 1, TEST-04 in Phase 2.
 - [ ] **Performance (PERF-01..02):** a load test with a separate account pool; each bottleneck fixed or accepted with measured numbers.
 - [ ] **Release and tooling (REL-01..04):** release only for a tagged commit with a passing `ci-success` run; pedantic zizmor findings resolved; gitleaks in lint; per-version changelog.
 - [ ] **Public install (PUB-01..05):** full audit before going public; multi-version manifest on GitHub Pages; public repository with maintainer approval at that time; catalog install and update verified; v1.0.0 published.
@@ -111,4 +120,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-09-17 after requirements definition*
+*Last updated: 2026-09-19 after Phase 02*

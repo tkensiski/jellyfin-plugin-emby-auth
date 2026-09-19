@@ -1,11 +1,12 @@
 ---
 phase: 02-safe-failures-for-the-fingerprint-file-and-settings
 verified: 2026-09-19T00:00:00Z
-status: human_needed
+status: passed
 score: 10/10 must-haves verified
 behavior_unverified: 0
 overrides_applied: 0
 human_verification:
+
   - test: "Force a failed settings load and a failed settings save in a real Jellyfin dashboard (`scripts/dev-env.sh up`, plugin settings page on port 28196), reading both messages in place."
     expected: "The load-failure message is legible in the Migration section, the Save button is visibly unavailable, and neither the Emby server URL nor the API key appears anywhere in the message. The save-failure message appears after a forced save failure and the loading indicator does not stay up. Both messages read as instructions to an administrator, not developer diagnostics, and each points to the Jellyfin log."
     why_human: "The jsdom tests assert that a message element holds specific text; whether that text reads well to a person in the real dashboard chrome is a judgment a test cannot make (02-VALIDATION.md Manual-Only Verifications; deferred from 02-02-PLAN.md Task 3's `<human-check>` per workflow.human_verify_mode=end-of-phase)."
