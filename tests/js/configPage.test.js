@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { buildDom, flush, firePageshow, clickSave } = require('./testHelpers');
+const { buildDom, flush, firePageshow, fireSubmit, clickSave } = require('./testHelpers');
 
 test('a failed settings load shows a message on the page', async () => {
   const { document, window } = buildDom({ getConfigFails: true });
@@ -83,4 +83,55 @@ test('the load-failure message repeats neither the configured URL nor the API ke
   assert.equal(summary.children.length, 0);
   assert.equal(summary.textContent.includes('sup3rsecret'), false);
   assert.equal(summary.textContent.includes(apiKeySentinel), false);
+});
+
+test('a failed configuration update shows a message', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+  const { document, window, dashboard } = buildDom({ updateConfigFails: true });
+  const hideCallsBefore = dashboard.hideLoadingCalls;
+
+  fireSubmit(document, window);
+  await flush();
+
+  assert.match(
+    document.querySelector('#EmbyAuthMigrationSummary').textContent,
+    /cannot save the plugin settings/,
+  );
+  assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
+});
+
+test('a failed re-fetch during save shows the same message', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+  const { document, window, api, dashboard } = buildDom({ getConfigFailsFromCall: 2 });
+
+  firePageshow(document, window);
+  await flush();
+
+  const hideCallsBefore = dashboard.hideLoadingCalls;
+  fireSubmit(document, window);
+  await flush();
+
+  assert.match(
+    document.querySelector('#EmbyAuthMigrationSummary').textContent,
+    /cannot save the plugin settings/,
+  );
+  assert.deepEqual(api.updateCalls, []);
+  assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
+});
+
+test('the save-failure message repeats neither the configured URL nor the API key', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+  const secretUrl = 'http://admin:sup3rsecret@emby.example.test:8096';
+  const apiKeySentinel = 'sentinel-api-key-9f8e7d';
+  const rejection = new Error(`request to ${secretUrl} failed with key ${apiKeySentinel}`);
+  const { document, window, dashboard } = buildDom({ updateConfigFails: rejection });
+
+  document.querySelector('#EmbyServerUrl').value = secretUrl;
+  document.querySelector('#EmbyApiKey').value = apiKeySentinel;
+
+  fireSubmit(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(summary.children.length, 0);
+  assert.equal(summary.textContent.includes('sup3rsecret'), false);
+  assert.equal(summary.textContent.includes(apiKeySentinel), false);
+  assert.ok(dashboard.hideLoadingCalls >= 1);
 });

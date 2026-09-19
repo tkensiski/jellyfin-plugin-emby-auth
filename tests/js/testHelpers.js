@@ -46,7 +46,9 @@ function rejectionFor(flag, genericMessage) {
  * @param {object} [options] - stub configuration.
  * @param {object} [options.config] - the configuration `getPluginConfiguration` resolves with.
  * @param {Array} [options.users] - the users `getJSON('EmbyAuth/Migration')` resolves with.
- * @param {boolean | Error} [options.getConfigFails] - makes `getPluginConfiguration` reject.
+ * @param {boolean | Error} [options.getConfigFails] - makes every `getPluginConfiguration` call reject.
+ * @param {number} [options.getConfigFailsFromCall] - makes `getPluginConfiguration` reject starting
+ *   with this 1-based call number, so an earlier call in the same test can still succeed.
  * @param {boolean | Error} [options.updateConfigFails] - makes `updatePluginConfiguration` reject.
  * @param {boolean | Error} [options.migrationStatusFails] - makes `getJSON` reject.
  * @param {boolean | Error} [options.runMigrationFails] - makes `ajax` reject.
@@ -57,6 +59,7 @@ function stubApiClient(options = {}) {
     config: { ...DEFAULT_CONFIG, ...(options.config ?? {}) },
     users: options.users ?? [],
     getConfigFails: options.getConfigFails ?? false,
+    getConfigFailsFromCall: options.getConfigFailsFromCall ?? null,
     updateConfigFails: options.updateConfigFails ?? false,
     migrationStatusFails: options.migrationStatusFails ?? false,
     runMigrationFails: options.runMigrationFails ?? false,
@@ -85,7 +88,9 @@ function stubApiClient(options = {}) {
     },
     getPluginConfiguration() {
       api.getConfigCalls += 1;
-      if (api.getConfigFails) {
+      const failsFromCallNumber =
+        api.getConfigFailsFromCall !== null && api.getConfigCalls >= api.getConfigFailsFromCall;
+      if (api.getConfigFails || failsFromCallNumber) {
         return Promise.reject(rejectionFor(api.getConfigFails, 'load configuration failed'));
       }
 
