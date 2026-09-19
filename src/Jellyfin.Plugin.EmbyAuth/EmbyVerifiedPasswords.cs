@@ -34,7 +34,7 @@ public sealed partial class EmbyVerifiedPasswords
     }
 
     /// <summary>
-    /// Records that Emby verified the password that has this hash. If the file cannot be written, the method logs an error and the record is lost.
+    /// Records that Emby verified the password that has this hash. If the file cannot be read or cannot be written, the method logs an error and the record is lost.
     /// </summary>
     /// <param name="userId">The Jellyfin user ID.</param>
     /// <param name="passwordHash">The saved password hash.</param>
@@ -45,6 +45,11 @@ public sealed partial class EmbyVerifiedPasswords
         lock (_lock)
         {
             var fingerprints = Load();
+            if (fingerprints is null)
+            {
+                return;
+            }
+
             if (fingerprints.TryGetValue(userId, out var existing) && existing == fingerprint)
             {
                 return;
@@ -65,7 +70,7 @@ public sealed partial class EmbyVerifiedPasswords
     }
 
     /// <summary>
-    /// Checks whether Emby verified the password that has this hash.
+    /// Checks whether Emby verified the password that has this hash. Returns <c>false</c> for every user while the file cannot be read.
     /// </summary>
     /// <param name="userId">The Jellyfin user ID.</param>
     /// <param name="passwordHash">The saved password hash.</param>
@@ -80,23 +85,27 @@ public sealed partial class EmbyVerifiedPasswords
         var fingerprint = Fingerprint(passwordHash);
         lock (_lock)
         {
-            return Load().TryGetValue(userId, out var recorded) && recorded == fingerprint;
+            return Load() is { } fingerprints && fingerprints.TryGetValue(userId, out var recorded) && recorded == fingerprint;
         }
     }
 
     private static string Fingerprint(string passwordHash) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(passwordHash)));
 
-    private Dictionary<Guid, string> Load()
+    /// <summary>
+    /// Reads the fingerprint file, caching the result. Returns <c>null</c>, and does not touch the cache, when the read fails —
+    /// so a caller writes nothing and keeps nothing, and the next call reads the file again.
+    /// </summary>
+    private Dictionary<Guid, string>? Load()
     {
         if (_fingerprints is not null)
         {
             return _fingerprints;
         }
 
-        _fingerprints = [];
         if (!File.Exists(_filePath))
         {
+            _fingerprints = [];
             return _fingerprints;
         }
 
@@ -107,12 +116,13 @@ public sealed partial class EmbyVerifiedPasswords
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
             LogReadFailed(_logger, ex, _filePath);
+            return null;
         }
 
         return _fingerprints;
     }
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot read {FilePath}. The plugin moves no user to the Default login method until users log in again through Emby. The next record replaces the file.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot read {FilePath}. The plugin records no verified password and moves no user to the Default login method while the read fails. It keeps the records that are in the file and reads the file again on the next login.")]
     private static partial void LogReadFailed(ILogger logger, Exception exception, string filePath);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot write {FilePath}. The plugin does not move this user to the Default login method until the user logs in again through Emby.")]

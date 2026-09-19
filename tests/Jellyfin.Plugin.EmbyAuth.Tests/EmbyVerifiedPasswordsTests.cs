@@ -117,7 +117,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    [Fact]
     public void UnreadableFile_KeepsItsRecords_WhenALoginIsRecorded()
     {
         File.WriteAllText(_filePath, UnreadableContents);
@@ -134,7 +134,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    [Fact]
     public void UnreadableFile_IsReadAgain_WhenItBecomesReadable()
     {
         var userId = Guid.NewGuid();
@@ -152,7 +152,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userId, HashA));
     }
 
-    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    [Fact]
     public async Task ConcurrentRecords_AreNotWritten_WhenTheFileIsUnreadable()
     {
         File.WriteAllText(_filePath, UnreadableContents);
