@@ -86,7 +86,7 @@ Plans:
 
 **Goal**: The Migration section of the settings page shows what the migration task and the fingerprint file actually do, the login method that users move to becomes a setting instead of a fixed value, and the migration code has unit tests against an SQLite in-memory `JellyfinDbContext`. The database test seam and the `ITaskManager` fake come before the fixes.
 **Depends on**: Phase 2
-**Requirements**: FPRT-01, FPRT-03, UI-03, MIGR-01, MIGR-02, AUTH-06, TEST-02, TEST-03, DOCS-01
+**Requirements**: FPRT-01, FPRT-03, UI-03, MIGR-01, MIGR-02, AUTH-06, TEST-02, TEST-03, DOCS-01, DOCS-05
 **Success Criteria** (what must be TRUE):
 
   1. When Jellyfin cannot read the fingerprint file, the Migration section tells the administrator and points to the Jellyfin log.
@@ -97,7 +97,8 @@ Plans:
   6. An administrator chooses the login method that users move to. The settings page offers only the login methods that Jellyfin reports as enabled, and a value that is not one of them is refused with a message. Every move uses the chosen method, including the move after a password that an administrator sets in Jellyfin. The class and task names no longer say "Default".
   7. An e2e test moves a user to a second login method that is not Jellyfin's Default, and that user then logs in with the password that Emby verified.
   8. A unit test fails if `EmbyAuthenticationProvider` becomes public, and a comment on the class says why it stays internal.
-  9. A password reset in Jellyfin leaves a saved password that nobody can type, instead of an empty one. An e2e test shows that the user still logs in through Emby after the reset, that a blank password is still refused, and that the account is not opened by a blank password after it moves to another login method. The migration list names any account on the Emby login method that has no saved password, and `docs/how-it-works.md` states the new reset behavior.
+  9. The migration list names every account on the Emby login method that has no saved password, and the Migration section warns that Jellyfin's Default login method opens such an account with a blank password and recommends setting one before the account moves. The plugin neither refuses the move nor writes a password the user cannot type. An e2e test shows that a user with no saved password still logs in through Emby, and that the migration list names that account.
+  10. `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account with no saved password, and connects that behavior to the deleted account after a failed password save, to the settings page warning, and to the plugin's role as an interim migration tool.
 
 **Plans**: TBD
 **UI hint**: yes

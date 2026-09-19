@@ -14,7 +14,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
 - [ ] **AUTH-05**: The plugin ends the Emby session whenever Emby returns an access token, including a login response that has no user name.
-- [ ] **AUTH-06**: The plugin never leaves an empty saved password on an account it manages. A password reset writes a random password hash instead of removing the password, so that a later move to another login method cannot leave an account that a blank password opens. The saved hash plays no part in an Emby login method login (AUTH-01), so the user still signs in through Emby. The migration list names any account on the Emby login method that still has no saved password, because an administrator can create one that the plugin never touched.
+- [ ] **AUTH-06**: An account on the Emby login method may have no saved password, and the plugin does not invent one. The saved hash plays no part in an Emby login method login (AUTH-01), so a missing password costs the user nothing while Emby checks the login. The settings page names every account on the Emby login method that has no saved password, warns that Jellyfin's Default login method opens such an account with a blank password, and recommends setting a password before the account moves. The plugin does not refuse the move and does not write a password the user cannot type.
 
 ### Verified Password Records
 
@@ -39,6 +39,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [ ] **DOCS-02**: `README.md` gives the manifest URL and the steps to install and update the plugin from the Jellyfin catalog.
 - [ ] **DOCS-03**: `README.md` states the tested Jellyfin and Emby versions, and that `targetAbi` sets only the minimum Jellyfin version.
 - [ ] **DOCS-04**: The Jellyfin version bump rule in `CLAUDE.md` names every pin, including the test project's `Jellyfin.Controller` reference and the `targetAbi` values in `tests/scripts/package.bats`.
+- [ ] **DOCS-05**: `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account that has no saved password, and names the three places this shapes the plugin: the account that a failed password save leaves behind is deleted (AUTH-04), the settings page warns before a move (AUTH-06), and the plugin is an interim tool whose end state is users on a login method that checks a password the user chose.
 
 ### Test Coverage
 
@@ -115,6 +116,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOCS-02 | Phase 6 | Pending |
 | DOCS-03 | Phase 5 | Pending |
 | DOCS-04 | Phase 6 | Pending |
+| DOCS-05 | Phase 3 | Pending |
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 3 | Pending |
 | TEST-03 | Phase 3 | Pending |
@@ -135,10 +137,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 
-- v1 requirements: 35 total
-- Mapped to phases: 35
+- v1 requirements: 36 total
+- Mapped to phases: 36
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-18 — MIGR-01, MIGR-02, and AUTH-06 added after the JellyfinSecurity compatibility test*
+*Last updated: 2026-09-18 — AUTH-06 rewritten to allow an empty saved password and warn instead, and DOCS-05 added for Jellyfin's blank-password behavior*
