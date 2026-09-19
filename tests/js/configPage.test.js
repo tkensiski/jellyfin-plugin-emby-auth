@@ -12,11 +12,18 @@ const {
   listItemTexts,
   settingsStatus,
   pageStyleRules,
+  messageChildren,
 } = require('./testHelpers');
 
 const LOAD_FAILURE_MESSAGE =
   'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
 const SAVE_FAILURE_MESSAGE = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
+const MIGRATION_READ_FAILURE_MESSAGE =
+  'Jellyfin cannot read the migration status. See the Jellyfin log.';
+const MIGRATION_START_FAILURE_MESSAGE = 'Jellyfin did not start the migration. See the Jellyfin log.';
+const MIGRATION_STARTED_MESSAGE = 'The migration runs. This list updates in a few seconds.';
+const NO_USERS_MESSAGE = 'No users are on the Emby login method.';
+const EXPECTED_ICON = [{ tagName: 'SPAN', classes: ['material-icons', 'warning'], ariaHidden: 'true', text: '' }];
 
 test('a failed settings load shows a message on the page', async () => {
   const { document, window } = buildDom({ getConfigFails: true });
@@ -25,6 +32,7 @@ test('a failed settings load shows a message on the page', async () => {
   await flush();
 
   assert.equal(settingsStatus(document).textContent, LOAD_FAILURE_MESSAGE);
+  assert.deepEqual(messageChildren(settingsStatus(document)), EXPECTED_ICON);
   assert.equal(
     document.querySelector('#EmbyAuthMigrationSummary').textContent.includes('plugin settings'),
     false,
@@ -95,7 +103,8 @@ test('the load-failure message repeats neither the configured URL nor the API ke
   await flush();
 
   const status = settingsStatus(document);
-  assert.equal(status.children.length, 0);
+  assert.deepEqual(messageChildren(status), EXPECTED_ICON);
+  assert.equal(status.textContent, LOAD_FAILURE_MESSAGE);
   assert.equal(status.textContent.includes('sup3rsecret'), false);
   assert.equal(status.textContent.includes(apiKeySentinel), false);
 });
@@ -108,6 +117,7 @@ test('a failed configuration update shows a message', async () => {
   await flush();
 
   assert.equal(settingsStatus(document).textContent, SAVE_FAILURE_MESSAGE);
+  assert.deepEqual(messageChildren(settingsStatus(document)), EXPECTED_ICON);
   assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
 });
 
@@ -139,7 +149,8 @@ test('the save-failure message repeats neither the configured URL nor the API ke
   await flush();
 
   const status = settingsStatus(document);
-  assert.equal(status.children.length, 0);
+  assert.deepEqual(messageChildren(status), EXPECTED_ICON);
+  assert.equal(status.textContent, SAVE_FAILURE_MESSAGE);
   assert.equal(status.textContent.includes('sup3rsecret'), false);
   assert.equal(status.textContent.includes(apiKeySentinel), false);
   assert.ok(dashboard.hideLoadingCalls >= 1);
@@ -216,9 +227,10 @@ test('an empty user list renders nothing and says so', async () => {
   await flush();
 
   assert.equal(listItemTexts(document).length, 0);
-  assert.equal(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    'No users are on the Emby login method.',
+  assert.equal(document.querySelector('#EmbyAuthMigrationSummary').textContent, NO_USERS_MESSAGE);
+  assert.deepEqual(
+    messageChildren(document.querySelector('#EmbyAuthMigrationSummary')),
+    [],
   );
 });
 
@@ -256,10 +268,9 @@ test('a failed migration status shows its message', async () => {
   firePageshow(document, window);
   await flush();
 
-  assert.match(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    /cannot read the migration status/,
-  );
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(summary.textContent, MIGRATION_READ_FAILURE_MESSAGE);
+  assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
 });
 
 test('Run migration now sends the request and reports it', async (t) => {
@@ -272,7 +283,9 @@ test('Run migration now sends the request and reports it', async (t) => {
   await flush();
 
   assert.equal(api.runMigrationCalls, 1);
-  assert.match(document.querySelector('#EmbyAuthMigrationSummary').textContent, /The migration runs/);
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(summary.textContent, MIGRATION_STARTED_MESSAGE);
+  assert.deepEqual(messageChildren(summary), []);
 });
 
 test('a failed Run migration now shows its message', async (t) => {
@@ -282,10 +295,9 @@ test('a failed Run migration now shows its message', async (t) => {
   clickRunMigration(document, window);
   await flush();
 
-  assert.match(
-    document.querySelector('#EmbyAuthMigrationSummary').textContent,
-    /did not start the migration/,
-  );
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(summary.textContent, MIGRATION_START_FAILURE_MESSAGE);
+  assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
 });
 
 test('the settings status sits with the Save control', () => {
@@ -339,6 +351,7 @@ test('a successful load clears a stale settings failure', async () => {
   await flush();
 
   assert.equal(settingsStatus(document).textContent, '');
+  assert.deepEqual(messageChildren(settingsStatus(document)), []);
   assert.equal(document.querySelector('.button-submit').disabled, false);
 });
 
@@ -400,4 +413,81 @@ test('a failed load clears the migration list', async () => {
 
   assert.equal(listItemTexts(document).length, 0);
   assert.equal(document.querySelector('#EmbyAuthMigrationSummary').textContent, '');
+});
+
+test('a plain migration message replaces a stale warning icon', async () => {
+  const users = [
+    { Name: 'alice', ReadyToMove: true },
+    { Name: 'bob', ReadyToMove: false },
+  ];
+  const { document, window, api } = buildDom({ users, migrationStatusFails: true });
+
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
+
+  api.migrationStatusFails = false;
+  firePageshow(document, window);
+  await flush();
+
+  assert.deepEqual(messageChildren(summary), []);
+  assert.equal(summary.textContent, 'Users on the Emby login method: 2. Ready to move: 1.');
+});
+
+test('a repeated settings failure shows only one icon', async () => {
+  const { document, window } = buildDom({ getConfigFails: true });
+
+  firePageshow(document, window);
+  await flush();
+  firePageshow(document, window);
+  await flush();
+
+  const status = settingsStatus(document);
+  assert.deepEqual(messageChildren(status), EXPECTED_ICON);
+  assert.equal(status.textContent, LOAD_FAILURE_MESSAGE);
+});
+
+test('a repeated migration failure shows only one icon', async () => {
+  const { document, window } = buildDom({ migrationStatusFails: true });
+
+  firePageshow(document, window);
+  await flush();
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
+  assert.equal(summary.textContent, MIGRATION_READ_FAILURE_MESSAGE);
+});
+
+test('a second save attempt clears the stale failure icon at once', async () => {
+  const { document, window } = buildDom({ updateConfigFails: true });
+
+  fireSubmit(document, window);
+  await flush();
+
+  const status = settingsStatus(document);
+  assert.deepEqual(messageChildren(status), EXPECTED_ICON);
+
+  fireSubmit(document, window);
+
+  assert.deepEqual(messageChildren(status), []);
+  assert.equal(status.textContent, '');
+
+  await flush();
+});
+
+test('the warning icon is sized and spaced for inline text', () => {
+  const { document } = buildDom({});
+
+  const iconRule = pageStyleRules(document).find(
+    (rule) => rule.selectorText && rule.selectorText.includes('.material-icons'),
+  );
+
+  assert.ok(iconRule, 'expected a page style rule targeting .material-icons');
+  assert.notEqual(iconRule.style.fontSize, '');
+  assert.notEqual(iconRule.style.verticalAlign, '');
+  assert.ok(Number.parseFloat(iconRule.style.marginRight) > 0);
 });

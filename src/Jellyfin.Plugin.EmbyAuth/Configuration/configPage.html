@@ -11,6 +11,12 @@
                 opacity: 0.38;
                 cursor: default;
             }
+
+            #EmbyAuthConfigPage .material-icons {
+                font-size: 1.2em;
+                vertical-align: middle;
+                margin-right: 0.25em;
+            }
         </style>
         <div data-role="content">
             <div class="content-primary">
@@ -66,14 +72,26 @@
                 pluginUniqueId: 'e973e09a-e8b4-40c1-9be2-8e51342de1f9'
             };
 
+            function showEmbyAuthMessage(element, text, isFailure) {
+                element.replaceChildren();
+                if (isFailure) {
+                    var icon = document.createElement('span');
+                    icon.className = 'material-icons warning';
+                    icon.setAttribute('aria-hidden', 'true');
+                    element.appendChild(icon);
+                }
+
+                element.appendChild(document.createTextNode(text));
+            }
+
             function loadEmbyAuthMigration() {
                 var summary = document.querySelector('#EmbyAuthMigrationSummary');
                 var list = document.querySelector('#EmbyAuthMigrationUsers');
                 return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
                     var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
-                    summary.textContent = status.Users.length === 0
+                    showEmbyAuthMessage(summary, status.Users.length === 0
                         ? 'No users are on the Emby login method.'
-                        : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.';
+                        : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.', false);
                     list.replaceChildren();
                     status.Users.forEach(function (user) {
                         var item = document.createElement('li');
@@ -81,12 +99,12 @@
                         list.appendChild(item);
                     });
                 }).catch(function () {
-                    summary.textContent = 'Jellyfin cannot read the migration status. See the Jellyfin log.';
+                    showEmbyAuthMessage(summary, 'Jellyfin cannot read the migration status. See the Jellyfin log.', true);
                 });
             }
 
             function clearEmbyAuthMigration() {
-                document.querySelector('#EmbyAuthMigrationSummary').textContent = '';
+                showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationSummary'), '', false);
                 document.querySelector('#EmbyAuthMigrationUsers').replaceChildren();
             }
 
@@ -95,7 +113,7 @@
                     var status = document.querySelector('#EmbyAuthSettingsStatus');
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
-                        status.textContent = '';
+                        showEmbyAuthMessage(status, '', false);
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
@@ -103,7 +121,7 @@
                         document.querySelector('.button-submit').disabled = false;
                         return loadEmbyAuthMigration();
                     }).catch(function () {
-                        status.textContent = 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
+                        showEmbyAuthMessage(status, 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.', true);
                         document.querySelector('.button-submit').disabled = true;
                         clearEmbyAuthMigration();
                     }).finally(function () {
@@ -115,17 +133,17 @@
                 .addEventListener('click', function () {
                     var summary = document.querySelector('#EmbyAuthMigrationSummary');
                     ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('EmbyAuth/Migration/Run') }).then(function () {
-                        summary.textContent = 'The migration runs. This list updates in a few seconds.';
+                        showEmbyAuthMessage(summary, 'The migration runs. This list updates in a few seconds.', false);
                         setTimeout(loadEmbyAuthMigration, 3000);
                     }).catch(function () {
-                        summary.textContent = 'Jellyfin did not start the migration. See the Jellyfin log.';
+                        showEmbyAuthMessage(summary, 'Jellyfin did not start the migration. See the Jellyfin log.', true);
                     });
                 });
 
             document.querySelector('#EmbyAuthConfigForm')
                 .addEventListener('submit', function (e) {
                     var status = document.querySelector('#EmbyAuthSettingsStatus');
-                    status.textContent = '';
+                    showEmbyAuthMessage(status, '', false);
                     document.querySelector('.button-submit').disabled = true;
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
@@ -138,7 +156,7 @@
                             document.querySelector('.button-submit').disabled = false;
                         });
                     }).catch(function () {
-                        status.textContent = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
+                        showEmbyAuthMessage(status, 'Jellyfin cannot save the plugin settings. See the Jellyfin log.', true);
                     }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });

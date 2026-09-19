@@ -189,6 +189,27 @@ function settingsStatus(document) {
 }
 
 /**
+ * Describes an element's children, in document order, for a deep-equal
+ * assertion against an expected child tree.
+ *
+ * Each entry holds the tag name, the class list as a sorted array (so the
+ * assertion does not depend on class order), the `aria-hidden` attribute
+ * (or null), and the child's own text content.
+ *
+ * @param {Element} element - the message element to describe.
+ * @returns {Array<{tagName: string, classes: string[], ariaHidden: (string | null), text: string}>}
+ *   one entry per element child, in document order.
+ */
+function messageChildren(element) {
+  return Array.from(element.children).map((child) => ({
+    tagName: child.tagName,
+    classes: Array.from(child.classList).sort(),
+    ariaHidden: child.getAttribute('aria-hidden'),
+    text: child.textContent,
+  }));
+}
+
+/**
  * Reads the CSS rules the page's own `<style>` elements declare.
  *
  * jsdom loads no dashboard stylesheet, so this is how a test can assert on a
@@ -275,4 +296,5 @@ module.exports = {
   listItemTexts,
   settingsStatus,
   pageStyleRules,
+  messageChildren,
 };
