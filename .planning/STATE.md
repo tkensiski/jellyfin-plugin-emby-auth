@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-17)
 Phase: 02 (Safe Failures for the Fingerprint File and Settings) — EXECUTING
 Plan: 3 of 3
 Status: Phase complete — ready for verification
-Last activity: 2026-09-19 — Completed quick task 260919-208: Move settings failure message next to Save and show Save as disabled
+Last activity: 2026-09-19 — Completed quick task 260919-inm: Add a warning icon to the four failure messages on the settings page
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -106,6 +106,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260919-208 | Move settings failure message next to Save and show Save as disabled | 2026-09-19 | 1f47767 | [260919-208-move-settings-failure-message-next-to-sa](./quick/260919-208-move-settings-failure-message-next-to-sa/) |
+| 260919-inm | Add a warning icon to the four failure messages on the settings page | 2026-09-19 | 325855e | [260919-inm-add-a-warning-icon-to-the-four-failure-m](./quick/260919-inm-add-a-warning-icon-to-the-four-failure-m/) |
 
 ## Deferred Items
 
