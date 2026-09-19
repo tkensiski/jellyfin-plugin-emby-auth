@@ -68,7 +68,7 @@ Plans:
   3. When saving the plugin settings fails, the settings page shows a message.
   4. Automated tests run the settings page JavaScript for load, save, their error messages, the migration list, and **Run migration now**. CI runs these tests on each pull request, and a test fails when a load or save error handler is removed.
 
-**Plans**: 2/3 plans executed
+**Plans**: 3/3 plans executed
 
 Plans:
 **Wave 1**
@@ -78,7 +78,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 02-02-PLAN.md — The UI-02 save-failure message, the rest of the TEST-04 coverage, and the documentation of both
-- [ ] 02-03-PLAN.md — FPRT-02: an unreadable fingerprint file keeps its records and is read again on the next login
+- [x] 02-03-PLAN.md — FPRT-02: an unreadable fingerprint file keeps its records and is read again on the next login
 
 **UI hint**: yes
 
@@ -156,7 +156,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
-| 2. Safe Failures for the Fingerprint File and Settings | 2/3 | In Progress|  |
+| 2. Safe Failures for the Fingerprint File and Settings | 3/3 | In Progress|  |
 | 3. Migration Status and Target | 0/TBD | Not started | - |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |

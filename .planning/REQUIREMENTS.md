@@ -19,7 +19,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 ### Verified Password Records
 
 - [ ] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure.
-- [ ] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it.
+- [x] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it.
 - [ ] **FPRT-03**: When the fingerprint file cannot be read, the Migration section of the settings page tells the administrator and points to the Jellyfin log.
 
 ### Settings Page
@@ -105,7 +105,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-05 | Phase 4 | Pending |
 | AUTH-06 | Phase 3 | Pending |
 | FPRT-01 | Phase 3 | Pending |
-| FPRT-02 | Phase 2 | Pending |
+| FPRT-02 | Phase 2 | Complete |
 | FPRT-03 | Phase 3 | Pending |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
