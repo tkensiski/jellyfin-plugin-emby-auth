@@ -80,6 +80,7 @@
 
             document.querySelector('#EmbyAuthConfigPage')
                 .addEventListener('pageshow', function () {
+                    var summary = document.querySelector('#EmbyAuthMigrationSummary');
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
@@ -87,6 +88,9 @@
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
                         document.querySelector('#AccountAccess').value = config.AccountAccess;
                         return loadEmbyAuthMigration();
+                    }).catch(function () {
+                        summary.textContent = 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
+                        document.querySelector('.button-submit').disabled = true;
                     }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });
