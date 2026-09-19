@@ -44,12 +44,18 @@ This phase spans two test layers. The C# layer exists; the JavaScript layer is a
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| *pending* | — | — | FPRT-02 | — | N/A | unit (xUnit) | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` | ✅ | ⬜ pending |
-| *pending* | — | — | UI-01 | T-02-01 | A load-failure message is a fixed string and never repeats the Emby URL or the API key | unit (`node:test` + jsdom) | `node --test` | ❌ W0 | ⬜ pending |
-| *pending* | — | — | UI-02 | T-02-01 | A save-failure message is a fixed string and never repeats the Emby URL or the API key | unit (`node:test` + jsdom) | `node --test` | ❌ W0 | ⬜ pending |
-| *pending* | — | — | TEST-04 | — | N/A | unit (`node:test` + jsdom) | `node --test` | ❌ W0 | ⬜ pending |
+| Task 1 | 02-01 | 1 | TEST-04 | T-02-SC | The first npm install in this repository stops for a human, in every mode | checkpoint (`blocking-human`) | none — human decision | n/a | ⬜ pending |
+| Task 2 | 02-01 | 1 | UI-01, TEST-04 | T-02-01, T-02-03, T-02-04 | The load-failure message is a fixed string; the installed dependency tree is not tracked | unit (`node:test` + jsdom) | `node --test` | ❌ created here | ⬜ pending |
+| Task 3 | 02-01 | 1 | UI-01, TEST-04 | T-02-01, T-02-02, T-02-03 | A rejection value carrying a `user:password@host` URL and an API key reaches no page message | unit (`node:test` + jsdom) | `node --test` | ✅ after 02-01 Task 2 | ⬜ pending |
+| Task 1 | 02-02 | 2 | UI-02 | T-02-01, T-02-03 | The save-failure message is a fixed string and never repeats the Emby URL or the API key | unit (`node:test` + jsdom) | `node --test` | ✅ | ⬜ pending |
+| Task 2 | 02-02 | 2 | TEST-04 | T-02-02 | A migration list entry built from an Emby user name renders as text, not markup | unit (`node:test` + jsdom) | `node --test` | ✅ | ⬜ pending |
+| Task 3 | 02-02 | 2 | UI-01, UI-02 | T-02-05 | The documentation states the limit of the guarantee and copies no message string | docs + human check | `mise run lint` | ✅ | ⬜ pending |
+| Task 1 | 02-03 | 2 | FPRT-02 | T-02-06, T-02-07, T-02-08 | A failed read never causes a write, and `Matches` is false for every user while it fails | unit (xUnit) | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` | ✅ | ⬜ pending |
+| Task 2 | 02-03 | 2 | FPRT-02 | T-02-10 | The documentation does not claim the plugin prevents or eliminates data loss | docs + human check | `rg` gates in the task `<verify>` | ✅ | ⬜ pending |
 
-*Task IDs are filled in after the plans exist. Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+
+**Full-suite command after 02-01 lands:** `mise run test` runs four entries — `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx`, `bats tests/scripts`, `npm --prefix tests/js ci`, and `node --test`. `node --test` takes no path argument.
 
 ---
 
@@ -57,8 +63,12 @@ This phase spans two test layers. The C# layer exists; the JavaScript layer is a
 
 - [ ] `.mise.toml` — pin `node`, and add the `node --test` line to `[tasks.test]`
 - [ ] `tests/js/package.json` and `tests/js/package-lock.json` — hold the `jsdom` dependency
+- [ ] `tests/js/testHelpers.js` — `buildDom()`, `flush()`, the `ApiClient` and `Dashboard` stubs, and the four event helpers
 - [ ] `tests/js/configPage.test.js` — the TEST-04 suite
 - [ ] `.gitignore` — add `node_modules/`, which it does not list today
+- [ ] `.pre-commit-config.yaml` — add `^tests/js/` to the `test` hook's `files` pattern, which matches nothing under that directory today
+
+All of Wave 0 lands in plan 02-01, Task 2, except the pre-commit pattern, which lands in plan 02-01, Task 3.
 
 ---
 
