@@ -6,7 +6,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 
 - `mise install` — install the pinned tools (`.mise.toml`).
 - `mise run lint` — check C# formatting, and run shellcheck, shfmt, actionlint, and zizmor.
-- `mise run test` — build with warnings as errors, then run the unit tests and the `scripts/package.sh` tests (`tests/scripts/`).
+- `mise run test` — build with warnings as errors, then run the unit tests, the `scripts/package.sh` tests (`tests/scripts/`), and the settings-page tests (`tests/js/`).
 - `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
 - `mise run package` — build `artifacts/release/jellyfin-plugin-emby-auth_<version>.zip` and `manifest.json` with `scripts/package.sh build`.
 - `prek run` — run the pre-commit hooks, which call `mise run lint` and `mise run test`.
@@ -34,6 +34,7 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
   - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
   - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
+- `tests/js/` — `node:test` tests for `configPage.html`, run with jsdom against the shipping file. `configPage.test.js` has the tests; `testHelpers.js` has the `ApiClient`/`Dashboard` stubs and DOM helpers, the one shared file of doubles, the same role `TestDoubles.cs` plays for the C# suite.
 - `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
 - `scripts/dev-env.sh` — the demo. It uses `e2e/compose.yaml` and `e2e/helpers.bash`.
 - `docs/` — user and developer documentation.

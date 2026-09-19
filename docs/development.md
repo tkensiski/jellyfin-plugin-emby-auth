@@ -5,7 +5,7 @@ The tools are pinned in `.mise.toml`. Run `mise install` first.
 | Task | Command |
 |---|---|
 | Check formatting, and lint scripts and workflows | `mise run lint` |
-| Build and run unit tests (warnings are errors), and the script tests | `mise run test` |
+| Build with warnings as errors, then run the unit tests, the script tests, and the settings-page tests | `mise run test` |
 | Run end-to-end tests in Docker | `mise run e2e` |
 | Build the release zip and manifest | `mise run package` |
 | Run pre-commit checks | `prek run` |
@@ -15,6 +15,10 @@ The tools are pinned in `.mise.toml`. Run `mise install` first.
 | Show or remove the demo | `scripts/dev-env.sh status` or `scripts/dev-env.sh down` |
 
 CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so a local run of these three tasks matches CI.
+
+## Settings-page tests
+
+The settings-page tests live in `tests/js/`. They run on Node's built-in test runner (`node --test`) with jsdom against the real `configPage.html`, so they exercise the shipping file, not a copy. `mise run test` installs the test dependency from the committed lockfile (`npm --prefix tests/js ci`) on every run, so a local run matches CI. To run only this suite, use `node --test` from the repository root; it takes no path argument.
 
 ## End-to-end tests
 
