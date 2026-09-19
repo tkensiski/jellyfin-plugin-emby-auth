@@ -44,7 +44,7 @@ test('activating Save twice after a failed load still sends nothing', async () =
   assert.deepEqual(api.updateCalls, []);
 });
 
-test('a later successful load turns Save back on', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+test('a later successful load turns Save back on', async () => {
   const { document, window, api } = buildDom({
     getConfigFails: true,
     config: {

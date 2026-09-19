@@ -87,6 +87,7 @@
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
                         document.querySelector('#AccountAccess').value = config.AccountAccess;
+                        document.querySelector('.button-submit').disabled = false;
                         return loadEmbyAuthMigration();
                     }).catch(function () {
                         summary.textContent = 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.';
