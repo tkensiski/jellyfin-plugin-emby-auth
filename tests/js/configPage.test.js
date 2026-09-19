@@ -85,7 +85,7 @@ test('the load-failure message repeats neither the configured URL nor the API ke
   assert.equal(summary.textContent.includes(apiKeySentinel), false);
 });
 
-test('a failed configuration update shows a message', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+test('a failed configuration update shows a message', async () => {
   const { document, window, dashboard } = buildDom({ updateConfigFails: true });
   const hideCallsBefore = dashboard.hideLoadingCalls;
 
@@ -99,7 +99,7 @@ test('a failed configuration update shows a message', { skip: 'RED — unskipped
   assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
 });
 
-test('a failed re-fetch during save shows the same message', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+test('a failed re-fetch during save shows the same message', async () => {
   const { document, window, api, dashboard } = buildDom({ getConfigFailsFromCall: 2 });
 
   firePageshow(document, window);
@@ -117,7 +117,7 @@ test('a failed re-fetch during save shows the same message', { skip: 'RED — un
   assert.ok(dashboard.hideLoadingCalls > hideCallsBefore);
 });
 
-test('the save-failure message repeats neither the configured URL nor the API key', { skip: 'RED — unskipped in the GREEN commit' }, async () => {
+test('the save-failure message repeats neither the configured URL nor the API key', async () => {
   const secretUrl = 'http://admin:sup3rsecret@emby.example.test:8096';
   const apiKeySentinel = 'sentinel-api-key-9f8e7d';
   const rejection = new Error(`request to ${secretUrl} failed with key ${apiKeySentinel}`);

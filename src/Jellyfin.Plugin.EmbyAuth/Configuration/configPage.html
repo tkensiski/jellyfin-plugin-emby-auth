@@ -110,15 +110,20 @@
 
             document.querySelector('#EmbyAuthConfigForm')
                 .addEventListener('submit', function (e) {
+                    var summary = document.querySelector('#EmbyAuthMigrationSummary');
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
                         config.EmbyApiKey = document.querySelector('#EmbyApiKey').value;
                         config.MigrationMode = document.querySelector('#MigrationMode').value;
                         config.AccountAccess = document.querySelector('#AccountAccess').value;
-                        ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
+                        return ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
                         });
+                    }).catch(function () {
+                        summary.textContent = 'Jellyfin cannot save the plugin settings. See the Jellyfin log.';
+                    }).finally(function () {
+                        Dashboard.hideLoadingMsg();
                     });
 
                     e.preventDefault();
