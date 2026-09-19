@@ -136,8 +136,10 @@ function stubDashboard() {
  * `Dashboard` stubs injected before the page's inline script parses.
  *
  * @param {object} [options] - forwarded to {@link stubApiClient}.
- * @returns {{window: import('jsdom').DOMWindow, document: Document, api: object, dashboard: object}}
- *   the constructed window, its document, and the two stubs.
+ * @returns {{window: import('jsdom').DOMWindow, document: Document, api: object,
+ *   dashboard: object, close: () => void}} the constructed window, its document, the
+ *   two stubs, and a `close()` that tears the window down, clearing any pending timer
+ *   (Run migration now schedules a 3-second reload on success).
  */
 function buildDom(options = {}) {
   const html = fs.readFileSync(PAGE_PATH, 'utf8');
@@ -153,7 +155,27 @@ function buildDom(options = {}) {
     },
   });
 
-  return { window: dom.window, document: dom.window.document, api, dashboard };
+  return {
+    window: dom.window,
+    document: dom.window.document,
+    api,
+    dashboard,
+    close() {
+      dom.window.close();
+    },
+  };
+}
+
+/**
+ * Reads the migration list's items as an array of their text content, in DOM order.
+ *
+ * @param {Document} document - the page's document.
+ * @returns {string[]} the text of each `<li>` under `#EmbyAuthMigrationUsers`.
+ */
+function listItemTexts(document) {
+  return Array.from(document.querySelectorAll('#EmbyAuthMigrationUsers li')).map(
+    (item) => item.textContent,
+  );
 }
 
 /**
@@ -226,4 +248,5 @@ module.exports = {
   fireSubmit,
   clickSave,
   clickRunMigration,
+  listItemTexts,
 };
