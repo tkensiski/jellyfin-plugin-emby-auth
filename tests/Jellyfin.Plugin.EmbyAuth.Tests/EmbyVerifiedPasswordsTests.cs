@@ -13,12 +13,22 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
     private const string HashA = "$PBKDF2-SHA512$iterations=210000$AAAA$BBBB";
     private const string HashB = "$PBKDF2-SHA512$iterations=210000$CCCC$DDDD";
 
+    /// <summary>
+    /// A record cut short: an opening brace, a quoted user identifier, a colon, and a quoted value with no closing quote or brace.
+    /// Deserializing this throws <see cref="System.Text.Json.JsonException"/>, so the three tests below assert against a real
+    /// record that survived, not a placeholder.
+    /// </summary>
+    private const string UnreadableContents = "{\"3fa85f64-5717-4562-b3fc-2c963f66afa6\":\"AB";
+
     private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-{Guid.NewGuid():N}.json");
+    private readonly string _retryFilePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-retry-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {
         File.Delete(_filePath);
         File.Delete(_filePath + ".tmp");
+        File.Delete(_retryFilePath);
+        File.Delete(_retryFilePath + ".tmp");
     }
 
     private EmbyVerifiedPasswords CreateStore(ILogger<EmbyVerifiedPasswords>? logger = null) =>
@@ -105,6 +115,54 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
 
         Assert.False(CreateStore(logger).Matches(Guid.NewGuid(), HashA));
         Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+    }
+
+    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    public void UnreadableFile_KeepsItsRecords_WhenALoginIsRecorded()
+    {
+        File.WriteAllText(_filePath, UnreadableContents);
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+        var store = CreateStore(logger);
+
+        Assert.False(store.Matches(Guid.NewGuid(), HashA));
+
+        store.Record(Guid.NewGuid(), HashA);
+
+        Assert.Equal(UnreadableContents, File.ReadAllText(_filePath));
+        Assert.False(File.Exists(_filePath + ".tmp"));
+        Assert.False(store.Matches(Guid.NewGuid(), HashA));
+        Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+    }
+
+    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    public void UnreadableFile_IsReadAgain_WhenItBecomesReadable()
+    {
+        var userId = Guid.NewGuid();
+        var retryStore = new EmbyVerifiedPasswords(_retryFilePath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        retryStore.Record(userId, HashA);
+        var validContents = File.ReadAllText(_retryFilePath);
+
+        File.WriteAllText(_filePath, UnreadableContents);
+        var store = CreateStore();
+
+        Assert.False(store.Matches(userId, HashA));
+
+        File.WriteAllText(_filePath, validContents);
+
+        Assert.True(store.Matches(userId, HashA));
+    }
+
+    [Fact(Skip = "RED — unskipped when Load() stops caching a failed read in the next commit (FPRT-02)")]
+    public async Task ConcurrentRecords_AreNotWritten_WhenTheFileIsUnreadable()
+    {
+        File.WriteAllText(_filePath, UnreadableContents);
+        var store = CreateStore();
+        var userIds = Enumerable.Range(0, 50).Select(_ => Guid.NewGuid()).ToArray();
+
+        await Task.WhenAll(userIds.Select(id => Task.Run(() => store.Record(id, HashA))));
+
+        Assert.Equal(UnreadableContents, File.ReadAllText(_filePath));
+        Assert.False(File.Exists(_filePath + ".tmp"));
     }
 
     [Fact]
