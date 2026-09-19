@@ -1,20 +1,14 @@
 ---
-status: testing
+status: complete
 phase: 02-safe-failures-for-the-fingerprint-file-and-settings
 source: [02-VERIFICATION.md]
 started: 2026-09-19T08:06:56Z
-updated: 2026-09-19T08:22:36Z
+updated: 2026-09-19T20:44:42Z
 ---
 
 ## Current Test
 
-number: 2
-name: Fingerprint-file documentation reads as actionable
-expected: |
-  An administrator can act on the read bullet — it states what the plugin does while the file is
-  unreadable, what it does not do to the file, and that the situation clears on its own. The
-  write bullet reads as it did before this phase.
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -35,15 +29,18 @@ why_human: |
   well to a person in the real dashboard chrome is a judgment a test cannot make. Deferred from
   02-02-PLAN.md Task 3's <human-check> block under workflow.human_verify_mode=end-of-phase.
 source: 02-02-PLAN.md Task 3
-result: issue
+result: pass
 reported: "I would move the save turned off below the save button so it looks like its part of it
   rather than the migration section" / "agreed it would be better to more than disable what the
   button does and make it look like its actually disabled" / "same for part b, it does as you
   said... but as before bad placement and the button should get deactivated"
 severity: minor
+result_note: |
+  First run recorded an issue. The tester confirmed the fix in a real dashboard after commits
+  1f47767, 325855e; the result above is that second, passing run.
 observed: |
   Both messages say what they promise, and neither exposes the Emby URL or the API key. The
-  wording passes. The placement and the button state do not.
+  wording passed on the first run. The placement and the button state did not, and were fixed.
 
   Part A, failed load. The message text matches configPage.html:93 exactly and the load did fail —
   both settings fields stayed empty. The disable works: selecting Save sends no request. Two
@@ -69,14 +66,14 @@ why_human: |
   Whether the wording is actionable is a judgment call, not something a regex match settles.
   Deferred from 02-03-PLAN.md Task 2's <human-check> block.
 source: 02-03-PLAN.md Task 2
-result: [pending]
+result: pass
 
 ## Summary
 
 total: 2
-passed: 0
-issues: 1
-pending: 1
+passed: 2
+issues: 0
+pending: 0
 skipped: 0
 blocked: 0
 
@@ -85,13 +82,19 @@ blocked: 0
 - gap_id: G-02-1
   truth: "After a failed settings load, an administrator sees the failure message with the Save
     control it describes, and Save reads as unavailable."
-  status: failed
+  status: resolved
   reason: "User reported: I would move the save turned off below the save button so it looks like
     its part of it rather than the migration section. And: agreed it would be better to more than
     disable what the button does and make it look like its actually disabled."
   severity: minor
   test: 1
-  artifacts: []
+  status_note: "Closed by two quick tasks, then confirmed by the tester in a real dashboard."
+  resolved_by: [260919-208, 260919-inm]
+  resolved_at: 2026-09-19
+  artifacts:
+    - path: "src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html"
+      issue: "One status element served both settings failures and migration status, and a
+        disabled Save kept its enabled styling."
   missing: []
 
 ### Carried forward from 02-REVIEW.md
