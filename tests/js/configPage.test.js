@@ -14,6 +14,9 @@ const {
   settingsStatus,
   pageStyleRules,
   messageChildren,
+  selectOptions,
+  DEFAULT_PROVIDER_ID,
+  REMAIN_ON_EMBY_LOGIN_METHOD,
 } = require('./testHelpers');
 
 const LOAD_FAILURE_MESSAGE =
@@ -329,15 +332,20 @@ test('the records-unavailable message contains no file system path', async () =>
   assert.equal(RECORDS_UNAVAILABLE_PATH_PATTERN.test(summary.textContent), false);
 });
 
-test('Run migration now sends the request and reports it', async (t) => {
+test('Run migration now saves the picked target then sends the request and reports it', async (t) => {
   const { document, window, api, close } = buildDom({});
   t.after(() => close());
 
   assert.ok(document.querySelector('#EmbyAuthRunMigration'));
 
+  firePageshow(document, window);
+  await flush();
+
   clickRunMigration(document, window);
   await flush();
 
+  assert.equal(api.updateCalls.length, 1);
+  assert.equal(api.updateCalls[0].MigrationTarget, DEFAULT_PROVIDER_ID);
   assert.equal(api.runMigrationCalls, 1);
   const summary = document.querySelector('#EmbyAuthMigrationSummary');
   assert.equal(summary.textContent, MIGRATION_STARTED_MESSAGE);
@@ -347,6 +355,9 @@ test('Run migration now sends the request and reports it', async (t) => {
 test('a failed Run migration now shows its message', async (t) => {
   const { document, window, close } = buildDom({ runMigrationFails: true });
   t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
 
   clickRunMigration(document, window);
   await flush();
@@ -359,6 +370,9 @@ test('a failed Run migration now shows its message', async (t) => {
 test('Run migration now begins polling that issues a second request after one interval', async (t) => {
   const { document, window, api, interval, close } = buildDom({});
   t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
 
   clickRunMigration(document, window);
   await flush();
@@ -375,6 +389,9 @@ test('polling continues across three consecutive Running responses', async (t) =
     taskSequence: [running, running, running],
   });
   t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
 
   clickRunMigration(document, window);
   await flush();
@@ -445,6 +462,9 @@ test('polling gives up after about 20 seconds when no run begins', async (t) => 
   const { document, window, api, interval, close } = buildDom({ task: neverStarted });
   t.after(() => close());
 
+  firePageshow(document, window);
+  await flush();
+
   clickRunMigration(document, window);
   await flush();
 
@@ -460,11 +480,16 @@ test('polling gives up after about 20 seconds when no run begins', async (t) => 
 });
 
 test('the page never stacks a second migration-status request while one is pending', async (t) => {
-  const { document, window, api, interval, close } = buildDom({ migrationStatusHangs: true });
+  const running = { State: 'Running', Progress: 0.2, LastEndTimeUtc: null, LastResult: null };
+  const { document, window, api, interval, close } = buildDom({ task: running });
   t.after(() => close());
 
-  clickRunMigration(document, window);
+  // The page's own load succeeds and starts polling because the task is already Running;
+  // only the poll's own subsequent requests hang, isolating the overlap guard under test.
+  firePageshow(document, window);
   await flush();
+
+  api.migrationStatusHangs = true;
   const callsBeforePoll = api.migrationStatusCalls;
 
   await tickPoll(interval, 2);
@@ -490,6 +515,9 @@ test('pagehide stops polling', async (t) => {
   const { document, window, api, interval, close } = buildDom({});
   t.after(() => close());
 
+  firePageshow(document, window);
+  await flush();
+
   clickRunMigration(document, window);
   await flush();
 
@@ -511,6 +539,137 @@ test('the section reports the migration task as absent when the response carries
   const summary = document.querySelector('#EmbyAuthMigrationSummary');
   assert.match(summary.textContent, /registered/i);
   assert.match(summary.textContent, /log/i);
+});
+
+test('the migration target dropdown orders Default, Remain, then the rest', async (t) => {
+  const availableTargets = [
+    { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
+    { Name: 'JellyfinSecurity', Id: 'jellyfin-security-provider-id' },
+    { Name: 'AnotherMethod', Id: 'another-provider-id' },
+  ];
+  const { document, window, close } = buildDom({ availableTargets });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const options = selectOptions(document.querySelector('#EmbyAuthMigrationTarget'));
+  assert.deepEqual(
+    options.map((option) => option.value),
+    [DEFAULT_PROVIDER_ID, REMAIN_ON_EMBY_LOGIN_METHOD, 'jellyfin-security-provider-id', 'another-provider-id'],
+  );
+  assert.equal(options[0].text, 'Move to Default');
+  assert.equal(options[1].text, 'Remain on Emby Login');
+  assert.equal(options[2].text, 'Move to JellyfinSecurity');
+});
+
+test('with only Default enabled the dropdown offers exactly two options', async (t) => {
+  const availableTargets = [{ Name: 'Default', Id: DEFAULT_PROVIDER_ID }];
+  const { document, window, close } = buildDom({ availableTargets });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const options = selectOptions(document.querySelector('#EmbyAuthMigrationTarget'));
+  assert.equal(options.length, 2);
+});
+
+test('an unavailable saved target selects nothing and names the Jellyfin log', async (t) => {
+  const { document, window, close } = buildDom({
+    config: { MigrationTarget: 'a-removed-plugin-provider-id' },
+  });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const select = document.querySelector('#EmbyAuthMigrationTarget');
+  assert.equal(select.value, '');
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.match(summary.textContent, /log/i);
+});
+
+test('Run migration now refuses to start when the saved target is unavailable', async (t) => {
+  const { document, window, api, close } = buildDom({
+    config: { MigrationTarget: 'a-removed-plugin-provider-id' },
+  });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  clickRunMigration(document, window);
+  await flush();
+
+  assert.deepEqual(api.updateCalls, []);
+  assert.equal(api.runMigrationCalls, 0);
+});
+
+test('picking a target and clicking Run saves it before queueing the task', async (t) => {
+  const availableTargets = [
+    { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
+    { Name: 'JellyfinSecurity', Id: 'jellyfin-security-provider-id' },
+  ];
+  const { document, window, api, close } = buildDom({ availableTargets });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  document.querySelector('#EmbyAuthMigrationTarget').value = 'jellyfin-security-provider-id';
+  clickRunMigration(document, window);
+  await flush();
+
+  assert.equal(api.updateCalls.length, 1);
+  assert.equal(api.updateCalls[0].MigrationTarget, 'jellyfin-security-provider-id');
+  assert.equal(api.runMigrationCalls, 1);
+});
+
+test('a failed save before Run stops the migration from starting', async (t) => {
+  const { document, window, api, close } = buildDom({ updateConfigFails: true });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  clickRunMigration(document, window);
+  await flush();
+
+  assert.equal(api.runMigrationCalls, 0);
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.match(summary.textContent, /log/i);
+});
+
+test('a target name with markup characters renders as an option with text only', async (t) => {
+  const availableTargets = [
+    { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
+    { Name: '<b>hacker</b>', Id: 'hacker-provider-id' },
+  ];
+  const { document, window, close } = buildDom({ availableTargets });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const option = Array.from(document.querySelector('#EmbyAuthMigrationTarget').options).find(
+    (candidate) => candidate.value === 'hacker-provider-id',
+  );
+  assert.equal(option.children.length, 0);
+  assert.ok(option.textContent.endsWith('<b>hacker</b>'));
+});
+
+test('submitting the settings form leaves the migration target unchanged', async (t) => {
+  const { document, window, api } = buildDom({});
+
+  firePageshow(document, window);
+  await flush();
+
+  fireSubmit(document, window);
+  await flush();
+
+  assert.equal(api.updateCalls.length, 1);
+  assert.equal(api.updateCalls[0].MigrationTarget, DEFAULT_PROVIDER_ID);
 });
 
 test('the settings status sits with the Save control', () => {

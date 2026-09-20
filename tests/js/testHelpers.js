@@ -14,11 +14,24 @@ const PAGE_PATH = path.join(
   'configPage.html',
 );
 
+/**
+ * Jellyfin's own Default login method ID, matching `LoginMethodMove.DefaultProviderId`.
+ */
+const DEFAULT_PROVIDER_ID = 'Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider';
+
+/**
+ * The value that means no path moves a user off the Emby login method, matching
+ * `PluginConfiguration.RemainOnEmbyLoginMethod`.
+ */
+const REMAIN_ON_EMBY_LOGIN_METHOD = 'RemainOnEmbyLoginMethod';
+
 const DEFAULT_CONFIG = {
   EmbyServerUrl: 'http://emby.example.test:8096',
   EmbyApiKey: 'default-api-key',
   MigrationMode: 'KeepEmbyInCharge',
   AccountAccess: 'NoLibraries',
+  MigrationTarget: DEFAULT_PROVIDER_ID,
+  PasswordSetTarget: '',
 };
 
 /**
@@ -28,6 +41,13 @@ const DEFAULT_CONFIG = {
  * passes `task: null` explicitly.
  */
 const DEFAULT_TASK = { State: 'Idle', Progress: null, LastEndTimeUtc: null, LastResult: null };
+
+/**
+ * The default `AvailableTargets` field: just Jellyfin's Default login method, matching a
+ * healthy install where the migration target dropdown's saved default selects cleanly. A test
+ * of the dropdown itself passes an explicit list.
+ */
+const DEFAULT_AVAILABLE_TARGETS = [{ Name: 'Default', Id: DEFAULT_PROVIDER_ID }];
 
 /**
  * Builds a rejection value for a stub method controlled by a failure flag.
@@ -65,7 +85,8 @@ function rejectionFor(flag, genericMessage) {
  * @param {boolean} [options.migrationStatusHangs] - makes every `getJSON('EmbyAuth/Migration')` call return a
  *   promise that never resolves, so a test can prove the page never issues a second request while one is pending.
  * @param {Array} [options.availableTargets] - the `AvailableTargets` field `getJSON('EmbyAuth/Migration')`
- *   resolves with. Defaults to an empty list.
+ *   resolves with. Defaults to a list holding only Jellyfin's Default login method (see
+ *   {@link DEFAULT_AVAILABLE_TARGETS}), so the default `config.MigrationTarget` selects cleanly.
  * @param {boolean | Error} [options.getConfigFails] - makes every `getPluginConfiguration` call reject.
  * @param {number} [options.getConfigFailsFromCall] - makes `getPluginConfiguration` reject starting
  *   with this 1-based call number, so an earlier call in the same test can still succeed.
@@ -82,7 +103,7 @@ function stubApiClient(options = {}) {
     task: options.task !== undefined ? options.task : DEFAULT_TASK,
     taskSequence: options.taskSequence ?? null,
     migrationStatusHangs: options.migrationStatusHangs ?? false,
-    availableTargets: options.availableTargets ?? [],
+    availableTargets: options.availableTargets ?? DEFAULT_AVAILABLE_TARGETS,
     getConfigFails: options.getConfigFails ?? false,
     getConfigFailsFromCall: options.getConfigFailsFromCall ?? null,
     updateConfigFails: options.updateConfigFails ?? false,
@@ -396,6 +417,21 @@ async function tickPoll(interval, times = 1) {
   }
 }
 
+/**
+ * Reads a `<select>`'s options as an array of `{ value, text, disabled, selected }`, in DOM order.
+ *
+ * @param {HTMLSelectElement} select - the select element.
+ * @returns {Array<{value: string, text: string, disabled: boolean, selected: boolean}>} its options.
+ */
+function selectOptions(select) {
+  return Array.from(select.options).map((option) => ({
+    value: option.value,
+    text: option.textContent,
+    disabled: option.disabled,
+    selected: option.selected,
+  }));
+}
+
 module.exports = {
   buildDom,
   stubApiClient,
@@ -410,4 +446,7 @@ module.exports = {
   settingsStatus,
   pageStyleRules,
   messageChildren,
+  selectOptions,
+  DEFAULT_PROVIDER_ID,
+  REMAIN_ON_EMBY_LOGIN_METHOD,
 };
