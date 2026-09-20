@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
 status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-09-20T18:10:31.682Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-09-20T19:42:26.066Z"
 last_activity: 2026-09-20
-last_activity_desc: "Completed quick task 260920-3lw: Move jsdom to devDependencies in tests/js"
-state_head: 1e374dd628c6096117bf7f9d4a3c1975dae55075
+last_activity_desc: Phase 04 execution started
+state_head: d795794811a487c25945f5217cb3a68d2d65f53c
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 22
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-19)
 
 **Core value:** A user moves from Emby to Jellyfin without a password reset, and no password that Emby did not verify ever opens an account.
-**Current focus:** Phase 03 — Migration Status and Target
+**Current focus:** Phase 04 — The Fingerprint Store, and Emby Traffic Under Failure
 
 ## Current Position
 
-Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — READY TO EXECUTE
-Plan: Not started
+Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
+Plan: 2 of 8
 Status: Ready to execute
-Last activity: 2026-09-20 — Completed quick task 260920-3lw: Move jsdom to devDependencies in tests/js
+Last activity: 2026-09-20 — Phase 04 execution started
 
 Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
 
@@ -74,6 +74,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 03-migration-status-and-target P05 | 24min | 3 tasks | 3 files |
 | Phase 03 P06 | 25min | 2 tasks | 6 files |
 | Phase 03 P07 | 23min | 3 tasks | 10 files |
+| Phase 04 P01 | 18min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,8 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03] Task 1's server-side refusal (EmbyAuthPlugin.UpdateConfiguration) closes the save-time migration-target gap only; ChangePassword/MoveAfterLogin/EmbyMigrationTask still resolve a stale-but-non-blank target to Move with no live enabled-list check — Task 2's action text explicitly branches only on MoveTargetKind and explicitly takes no new IUserManager dependency; closing the full resolve-time gap would need IUserManager added to three files not listed in this plan's files_modified — documented as an explicit out-of-scope decision in 03-06-SUMMARY.md per the 03-04 executor's carry-over instruction
 - [Phase 03]: [Phase 03-migration-status-and-target]: [Phase 03] The mounted JellyfinSecurity plugin folder is JellyfinSecurity_2.6.1.1, matching what the unpacked meta.json reports, not the release tag's 2.6.1.0 — the plan's own instruction to confirm against meta.json and use what it says covers this mismatch
 - [Phase 03]: [Phase 03-migration-status-and-target]: [Phase 03] fetch-jellyfinsecurity.sh's clean action uses trash (macOS-only) safely, because no mise task or CI job ever calls it — only fetch, which needs no destructive delete, runs in any automated path
+- [Phase 04]: [Phase 04] Checkpoint resolved proceed: fingerprint store moves to SQLite, one-way for data written after the upgrade; plugin project gains a pinned Microsoft.Data.Sqlite.Core reference — Removes the lock-around-I/O contention and the three documented failure modes of the JSON store (lost record on read failure, every user reported unverified during a read failure, in-memory record lost on restart)
+- [Phase 04]: [Phase 04] Task 1's RED phase proved nothing against the pre-rewrite JSON store (storage-engine swap behind an unchanged API); red was proven instead by break-then-restore against the finished SQLite implementation, per human direction — Unskipping all 14 rewritten tests against the unmodified JSON store passed all 14 — no behavior in the <behavior> block is false before the rewrite and true after it
 
 ### Pending Todos
 
@@ -141,6 +144,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T09:30:12.422Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-emby-traffic-under-load-and-failure/04-CONTEXT.md
+Last session: 2026-09-20T19:42:19.912Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
