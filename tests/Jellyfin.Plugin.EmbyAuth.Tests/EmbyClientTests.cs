@@ -193,7 +193,7 @@ public class EmbyClientTests
         AssertNoSecretsLogged();
     }
 
-    [Fact(Skip = "Task 1: every readable token ends its Emby session")]
+    [Fact]
     public async Task Login_EndsTheEmbySession_WhenTheResponseHasATokenAndNoUserName()
     {
         var handler = new StubHttpMessageHandler()
