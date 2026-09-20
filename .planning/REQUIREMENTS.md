@@ -44,7 +44,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 ### Test Coverage
 
 - [x] **TEST-01**: Unit tests cover `EmbyAuthenticationProvider`: account checks, the Emby login, account creation and update, and every failure path in AUTH-04.
-- [x] **TEST-02**: Unit tests cover `MoveToDefaultLoginMethod`, `DefaultLoginMethod`, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`.
+- [x] **TEST-02**: Unit tests cover `MoveAfterLogin`, `LoginMethodMove`, `EmbyLoginMethodUsers`, and `EmbyMigrationTask` against an SQLite in-memory `JellyfinDbContext`.
 - [x] **TEST-03**: Unit tests cover `EmbyAuthController`: the migration status, the run request, and the task state.
 - [x] **TEST-04**: Automated tests run the settings page JavaScript: load, save, their error messages, the migration list, and **Run migration now**.
 - [ ] **TEST-05**: A test covers concurrent first logins through Jellyfin.
