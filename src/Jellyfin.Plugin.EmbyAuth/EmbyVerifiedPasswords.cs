@@ -89,6 +89,23 @@ public sealed partial class EmbyVerifiedPasswords
         }
     }
 
+    /// <summary>
+    /// Checks whether the fingerprint file could be read on this call.
+    /// </summary>
+    /// <remarks>
+    /// A <c>false</c> result means the file could not be read on this call only; the next call reads the file again,
+    /// so the result is not sticky. Because <see cref="Load"/> caches a successful read and retries after a failed
+    /// one, this method is cheap: call it once per request, never once per user.
+    /// </remarks>
+    /// <returns><c>true</c> if the file was read successfully, including when it is absent; <c>false</c> if the read failed.</returns>
+    public bool RecordsAvailable()
+    {
+        lock (_lock)
+        {
+            return Load() is not null;
+        }
+    }
+
     private static string Fingerprint(string passwordHash) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(passwordHash)));
 

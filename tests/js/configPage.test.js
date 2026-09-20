@@ -24,6 +24,7 @@ const MIGRATION_START_FAILURE_MESSAGE = 'Jellyfin did not start the migration. S
 const MIGRATION_STARTED_MESSAGE = 'The migration runs. This list updates in a few seconds.';
 const NO_USERS_MESSAGE = 'No users are on the Emby login method.';
 const EXPECTED_ICON = [{ tagName: 'SPAN', classes: ['material-icons', 'warning'], ariaHidden: 'true', text: '' }];
+const RECORDS_UNAVAILABLE_PATH_PATTERN = /[\\/]/;
 
 test('a failed settings load shows a message on the page', async () => {
   const { document, window } = buildDom({ getConfigFails: true });
@@ -271,6 +272,38 @@ test('a failed migration status shows its message', async () => {
   const summary = document.querySelector('#EmbyAuthMigrationSummary');
   assert.equal(summary.textContent, MIGRATION_READ_FAILURE_MESSAGE);
   assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
+});
+
+test('a records-unavailable migration status shows a warning naming the Jellyfin log', { skip: 'RED: unskipped in the 03-01 Task 2 GREEN commit that wires loadEmbyAuthMigration to status.RecordsUnavailable' }, async () => {
+  const { document, window } = buildDom({ recordsUnavailable: true });
+
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.match(summary.textContent, /log/i);
+  assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
+});
+
+test('a records-available migration status shows no records-unavailable warning', async () => {
+  const { document, window } = buildDom({ recordsUnavailable: false, users: [] });
+
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(summary.textContent, NO_USERS_MESSAGE);
+  assert.deepEqual(messageChildren(summary), []);
+});
+
+test('the records-unavailable message contains no file system path', async () => {
+  const { document, window } = buildDom({ recordsUnavailable: true });
+
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.equal(RECORDS_UNAVAILABLE_PATH_PATTERN.test(summary.textContent), false);
 });
 
 test('Run migration now sends the request and reports it', async (t) => {

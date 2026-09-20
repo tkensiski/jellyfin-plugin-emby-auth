@@ -46,6 +46,8 @@ function rejectionFor(flag, genericMessage) {
  * @param {object} [options] - stub configuration.
  * @param {object} [options.config] - the configuration `getPluginConfiguration` resolves with.
  * @param {Array} [options.users] - the users `getJSON('EmbyAuth/Migration')` resolves with.
+ * @param {boolean} [options.recordsUnavailable] - the `RecordsUnavailable` flag `getJSON('EmbyAuth/Migration')`
+ *   resolves with, settable at any time on the returned stub.
  * @param {boolean | Error} [options.getConfigFails] - makes every `getPluginConfiguration` call reject.
  * @param {number} [options.getConfigFailsFromCall] - makes `getPluginConfiguration` reject starting
  *   with this 1-based call number, so an earlier call in the same test can still succeed.
@@ -58,6 +60,7 @@ function stubApiClient(options = {}) {
   const api = {
     config: { ...DEFAULT_CONFIG, ...(options.config ?? {}) },
     users: options.users ?? [],
+    recordsUnavailable: options.recordsUnavailable ?? false,
     getConfigFails: options.getConfigFails ?? false,
     getConfigFailsFromCall: options.getConfigFailsFromCall ?? null,
     updateConfigFails: options.updateConfigFails ?? false,
@@ -76,7 +79,7 @@ function stubApiClient(options = {}) {
         return Promise.reject(rejectionFor(api.migrationStatusFails, 'migration status failed'));
       }
 
-      return Promise.resolve({ Users: api.users });
+      return Promise.resolve({ Users: api.users, RecordsUnavailable: api.recordsUnavailable });
     },
     ajax() {
       api.runMigrationCalls += 1;

@@ -42,7 +42,7 @@ public sealed class EmbyAuthController(
         await using (dbContext.ConfigureAwait(false))
         {
             var users = await EmbyLoginMethodUsers.ListAsync(dbContext, verifiedPasswords, cancellationToken).ConfigureAwait(false);
-            return new MigrationStatus(users.Select(user => new MigrationUser(user.Username, user.ReadyToMove)).ToList());
+            return new MigrationStatus(false, users.Select(user => new MigrationUser(user.Username, user.ReadyToMove)).ToList());
         }
     }
 
@@ -62,8 +62,13 @@ public sealed class EmbyAuthController(
 /// <summary>
 /// The migration status.
 /// </summary>
+/// <param name="RecordsUnavailable">
+/// Whether Jellyfin could not read the record of passwords Emby verified on this call. While <c>true</c>, the
+/// readiness of every user in <see cref="Users"/> is unknown; the condition is not sticky, and the next call
+/// reads the file again.
+/// </param>
 /// <param name="Users">The users on the Emby login method, sorted by name.</param>
-public sealed record MigrationStatus(IReadOnlyList<MigrationUser> Users);
+public sealed record MigrationStatus(bool RecordsUnavailable, IReadOnlyList<MigrationUser> Users);
 
 /// <summary>
 /// A user on the Emby login method.
