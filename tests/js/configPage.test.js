@@ -685,7 +685,7 @@ test('a no-saved-password account with the Default target gets the blank-passwor
   assert.match(warning.textContent, /nopass/);
 });
 
-test('a no-saved-password account with another target gets the cannot-tell warning', async (t) => {
+test('a no-saved-password account with another target gets the delegation warning', async (t) => {
   const users = [{ Name: 'nopass', State: 'NoPassword' }];
   const availableTargets = [
     { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
@@ -702,8 +702,9 @@ test('a no-saved-password account with another target gets the cannot-tell warni
   await flush();
 
   const warning = document.querySelector('#EmbyAuthMigrationWarning');
-  assert.match(warning.textContent, /cannot tell|does not know/i);
-  assert.doesNotMatch(warning.textContent, /blank password/i);
+  assert.match(warning.textContent, /blank password/i);
+  assert.match(warning.textContent, /Default/);
+  assert.doesNotMatch(warning.textContent, /cannot tell|does not know/i);
 });
 
 test('a no-saved-password account with the Remain target gets no warning', async (t) => {

@@ -198,11 +198,13 @@
                 selectEmbyAuthTargetValue(select, savedValue);
             }
 
-            // The plugin never claims a behaviour it has not verified (AUTH-06, D-18). The specific
-            // blank-password claim is made only about Jellyfin's own Default login method, verified at
-            // DefaultAuthenticationProvider.cs:61-68; any other method gets the "cannot tell" wording; Remain
-            // on Emby Login gets no warning at all, because no account reaches another method. The plugin
-            // neither refuses the move nor invents a password -- this states the risk and a recommendation.
+            // The plugin never claims a behaviour it has not verified (AUTH-06, D-18). Jellyfin's own Default
+            // login method opens an account with no saved password with a blank password, verified at
+            // DefaultAuthenticationProvider.cs:61-68. Any other login method that hands its password check to
+            // Default inherits that behaviour -- measured this way for JellyfinSecurity -- so the fallback
+            // wording states that mechanism instead of claiming the behaviour is unknown. Remain on Emby Login
+            // gets no warning at all, because no account reaches another method. The plugin neither refuses the
+            // move nor invents a password -- this states the risk and a recommendation.
             function embyAuthNoPasswordWarningText(users, migrationTarget) {
                 if (migrationTarget === EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD) {
                     return '';
@@ -220,7 +222,7 @@
                     return 'Jellyfin\'s Default login method opens an account with no saved password when a blank password is sent. Set a password for these accounts before they move: ' + who + '.';
                 }
 
-                return 'The plugin cannot tell how the migration target treats an account with no saved password. Set a password for these accounts before they move: ' + who + '.';
+                return 'A login method that hands the password check to Jellyfin\'s Default login method opens an account with no saved password when a blank password is sent, the way Default itself does. Set a password for these accounts before they move: ' + who + '.';
             }
 
             function renderEmbyAuthMigrationWarning(users, migrationTarget) {
