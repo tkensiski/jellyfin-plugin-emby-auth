@@ -162,7 +162,7 @@ public class EmbyUserDirectoryTests
         Assert.Equal(EmbyUserStatus.Unavailable, status);
     }
 
-    [Fact(Skip = "04-03 Task 2: red until the single-flight guard lands")]
+    [Fact]
     public async Task ConcurrentReaders_OnAnExpiredSnapshot_SendOneRequest()
     {
         var handler = new StubHttpMessageHandler().Then(UserList);
@@ -192,7 +192,7 @@ public class EmbyUserDirectoryTests
         Assert.All(results, status => Assert.Equal(EmbyUserStatus.Active, status));
     }
 
-    [Fact(Skip = "04-03 Task 2: red until the single-flight guard lands")]
+    [Fact]
     public async Task ConcurrentReaders_OnAColdDirectory_SendOneRequest()
     {
         var handler = new StubHttpMessageHandler().Then(UserList);
@@ -218,7 +218,7 @@ public class EmbyUserDirectoryTests
         Assert.All(results, status => Assert.Equal(EmbyUserStatus.Active, status));
     }
 
-    [Fact(Skip = "04-03 Task 2: red until the single-flight guard lands")]
+    [Fact]
     public async Task ConcurrentReaders_WithDifferentSettings_SendTwoRequests()
     {
         var handler = new StubHttpMessageHandler().Then(UserList).Then(UserList);
@@ -246,7 +246,7 @@ public class EmbyUserDirectoryTests
         Assert.Contains(handler.Requests[1].EmbyToken, new[] { "key-1", "key-2" });
     }
 
-    [Fact(Skip = "04-03 Task 2: red until the single-flight guard lands")]
+    [Fact]
     public async Task ConcurrentReaders_AfterAFailedRefresh_AreNotBlocked()
     {
         var handler = new StubHttpMessageHandler().Then(() => throw new HttpRequestException("Connection refused"));
