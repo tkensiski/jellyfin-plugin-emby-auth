@@ -201,15 +201,65 @@ public sealed partial class EmbyVerifiedPasswords
     }
 
     /// <summary>
-    /// Imports the records from the legacy fingerprint JSON file into this database, once.
+    /// Imports the records from the legacy fingerprint JSON file into this database, once. The database's own
+    /// <c>user_version</c> is the marker: a nonzero value means an earlier call already imported (or found
+    /// nothing to import), so this returns immediately without touching the file or the table. The rows and the
+    /// marker commit together in one transaction, so a failure partway through leaves neither a half-imported
+    /// table nor a marker claiming an import that did not finish, and the legacy file itself is never written,
+    /// moved, or deleted.
     /// </summary>
-    /// <remarks>Not yet implemented. The next commit adds the import; every caller here is unaffected.</remarks>
     /// <param name="connection">The open connection to import into.</param>
     private void ImportLegacyRecords(SqliteConnection connection)
     {
-        _ = connection;
-        _ = _legacyFilePath;
-        _ = SchemaVersion;
+        using var transaction = connection.BeginTransaction(deferred: false);
+
+        using (var userVersionCommand = connection.CreateCommand())
+        {
+            userVersionCommand.Transaction = transaction;
+            userVersionCommand.CommandText = "PRAGMA user_version;";
+            if ((long)userVersionCommand.ExecuteScalar()! != 0)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            if (File.Exists(_legacyFilePath))
+            {
+                var json = File.ReadAllText(_legacyFilePath);
+                var records = JsonSerializer.Deserialize<Dictionary<Guid, string>>(json) ?? [];
+                foreach (var (userId, fingerprint) in records)
+                {
+                    using var insertCommand = connection.CreateCommand();
+                    insertCommand.Transaction = transaction;
+                    insertCommand.CommandText = "INSERT INTO VerifiedPasswords (UserId, Fingerprint) VALUES ($userId, $fingerprint) ON CONFLICT(UserId) DO NOTHING;";
+                    insertCommand.Parameters.AddWithValue("$userId", userId.ToString());
+                    insertCommand.Parameters.AddWithValue("$fingerprint", fingerprint);
+                    insertCommand.ExecuteNonQuery();
+                }
+            }
+
+            using (var markDoneCommand = connection.CreateCommand())
+            {
+                markDoneCommand.Transaction = transaction;
+
+                // PRAGMA does not accept a bound parameter. Justification for CA2100: SchemaVersion is a
+                // compile-time int constant, never user input.
+#pragma warning disable CA2100
+                markDoneCommand.CommandText = FormattableString.Invariant($"PRAGMA user_version = {SchemaVersion};");
+#pragma warning restore CA2100
+                markDoneCommand.ExecuteNonQuery();
+            }
+
+            transaction.Commit();
+        }
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        {
+            // Disposing the uncommitted transaction rolls back both the rows and the user_version change
+            // together, leaving the marker unset so the next start tries the import again.
+            LogImportFailed(_logger, ex, _legacyFilePath);
+        }
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot read the verified-password records in {DatabasePath}. It reports every user as needing an Emby login until the read succeeds.")]

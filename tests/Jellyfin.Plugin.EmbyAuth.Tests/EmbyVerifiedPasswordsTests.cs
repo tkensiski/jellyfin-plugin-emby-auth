@@ -266,7 +266,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
                 entry.Contains(fingerprint, StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_MakesEveryLegacyRecordMatch_OnFirstStart()
     {
         var userA = Guid.NewGuid();
@@ -283,7 +283,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userB, HashB));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_DoesNotRunASecondTime()
     {
         var userA = Guid.NewGuid();
@@ -303,7 +303,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(secondStore.Matches(userB, HashB));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_DoesNotOverwriteARecordTheStoreAlreadyWrote()
     {
         var userId = Guid.NewGuid();
@@ -319,7 +319,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.False(secondStore.Matches(userId, HashA));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_LeavesTheLegacyFileUnchanged()
     {
         WriteLegacyFile(new Dictionary<Guid, string> { [Guid.NewGuid()] = Fingerprint(HashA) });
@@ -331,7 +331,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Equal(bytesBefore, File.ReadAllBytes(_legacyFilePath));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_MarksItselfDone_WhenNoLegacyFileExists()
     {
         var logger = new CapturingLogger<EmbyVerifiedPasswords>();
@@ -342,7 +342,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Equal(1, GetUserVersion());
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_ImportsNothing_AndLogsOneError_WhenTheLegacyFileCannotBeRead()
     {
         File.WriteAllText(_legacyFilePath, "not json");
@@ -364,7 +364,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(thirdStore.Matches(validUserId, HashB));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_ImportsNothing_WhenOneEntryInTheFileIsUnusable()
     {
         var userId = Guid.NewGuid();
@@ -380,7 +380,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    [Fact]
     public void Import_LeavesAUsableStore_WhenItFails()
     {
         File.WriteAllText(_legacyFilePath, "not json");
