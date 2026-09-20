@@ -84,23 +84,44 @@
                 element.appendChild(document.createTextNode(text));
             }
 
+            function migrationStateText(state) {
+                switch (state) {
+                    case 'Ready':
+                        return 'will move on the next run';
+                    case 'NeedsEmbyLogin':
+                        return 'needs one login while Emby runs';
+                    case 'NoPassword':
+                        return 'has no saved password';
+                    case 'Unknown':
+                    default:
+                        return 'readiness unknown';
+                }
+            }
+
             function loadEmbyAuthMigration() {
                 var summary = document.querySelector('#EmbyAuthMigrationSummary');
                 var list = document.querySelector('#EmbyAuthMigrationUsers');
                 return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
                     if (status.RecordsUnavailable) {
                         showEmbyAuthMessage(summary, 'Jellyfin cannot read the record of passwords Emby verified. The readiness of each account is unknown until it can. See the Jellyfin log for detail.', true);
+                    } else if (status.Users.length === 0) {
+                        showEmbyAuthMessage(summary, 'No users are on the Emby login method.', false);
                     } else {
-                        var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
-                        showEmbyAuthMessage(summary, status.Users.length === 0
-                            ? 'No users are on the Emby login method.'
-                            : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.', false);
+                        var counts = { Ready: 0, NeedsEmbyLogin: 0, NoPassword: 0, Unknown: 0 };
+                        status.Users.forEach(function (user) {
+                            counts[user.State] = (counts[user.State] || 0) + 1;
+                        });
+                        showEmbyAuthMessage(summary, 'Users on the Emby login method: ' + status.Users.length
+                            + '. Ready: ' + counts.Ready
+                            + '. Needs an Emby login: ' + counts.NeedsEmbyLogin
+                            + '. No saved password: ' + counts.NoPassword
+                            + '. Unknown: ' + counts.Unknown + '.', false);
                     }
 
                     list.replaceChildren();
                     status.Users.forEach(function (user) {
                         var item = document.createElement('li');
-                        item.textContent = user.Name + ': ' + (user.ReadyToMove ? 'ready' : 'needs one login while Emby runs');
+                        item.textContent = user.Name + ': ' + migrationStateText(user.State);
                         list.appendChild(item);
                     });
                 }).catch(function () {

@@ -45,9 +45,14 @@ function rejectionFor(flag, genericMessage) {
  *
  * @param {object} [options] - stub configuration.
  * @param {object} [options.config] - the configuration `getPluginConfiguration` resolves with.
- * @param {Array} [options.users] - the users `getJSON('EmbyAuth/Migration')` resolves with.
+ * @param {Array} [options.users] - the users `getJSON('EmbyAuth/Migration')` resolves with. Defaults to an empty
+ *   list, so an ordinary successful load needs no configuration.
  * @param {boolean} [options.recordsUnavailable] - the `RecordsUnavailable` flag `getJSON('EmbyAuth/Migration')`
  *   resolves with, settable at any time on the returned stub.
+ * @param {object | null} [options.task] - the `Task` field `getJSON('EmbyAuth/Migration')` resolves with. Defaults
+ *   to `null`, matching an install with no registered migration-task worker.
+ * @param {Array} [options.availableTargets] - the `AvailableTargets` field `getJSON('EmbyAuth/Migration')`
+ *   resolves with. Defaults to an empty list.
  * @param {boolean | Error} [options.getConfigFails] - makes every `getPluginConfiguration` call reject.
  * @param {number} [options.getConfigFailsFromCall] - makes `getPluginConfiguration` reject starting
  *   with this 1-based call number, so an earlier call in the same test can still succeed.
@@ -61,6 +66,8 @@ function stubApiClient(options = {}) {
     config: { ...DEFAULT_CONFIG, ...(options.config ?? {}) },
     users: options.users ?? [],
     recordsUnavailable: options.recordsUnavailable ?? false,
+    task: options.task ?? null,
+    availableTargets: options.availableTargets ?? [],
     getConfigFails: options.getConfigFails ?? false,
     getConfigFailsFromCall: options.getConfigFailsFromCall ?? null,
     updateConfigFails: options.updateConfigFails ?? false,
@@ -79,7 +86,12 @@ function stubApiClient(options = {}) {
         return Promise.reject(rejectionFor(api.migrationStatusFails, 'migration status failed'));
       }
 
-      return Promise.resolve({ Users: api.users, RecordsUnavailable: api.recordsUnavailable });
+      return Promise.resolve({
+        Users: api.users,
+        RecordsUnavailable: api.recordsUnavailable,
+        Task: api.task,
+        AvailableTargets: api.availableTargets,
+      });
     },
     ajax() {
       api.runMigrationCalls += 1;

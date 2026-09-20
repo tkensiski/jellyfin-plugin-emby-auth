@@ -178,9 +178,9 @@ test('a successful load fills the four inputs', async () => {
 
 test('the migration list shows one entry per user', async () => {
   const users = [
-    { Name: 'alice', ReadyToMove: true },
-    { Name: 'bob', ReadyToMove: false },
-    { Name: 'carol', ReadyToMove: true },
+    { Name: 'alice', State: 'Ready' },
+    { Name: 'bob', State: 'NeedsEmbyLogin' },
+    { Name: 'carol', State: 'Ready' },
   ];
   const { document, window } = buildDom({ users });
 
@@ -188,16 +188,16 @@ test('the migration list shows one entry per user', async () => {
   await flush();
 
   assert.deepEqual(listItemTexts(document), [
-    'alice: ready',
+    'alice: will move on the next run',
     'bob: needs one login while Emby runs',
-    'carol: ready',
+    'carol: will move on the next run',
   ]);
 });
 
 test('two users with the same name each get their own entry', async () => {
   const users = [
-    { Name: 'duplicate', ReadyToMove: true },
-    { Name: 'duplicate', ReadyToMove: false },
+    { Name: 'duplicate', State: 'Ready' },
+    { Name: 'duplicate', State: 'NeedsEmbyLogin' },
   ];
   const { document, window } = buildDom({ users });
 
@@ -209,16 +209,38 @@ test('two users with the same name each get their own entry', async () => {
 
 test('the list keeps the server order', async () => {
   const users = [
-    { Name: 'zeta', ReadyToMove: true },
-    { Name: 'alpha', ReadyToMove: true },
-    { Name: 'mike', ReadyToMove: true },
+    { Name: 'zeta', State: 'Ready' },
+    { Name: 'alpha', State: 'Ready' },
+    { Name: 'mike', State: 'Ready' },
   ];
   const { document, window } = buildDom({ users });
 
   firePageshow(document, window);
   await flush();
 
-  assert.deepEqual(listItemTexts(document), ['zeta: ready', 'alpha: ready', 'mike: ready']);
+  assert.deepEqual(listItemTexts(document), [
+    'zeta: will move on the next run',
+    'alpha: will move on the next run',
+    'mike: will move on the next run',
+  ]);
+});
+
+test('the migration list renders a distinct string for each of the four states', async () => {
+  // Every user shares the same name, so uniqueness can only come from the state-derived text, not the name.
+  const users = [
+    { Name: 'user', State: 'Ready' },
+    { Name: 'user', State: 'NeedsEmbyLogin' },
+    { Name: 'user', State: 'NoPassword' },
+    { Name: 'user', State: 'Unknown' },
+  ];
+  const { document, window } = buildDom({ users });
+
+  firePageshow(document, window);
+  await flush();
+
+  const texts = listItemTexts(document);
+  assert.equal(texts.length, 4);
+  assert.equal(new Set(texts).size, 4);
 });
 
 test('an empty user list renders nothing and says so', async () => {
@@ -237,9 +259,9 @@ test('an empty user list renders nothing and says so', async () => {
 
 test('loading the migration status twice does not accumulate entries', async () => {
   const users = [
-    { Name: 'alice', ReadyToMove: true },
-    { Name: 'bob', ReadyToMove: false },
-    { Name: 'carol', ReadyToMove: true },
+    { Name: 'alice', State: 'Ready' },
+    { Name: 'bob', State: 'NeedsEmbyLogin' },
+    { Name: 'carol', State: 'Ready' },
   ];
   const { document, window } = buildDom({ users });
 
@@ -252,7 +274,7 @@ test('loading the migration status twice does not accumulate entries', async () 
 });
 
 test('a user name containing markup characters renders as text', async () => {
-  const users = [{ Name: '<b>hacker</b>', ReadyToMove: true }];
+  const users = [{ Name: '<b>hacker</b>', State: 'Ready' }];
   const { document, window } = buildDom({ users });
 
   firePageshow(document, window);
@@ -260,7 +282,7 @@ test('a user name containing markup characters renders as text', async () => {
 
   const item = document.querySelector('#EmbyAuthMigrationUsers li');
   assert.equal(item.children.length, 0);
-  assert.equal(item.textContent, '<b>hacker</b>: ready');
+  assert.equal(item.textContent, '<b>hacker</b>: will move on the next run');
 });
 
 test('a failed migration status shows its message', async () => {
@@ -430,9 +452,9 @@ test('a successful save turns Save back on', async () => {
 
 test('a failed load clears the migration list', async () => {
   const users = [
-    { Name: 'alice', ReadyToMove: true },
-    { Name: 'bob', ReadyToMove: false },
-    { Name: 'carol', ReadyToMove: true },
+    { Name: 'alice', State: 'Ready' },
+    { Name: 'bob', State: 'NeedsEmbyLogin' },
+    { Name: 'carol', State: 'Ready' },
   ];
   const { document, window, api } = buildDom({ users });
 
@@ -450,8 +472,8 @@ test('a failed load clears the migration list', async () => {
 
 test('a plain migration message replaces a stale warning icon', async () => {
   const users = [
-    { Name: 'alice', ReadyToMove: true },
-    { Name: 'bob', ReadyToMove: false },
+    { Name: 'alice', State: 'Ready' },
+    { Name: 'bob', State: 'NeedsEmbyLogin' },
   ];
   const { document, window, api } = buildDom({ users, migrationStatusFails: true });
 
@@ -466,7 +488,10 @@ test('a plain migration message replaces a stale warning icon', async () => {
   await flush();
 
   assert.deepEqual(messageChildren(summary), []);
-  assert.equal(summary.textContent, 'Users on the Emby login method: 2. Ready to move: 1.');
+  assert.equal(
+    summary.textContent,
+    'Users on the Emby login method: 2. Ready: 1. Needs an Emby login: 1. No saved password: 0. Unknown: 0.',
+  );
 });
 
 test('a repeated settings failure shows only one icon', async () => {
