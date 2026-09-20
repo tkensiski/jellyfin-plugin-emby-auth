@@ -7,6 +7,7 @@ using MediaBrowser.Common.Plugins;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -89,4 +90,16 @@ public partial class EmbyAuthPlugin : BasePlugin<PluginConfiguration>, IHasWebPa
 
     [LoggerMessage(Level = LogLevel.Error, Message = "The Emby Auth plugin refused to save its settings. {Problem}")]
     private static partial void LogConfigurationRefused(ILogger logger, string problem);
+
+    /// <summary>
+    /// Clears pooled SQLite connections before the plugin's assembly is unloaded. <see cref="SqliteConnection"/>
+    /// pooling can otherwise hold the collectible <see cref="System.Runtime.Loader.AssemblyLoadContext"/> a
+    /// plugin is loaded into (dotnet/efcore#27498), the same treatment Jellyfin's own SqliteDatabaseProvider
+    /// gives its connections at shutdown.
+    /// </summary>
+    public override void OnUninstalling()
+    {
+        SqliteConnection.ClearAllPools();
+        base.OnUninstalling();
+    }
 }

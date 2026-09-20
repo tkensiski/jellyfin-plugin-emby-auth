@@ -17,41 +17,46 @@ namespace Jellyfin.Plugin.EmbyAuth.Tests;
 public sealed class EmbyAuthControllerTests : IDisposable
 {
     /// <summary>
-    /// A record cut short: an opening brace, a quoted user identifier, a colon, and a quoted value with no closing
-    /// quote or brace. Deserializing this throws <see cref="System.Text.Json.JsonException"/>, matching the fixture
-    /// <c>EmbyVerifiedPasswordsTests</c> already uses to provoke a read failure.
+    /// Bytes that are not a SQLite database, matching the fixture <c>EmbyVerifiedPasswordsTests</c> already uses
+    /// to provoke a read failure.
     /// </summary>
-    private const string UnreadableContents = "{\"3fa85f64-5717-4562-b3fc-2c963f66afa6\":\"AB";
+    private const string UnreadableContents = "not a database";
 
-    private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-{Guid.NewGuid():N}.json");
+    private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-{Guid.NewGuid():N}.db");
     private readonly SqliteJellyfinDbContextFactory _dbContextFactory = new();
     private readonly FakeTaskManager _taskManager = new();
     private readonly FakeUserManager _userManager = new();
 
     public void Dispose()
     {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(_filePath);
-        File.Delete(_filePath + ".tmp");
+        File.Delete(_filePath + "-wal");
+        File.Delete(_filePath + "-shm");
         _dbContextFactory.Dispose();
     }
 
     /// <summary>
-    /// Builds the contents of a readable fingerprint file by recording a real password through a throwaway
-    /// <see cref="EmbyVerifiedPasswords"/> instance, then reading back what it wrote.
+    /// Builds the contents of a readable fingerprint database by recording a real password through a throwaway
+    /// <see cref="EmbyVerifiedPasswords"/> instance, then reading back what it wrote. A SQLite database is
+    /// binary, so this reads and writes bytes, never text: round-tripping through <see cref="File.ReadAllText"/>
+    /// re-encodes non-UTF-8 byte sequences and corrupts the file.
     /// </summary>
-    /// <returns>The valid JSON contents of a fingerprint file holding one record.</returns>
-    private static string ValidFingerprintFileContents()
+    /// <returns>The valid bytes of a fingerprint database holding one record.</returns>
+    private static byte[] ValidFingerprintFileContents()
     {
-        var seedPath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-seed-{Guid.NewGuid():N}.json");
+        var seedPath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-seed-{Guid.NewGuid():N}.db");
         try
         {
             new EmbyVerifiedPasswords(seedPath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(Guid.NewGuid(), "hash");
-            return File.ReadAllText(seedPath);
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+            return File.ReadAllBytes(seedPath);
         }
         finally
         {
             File.Delete(seedPath);
-            File.Delete(seedPath + ".tmp");
+            File.Delete(seedPath + "-wal");
+            File.Delete(seedPath + "-shm");
         }
     }
 
@@ -95,7 +100,10 @@ public sealed class EmbyAuthControllerTests : IDisposable
         var first = await controller.GetMigrationStatus(CancellationToken.None);
         Assert.True(first.Value!.RecordsUnavailable);
 
-        File.WriteAllText(_filePath, ValidFingerprintFileContents());
+        // Drop pooled connections before overwriting the file, so a pooled connection does not retain stale
+        // schema or page-cache state from the corrupt bytes it just opened.
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        File.WriteAllBytes(_filePath, ValidFingerprintFileContents());
 
         var second = await controller.GetMigrationStatus(CancellationToken.None);
         Assert.False(second.Value!.RecordsUnavailable);

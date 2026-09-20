@@ -33,7 +33,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
     private EmbyVerifiedPasswords CreateStore(ILogger<EmbyVerifiedPasswords>? logger = null) =>
         new(_databasePath, logger ?? NullLogger<EmbyVerifiedPasswords>.Instance);
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void Matches_TheRecordedHash()
     {
         var store = CreateStore();
@@ -44,7 +44,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userId, HashA));
     }
 
-    [Theory(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Theory]
     [InlineData(HashB)]
     [InlineData("")]
     [InlineData(null)]
@@ -58,7 +58,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.False(store.Matches(userId, hash));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void DoesNotMatch_AnUnknownUser()
     {
         var store = CreateStore();
@@ -67,7 +67,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.False(store.Matches(Guid.NewGuid(), HashA));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void Record_ReplacesTheEarlierHash()
     {
         var store = CreateStore();
@@ -80,7 +80,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userId, HashB));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void Records_SurviveARestart()
     {
         var userId = Guid.NewGuid();
@@ -89,7 +89,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(CreateStore().Matches(userId, HashA));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void Database_DoesNotContainThePasswordHash()
     {
         CreateStore().Record(Guid.NewGuid(), HashA);
@@ -97,7 +97,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.DoesNotContain("BBBB", Encoding.Latin1.GetString(File.ReadAllBytes(_databasePath)), StringComparison.Ordinal);
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void MissingFile_MatchesNothing_WithoutAnError()
     {
         var logger = new CapturingLogger<EmbyVerifiedPasswords>();
@@ -106,7 +106,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Empty(logger.Entries);
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void UnreadableFile_MatchesNothing_AndLogsAnError()
     {
         File.WriteAllText(_databasePath, NotADatabase);
@@ -116,7 +116,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public async Task ConcurrentRecords_AreAllKept()
     {
         var store = CreateStore();
@@ -128,7 +128,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.All(userIds, id => Assert.True(reloaded.Matches(id, HashA)));
     }
 
-    [Theory(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Theory]
     [InlineData("")]
     [InlineData(null)]
     public void Record_Throws_ForAnEmptyOrNullHash(string? hash)
@@ -138,7 +138,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.ThrowsAny<ArgumentException>(() => store.Record(Guid.NewGuid(), hash!));
     }
 
-    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    [Fact]
     public void Fingerprint_IsCaseSensitive()
     {
         var store = CreateStore();

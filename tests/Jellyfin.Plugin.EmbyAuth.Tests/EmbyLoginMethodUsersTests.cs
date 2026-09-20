@@ -16,19 +16,21 @@ public sealed class EmbyLoginMethodUsersTests : IDisposable
     private const string AnotherProviderId = "Jellyfin.Plugin.EmbyAuth.Tests.AnotherLoginMethod";
 
     /// <summary>
-    /// A record cut short: an opening brace, a quoted user identifier, a colon, and a quoted value with no closing
-    /// quote or brace. Deserializing this throws <see cref="System.Text.Json.JsonException"/>, matching the fixture
-    /// <c>EmbyVerifiedPasswordsTests</c> already uses to provoke a read failure.
+    /// Bytes that are not a SQLite database. Opening a database at this path fails with a
+    /// <see cref="Microsoft.Data.Sqlite.SqliteException"/> reporting "file is not a database", matching the
+    /// fixture <c>EmbyVerifiedPasswordsTests</c> already uses to provoke a read failure.
     /// </summary>
-    private const string UnreadableContents = "{\"3fa85f64-5717-4562-b3fc-2c963f66afa6\":\"AB";
+    private const string UnreadableContents = "not a database";
 
     private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-login-method-users-tests-{Guid.NewGuid():N}.json");
     private readonly SqliteJellyfinDbContextFactory _dbContextFactory = new();
 
     public void Dispose()
     {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.Delete(_filePath);
-        File.Delete(_filePath + ".tmp");
+        File.Delete(_filePath + "-wal");
+        File.Delete(_filePath + "-shm");
         _dbContextFactory.Dispose();
     }
 
@@ -197,12 +199,17 @@ public sealed class EmbyLoginMethodUsersTests : IDisposable
     [Fact]
     public async Task ListAsync_NeverMarksNeedsEmbyLogin_AndChecksAvailabilityOnlyOnce_WhenTheFingerprintFileCannotBeRead()
     {
-        File.WriteAllText(_filePath, UnreadableContents);
         await SeedUserAsync("alice", EmbyAuthenticationProvider.ProviderId, "hash-alice");
         await SeedUserAsync("bob", EmbyAuthenticationProvider.ProviderId, "hash-bob");
         await SeedUserAsync("carol", EmbyAuthenticationProvider.ProviderId, "hash-carol");
         var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+
+        // Construct on a healthy database first, so its own EnsureInitialized() succeeds and logs nothing.
+        // Corrupting the file only after construction means the single log entry this test asserts on below can
+        // come only from RecordsAvailable() itself, not from construction-time initialization.
         var verifiedPasswords = new EmbyVerifiedPasswords(_filePath, logger);
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        File.WriteAllText(_filePath, UnreadableContents);
         var context = _dbContextFactory.CreateDbContext();
 
         IReadOnlyList<EmbyLoginMethodUser> users;
@@ -214,10 +221,10 @@ public sealed class EmbyLoginMethodUsersTests : IDisposable
         Assert.Equal(3, users.Count);
         Assert.All(users, user => Assert.Equal(MigrationUserState.Unknown, user.State));
 
-        // EmbyVerifiedPasswords.Load() logs an error every time it retries a failed read, and never caches a
-        // failure. So exactly one log entry proves RecordsAvailable() was called once for this whole ListAsync
-        // call, not once per one of the three users above. A counting subclass is not available here because
-        // EmbyVerifiedPasswords is sealed.
+        // EmbyVerifiedPasswords.RecordsAvailable() logs an error every time it retries a failed read, and never
+        // caches a failure. So exactly one log entry proves RecordsAvailable() was called once for this whole
+        // ListAsync call, not once per one of the three users above. A counting subclass is not available here
+        // because EmbyVerifiedPasswords is sealed.
         Assert.Single(logger.Entries);
     }
 }

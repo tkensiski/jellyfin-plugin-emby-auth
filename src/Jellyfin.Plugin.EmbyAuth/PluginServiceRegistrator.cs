@@ -20,9 +20,9 @@ namespace Jellyfin.Plugin.EmbyAuth;
 public class PluginServiceRegistrator : IPluginServiceRegistrator
 {
     /// <summary>
-    /// The name of the file, in Jellyfin's plugin configuration folder, that records the password hashes that Emby verified.
+    /// The name of the SQLite database file, in the plugin's data folder, that records the password hashes that Emby verified.
     /// </summary>
-    public const string VerifiedPasswordsFileName = "Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json";
+    public const string VerifiedPasswordsDatabaseFileName = "Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.db";
 
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
@@ -31,7 +31,13 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<EmbyClient>();
         serviceCollection.AddSingleton<EmbyUserDirectory>();
         serviceCollection.AddSingleton(services => new EmbyVerifiedPasswords(
-            Path.Combine(services.GetRequiredService<IApplicationPaths>().PluginConfigurationsPath, VerifiedPasswordsFileName),
+            // Same PluginsPath + assembly-name derivation Jellyfin uses for BasePlugin.DataFolderPath
+            // (MediaBrowser.Common/Plugins/BasePluginOfT.cs:50, tag v12.1), so the database lands in the
+            // plugin data folder without depending on EmbyAuthPlugin.Instance being constructed yet.
+            Path.Combine(
+                services.GetRequiredService<IApplicationPaths>().PluginsPath,
+                Path.GetFileNameWithoutExtension(typeof(EmbyVerifiedPasswords).Assembly.Location),
+                VerifiedPasswordsDatabaseFileName),
             services.GetRequiredService<ILogger<EmbyVerifiedPasswords>>()));
         serviceCollection.AddSingleton<Func<PluginConfiguration?>>(_ => () => EmbyAuthPlugin.Instance?.Configuration);
         serviceCollection.AddSingleton<IAuthenticationProvider>(services => new EmbyAuthenticationProvider(
