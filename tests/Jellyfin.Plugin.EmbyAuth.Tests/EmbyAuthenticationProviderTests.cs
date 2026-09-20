@@ -328,6 +328,40 @@ public class EmbyAuthenticationProviderTests
         Assert.Equal(["CreateUserAsync", "UpdateUserAsync"], userManager.Calls);
     }
 
+    /// <summary>
+    /// The degenerate case of a first-login burst: one caller, no race. Pins the outcome a concurrency test that
+    /// sees exactly one account must be comparing against.
+    /// </summary>
+    [Fact]
+    public async Task CreatesExactlyOneAccount_WhenOneFirstLoginArrivesAlone()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+
+        await provider.Authenticate("alice", "alice-pass", null);
+
+        Assert.Equal(["CreateUserAsync", "UpdateUserAsync"], userManager.Calls);
+    }
+
+    /// <summary>
+    /// An end-to-end burst cannot say which concurrent login won, so its assertions are invariants about the
+    /// account that exists. This test states what that account must look like, whichever caller created it.
+    /// </summary>
+    [Fact]
+    public async Task TheWinningLogin_LeavesTheAccountOnTheEmbyLoginMethodWithTheVerifiedHash()
+    {
+        var userManager = new FakeUserManager();
+        var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
+        var provider = CreateProvider(handler, userManager, out _);
+        var expectedHash = new FakeCryptoProvider().CreatePasswordHash("alice-pass").ToString();
+
+        await provider.Authenticate("alice", "alice-pass", null);
+
+        Assert.Equal(EmbyAuthenticationProvider.ProviderId, userManager.LastUpdatedUser!.AuthenticationProviderId);
+        Assert.Equal(expectedHash, userManager.LastUpdatedUser.Password);
+    }
+
     [Fact]
     public async Task CreatesTheAccountOnlyOnce_WhenTheSameEmbyUserLogsInTwice()
     {
