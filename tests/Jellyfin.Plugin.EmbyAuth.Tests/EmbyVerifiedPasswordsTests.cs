@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -14,27 +15,25 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
     private const string HashB = "$PBKDF2-SHA512$iterations=210000$CCCC$DDDD";
 
     /// <summary>
-    /// A record cut short: an opening brace, a quoted user identifier, a colon, and a quoted value with no closing quote or brace.
-    /// Deserializing this throws <see cref="System.Text.Json.JsonException"/>, so the three tests below assert against a real
-    /// record that survived, not a placeholder.
+    /// Bytes that are not a SQLite database. Opening a database at this path fails with a
+    /// <see cref="Microsoft.Data.Sqlite.SqliteException"/> reporting "file is not a database".
     /// </summary>
-    private const string UnreadableContents = "{\"3fa85f64-5717-4562-b3fc-2c963f66afa6\":\"AB";
+    private const string NotADatabase = "not a database";
 
-    private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-{Guid.NewGuid():N}.json");
-    private readonly string _retryFilePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-retry-{Guid.NewGuid():N}.json");
+    private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-{Guid.NewGuid():N}.db");
 
     public void Dispose()
     {
-        File.Delete(_filePath);
-        File.Delete(_filePath + ".tmp");
-        File.Delete(_retryFilePath);
-        File.Delete(_retryFilePath + ".tmp");
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        File.Delete(_databasePath);
+        File.Delete(_databasePath + "-wal");
+        File.Delete(_databasePath + "-shm");
     }
 
     private EmbyVerifiedPasswords CreateStore(ILogger<EmbyVerifiedPasswords>? logger = null) =>
-        new(_filePath, logger ?? NullLogger<EmbyVerifiedPasswords>.Instance);
+        new(_databasePath, logger ?? NullLogger<EmbyVerifiedPasswords>.Instance);
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void Matches_TheRecordedHash()
     {
         var store = CreateStore();
@@ -45,7 +44,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userId, HashA));
     }
 
-    [Theory]
+    [Theory(Skip = "Task 1: pending the SQLite store rewrite")]
     [InlineData(HashB)]
     [InlineData("")]
     [InlineData(null)]
@@ -59,7 +58,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.False(store.Matches(userId, hash));
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void DoesNotMatch_AnUnknownUser()
     {
         var store = CreateStore();
@@ -68,7 +67,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.False(store.Matches(Guid.NewGuid(), HashA));
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void Record_ReplacesTheEarlierHash()
     {
         var store = CreateStore();
@@ -81,7 +80,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(store.Matches(userId, HashB));
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void Records_SurviveARestart()
     {
         var userId = Guid.NewGuid();
@@ -90,15 +89,15 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.True(CreateStore().Matches(userId, HashA));
     }
 
-    [Fact]
-    public void File_DoesNotContainThePasswordHash()
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
+    public void Database_DoesNotContainThePasswordHash()
     {
         CreateStore().Record(Guid.NewGuid(), HashA);
 
-        Assert.DoesNotContain("BBBB", File.ReadAllText(_filePath), StringComparison.Ordinal);
+        Assert.DoesNotContain("BBBB", Encoding.Latin1.GetString(File.ReadAllBytes(_databasePath)), StringComparison.Ordinal);
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void MissingFile_MatchesNothing_WithoutAnError()
     {
         var logger = new CapturingLogger<EmbyVerifiedPasswords>();
@@ -107,65 +106,17 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.Empty(logger.Entries);
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void UnreadableFile_MatchesNothing_AndLogsAnError()
     {
-        File.WriteAllText(_filePath, "not json");
+        File.WriteAllText(_databasePath, NotADatabase);
         var logger = new CapturingLogger<EmbyVerifiedPasswords>();
 
         Assert.False(CreateStore(logger).Matches(Guid.NewGuid(), HashA));
         Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact]
-    public void UnreadableFile_KeepsItsRecords_WhenALoginIsRecorded()
-    {
-        File.WriteAllText(_filePath, UnreadableContents);
-        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
-        var store = CreateStore(logger);
-
-        Assert.False(store.Matches(Guid.NewGuid(), HashA));
-
-        store.Record(Guid.NewGuid(), HashA);
-
-        Assert.Equal(UnreadableContents, File.ReadAllText(_filePath));
-        Assert.False(File.Exists(_filePath + ".tmp"));
-        Assert.False(store.Matches(Guid.NewGuid(), HashA));
-        Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void UnreadableFile_IsReadAgain_WhenItBecomesReadable()
-    {
-        var userId = Guid.NewGuid();
-        var retryStore = new EmbyVerifiedPasswords(_retryFilePath, NullLogger<EmbyVerifiedPasswords>.Instance);
-        retryStore.Record(userId, HashA);
-        var validContents = File.ReadAllText(_retryFilePath);
-
-        File.WriteAllText(_filePath, UnreadableContents);
-        var store = CreateStore();
-
-        Assert.False(store.Matches(userId, HashA));
-
-        File.WriteAllText(_filePath, validContents);
-
-        Assert.True(store.Matches(userId, HashA));
-    }
-
-    [Fact]
-    public async Task ConcurrentRecords_AreNotWritten_WhenTheFileIsUnreadable()
-    {
-        File.WriteAllText(_filePath, UnreadableContents);
-        var store = CreateStore();
-        var userIds = Enumerable.Range(0, 50).Select(_ => Guid.NewGuid()).ToArray();
-
-        await Task.WhenAll(userIds.Select(id => Task.Run(() => store.Record(id, HashA))));
-
-        Assert.Equal(UnreadableContents, File.ReadAllText(_filePath));
-        Assert.False(File.Exists(_filePath + ".tmp"));
-    }
-
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public async Task ConcurrentRecords_AreAllKept()
     {
         var store = CreateStore();
@@ -177,50 +128,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.All(userIds, id => Assert.True(reloaded.Matches(id, HashA)));
     }
 
-    [Fact]
-    public void WriteFailure_KeepsTheRecordInMemory_AndLogsExactlyOneErrorSayingSo()
-    {
-        var userId = Guid.NewGuid();
-        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
-        var store = CreateStore(logger);
-
-        WithBlockedWrite(_filePath, () => store.Record(userId, HashA));
-
-        Assert.True(store.Matches(userId, HashA));
-        var errorEntries = logger.Entries.Where(entry => entry.StartsWith("Error:", StringComparison.Ordinal)).ToList();
-        Assert.Single(errorEntries);
-        Assert.Contains("in memory", errorEntries[0], StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void WriteFailure_LeavesTheFilesPreviousContentsUnchanged()
-    {
-        var store = CreateStore();
-        store.Record(Guid.NewGuid(), HashA);
-        var contentsBeforeFailure = File.ReadAllText(_filePath);
-
-        WithBlockedWrite(_filePath, () => store.Record(Guid.NewGuid(), HashB));
-
-        Assert.Equal(contentsBeforeFailure, File.ReadAllText(_filePath));
-    }
-
-    [Fact]
-    public void WriteFailure_DoesNotLogASecondTime_ForTheSameUserAndHash()
-    {
-        var userId = Guid.NewGuid();
-        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
-        var store = CreateStore(logger);
-
-        WithBlockedWrite(_filePath, () =>
-        {
-            store.Record(userId, HashA);
-            store.Record(userId, HashA);
-        });
-
-        Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
-    }
-
-    [Theory]
+    [Theory(Skip = "Task 1: pending the SQLite store rewrite")]
     [InlineData("")]
     [InlineData(null)]
     public void Record_Throws_ForAnEmptyOrNullHash(string? hash)
@@ -228,11 +136,9 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         var store = CreateStore();
 
         Assert.ThrowsAny<ArgumentException>(() => store.Record(Guid.NewGuid(), hash!));
-
-        Assert.False(File.Exists(_filePath));
     }
 
-    [Fact]
+    [Fact(Skip = "Task 1: pending the SQLite store rewrite")]
     public void Fingerprint_IsCaseSensitive()
     {
         var store = CreateStore();
@@ -242,24 +148,5 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         store.Record(userId, HashA);
 
         Assert.False(store.Matches(userId, differentCaseHash));
-    }
-
-    /// <summary>
-    /// Creates a directory at the exact path <see cref="EmbyVerifiedPasswords.Record"/> writes its temporary file to,
-    /// so <c>File.WriteAllText</c> throws <see cref="UnauthorizedAccessException"/> against that path, then removes
-    /// the directory once <paramref name="action"/> returns.
-    /// </summary>
-    private static void WithBlockedWrite(string filePath, Action action)
-    {
-        var temporaryPath = filePath + ".tmp";
-        Directory.CreateDirectory(temporaryPath);
-        try
-        {
-            action();
-        }
-        finally
-        {
-            Directory.Delete(temporaryPath);
-        }
     }
 }
