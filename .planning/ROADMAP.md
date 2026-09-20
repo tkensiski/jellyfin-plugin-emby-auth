@@ -118,7 +118,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 03-05-PLAN.md — The settings page: the polling loop, the target dropdown above **Run migration now**, and the no-saved-password warning
+- [x] 03-05-PLAN.md — The settings page: the polling loop, the target dropdown above **Run migration now**, and the no-saved-password warning
 - [ ] 03-06-PLAN.md — The plugin refuses a target Jellyfin does not report as enabled, and a password set in Jellyfin follows the password-set target
 
 **Wave 5** *(blocked on Wave 4 completion)*

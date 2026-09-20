@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 03
 current_phase_name: Migration Status and Target
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-09-20T04:50:26.461Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-09-20T05:31:00.746Z"
 last_activity: 2026-09-19
 last_activity_desc: Phase 03 execution started
-state_head: 604d859396e89146d317fda3bee8749edc9622e5
+state_head: 785bc9c943d74a879c0327db96f28a8e8e7ca7a8
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 14
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 03 (Migration Status and Target) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Status: Ready to execute
 Last activity: 2026-09-19 — Phase 03 execution started
 
@@ -70,6 +70,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 03 P02 | 16min | 3 tasks | 5 files |
 | Phase 03 P03 | 25min | 3 tasks | 10 files |
 | Phase 03-migration-status-and-target P04 | 36min | 3 tasks | 22 files |
+| Phase 03-migration-status-and-target P05 | 24min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03] Task 1's RED commit uses Skip-marked shape-validation tests rather than a non-compiling commit, because prek's pre-commit hook runs mise run test and would block a build failure — Same convention Phase 01 established for the identical hook constraint (STATE.md)
 - [Phase 03]: [Phase 03] MoveTargetKind (Move/Remain/Invalid) replaces a nullable string for a resolved move target — Remain (deliberate, silent) and Invalid (misconfiguration, one Error log) need different treatment; collapsing them would either spam the log or hide a real misconfiguration
 - [Phase 03]: [Phase 03] LoginMethodMove.ResolveMigrationTarget/ResolvePasswordSetTarget do not check whether Jellyfin currently reports the configured target as enabled; a target that disappears after being saved still resolves to Move and gets written unconditionally — Deliberately deferred to plan 06's save-time refusal per this plan's own Task 1 action text; the runtime skip-and-log behavior for an already-saved, now-disappeared target is not yet implemented anywhere
+- [Phase 03-migration-status-and-target]: [Phase 03] RESEARCH.md's node:test mock.timers approach does not work for the polling tests -- jsdom implements window.setInterval by chaining Node's own setTimeout, which mock.timers (mocking the bare setInterval function) never intercepts — Confirmed via jsdom/lib/jsdom/browser/Window.js's timerInitializationSteps, which calls the bare setTimeout even for window.setInterval; fixed with a direct window.setInterval/clearInterval fake installed in beforeParse instead
+- [Phase 03-migration-status-and-target]: [Phase 03] Changed stubApiClient's task default from null to an idle never-run fixture, and availableTargets' default from empty to Default-only, so this plan's new task-absent and unknown-target summary conditions do not trip every unrelated pre-existing test — Those defaults predated this plan (01/03) from before the page ever rendered anything from either field; tests of the absent/unknown conditions now pass an explicit override instead
 
 ### Pending Todos
 
@@ -132,6 +135,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T04:50:26.386Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-09-20T05:31:00.675Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None
