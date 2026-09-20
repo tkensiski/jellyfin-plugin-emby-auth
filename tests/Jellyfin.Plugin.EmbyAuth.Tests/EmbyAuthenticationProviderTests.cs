@@ -201,7 +201,7 @@ public class EmbyAuthenticationProviderTests
     /// <c>CreateUserAsync</c> second gets the duplicate-name <see cref="ArgumentException"/> Jellyfin builds at
     /// <c>UserManager.cs:619-623</c>.
     /// </summary>
-    [Fact(Skip = "test(04-04): assert the race-loser message names both causes")]
+    [Fact]
     public async Task RefusesTheLosingLogin_WhenTwoFirstLoginsForOneNameRace()
     {
         var userManager = new FakeUserManager { CreateUserThrows = new ArgumentException("A user with the name 'alice' already exists.") };

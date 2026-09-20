@@ -256,7 +256,7 @@ internal sealed partial class EmbyAuthenticationProvider(
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin created a Jellyfin account for Emby user {EmbyUserName}. Account access: {AccountAccess}.")]
     private static partial void LogAccountCreated(ILogger logger, string embyUserName, AccountAccess accountAccess);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot create an account for Emby user {EmbyUserName}. If Jellyfin does not allow this user name, rename the user on Emby.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot create an account for Emby user {EmbyUserName}. Two logins for this user may have arrived at the same time. If so, one of them succeeded, and the user can log in again. If Jellyfin does not allow this user name, rename the user on Emby.")]
     private static partial void LogCreateAccountFailed(ILogger logger, Exception exception, string embyUserName);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot save the password for user {Username}. The plugin refused the login.")]
