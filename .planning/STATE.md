@@ -7,7 +7,7 @@ status: planning
 stopped_at: Phase 4 context gathered
 last_updated: "2026-09-20T09:30:12.578Z"
 last_activity: 2026-09-20
-last_activity_desc: Phase 03 complete, transitioned to Phase 4
+last_activity_desc: "Completed quick task 260920-3lw: Move jsdom to devDependencies in tests/js"
 state_head: c86bc5d2525ebd7bbbe58e6a9a36ec4674eb0afc
 progress:
   total_phases: 6
@@ -30,7 +30,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 Phase: 4 — Emby Traffic Under Load and Failure
 Plan: Not started
 Status: Ready to plan
-Last activity: 2026-09-20 — Phase 03 complete, transitioned to Phase 4
+Last activity: 2026-09-20 — Completed quick task 260920-3lw: Move jsdom to devDependencies in tests/js
 
 Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
 
@@ -122,7 +122,6 @@ None yet.
 
 - Research flags for phase planning (`.planning/research/SUMMARY.md:88`): the fault-injection tool for the load test (Phase 4), the assumption that tags are pushed from `main` behind the CI gate (Phase 5), Pages action SHAs (Phase 6). The `pageshow`-under-jsdom flag is resolved — Phase 2 shipped the suite.
 - [Phase 3]: **FPRT-01 must fix a stated-behavior mismatch, not only add a guarantee.** `EmbyVerifiedPasswords.Record()` assigns into the cache at `EmbyVerifiedPasswords.cs:58` before the write at `:62-63`, and `Load()` returns the `_fingerprints` field by reference, so a failed write leaves the cache holding a record the disk does not. `MoveToDefaultLoginMethod` then reads that cache (`MoveToDefaultLoginMethod.cs:48`) after the login, so in `MoveAfterFirstLogin` mode the user **is** moved to Default despite the write failure. Two shipped sentences say the opposite: the log message at `EmbyVerifiedPasswords.cs:128` and `docs/how-it-works.md:49`. Not a privilege escalation — Emby verified that password moments earlier — but Phase 3 must either correct both sentences or move the cache mutation after a successful write. Traced and recorded as O-1 in `02-SECURITY.md`; carried from WR-01 in `02-REVIEW.md`.
-- [Phase 2, minor]: `tests/js/package.json:4` declares `jsdom` under `dependencies` rather than `devDependencies`. No security effect — the package is `private: true`, test-only, and never ships — but the classification contradicts `02-01-SUMMARY.md:20`.
 
 ### Quick Tasks Completed
 
@@ -130,6 +129,7 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260919-208 | Move settings failure message next to Save and show Save as disabled | 2026-09-19 | 1f47767 | [260919-208-move-settings-failure-message-next-to-sa](./quick/260919-208-move-settings-failure-message-next-to-sa/) |
 | 260919-inm | Add a warning icon to the four failure messages on the settings page | 2026-09-19 | 325855e | [260919-inm-add-a-warning-icon-to-the-four-failure-m](./quick/260919-inm-add-a-warning-icon-to-the-four-failure-m/) |
+| 260920-3lw | Move jsdom to devDependencies in tests/js | 2026-09-20 | b88045b | [260920-3lw-move-jsdom-to-devdependencies-in-tests-j](./quick/260920-3lw-move-jsdom-to-devdependencies-in-tests-j/) |
 
 ## Deferred Items
 
