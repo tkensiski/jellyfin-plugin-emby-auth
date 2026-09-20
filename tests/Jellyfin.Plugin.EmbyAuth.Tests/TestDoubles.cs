@@ -454,7 +454,7 @@ public sealed class FakeScheduledTaskWorker(IScheduledTask task) : IScheduledTas
     public double? CurrentProgress { get; set; }
 
     /// <inheritdoc />
-    public TaskResult LastExecutionResult { get; set; } = new();
+    public TaskResult? LastExecutionResult { get; set; } = new();
 
     /// <inheritdoc />
     public string Name => task.Name;

@@ -1,8 +1,13 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.EmbyAuth.Api;
+using MediaBrowser.Model.Dto;
+using MediaBrowser.Model.Tasks;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -20,6 +25,7 @@ public sealed class EmbyAuthControllerTests : IDisposable
     private readonly string _filePath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-{Guid.NewGuid():N}.json");
     private readonly SqliteJellyfinDbContextFactory _dbContextFactory = new();
     private readonly FakeTaskManager _taskManager = new();
+    private readonly FakeUserManager _userManager = new();
 
     public void Dispose()
     {
@@ -49,7 +55,10 @@ public sealed class EmbyAuthControllerTests : IDisposable
     }
 
     private EmbyAuthController CreateController() =>
-        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager);
+        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager, _userManager);
+
+    private MoveEmbyUsersToDefaultTask CreateMigrationTask() =>
+        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), NullLogger<MoveEmbyUsersToDefaultTask>.Instance);
 
     [Fact]
     public async Task GetMigrationStatus_ReportsRecordsUnavailable_WhenTheFingerprintFileCannotBeRead()
@@ -85,5 +94,111 @@ public sealed class EmbyAuthControllerTests : IDisposable
 
         var second = await controller.GetMigrationStatus(CancellationToken.None);
         Assert.False(second.Value!.RecordsUnavailable);
+    }
+
+    [Fact]
+    public async Task GetMigrationStatus_ReportsTaskStateAndProgress_WhenAWorkerIsRunning()
+    {
+        var worker = new FakeScheduledTaskWorker(CreateMigrationTask())
+        {
+            State = TaskState.Running,
+            CurrentProgress = 42.5,
+        };
+        _taskManager.Tasks.Add(worker);
+        var controller = CreateController();
+
+        var response = await controller.GetMigrationStatus(CancellationToken.None);
+
+        var task = response.Value!.Task;
+        Assert.NotNull(task);
+        Assert.Equal(TaskState.Running, task.State);
+        Assert.Equal(42.5, task.Progress);
+    }
+
+    [Fact]
+    public async Task GetMigrationStatus_ReportsTaskAsAbsent_WhenTheOnlyRegisteredWorkerWrapsADifferentTask()
+    {
+        _taskManager.Tasks.Add(new FakeScheduledTaskWorker(new OtherScheduledTask()));
+        var controller = CreateController();
+
+        var response = await controller.GetMigrationStatus(CancellationToken.None);
+
+        Assert.Null(response.Value!.Task);
+    }
+
+    [Fact]
+    public async Task GetMigrationStatus_ReportsNoLastEndTimeOrResult_WhenTheWorkerHasNoLastExecutionResult()
+    {
+        var worker = new FakeScheduledTaskWorker(CreateMigrationTask())
+        {
+            LastExecutionResult = null,
+        };
+        _taskManager.Tasks.Add(worker);
+        var controller = CreateController();
+
+        var response = await controller.GetMigrationStatus(CancellationToken.None);
+
+        var task = response.Value!.Task;
+        Assert.NotNull(task);
+        Assert.Null(task.LastEndTimeUtc);
+        Assert.Null(task.LastResult);
+    }
+
+    [Fact]
+    public async Task GetMigrationStatus_ReportsAvailableTargets_ExcludingTheEmbyMethod()
+    {
+        _userManager.AuthenticationProviders =
+        [
+            new NameIdPair { Name = "Default", Id = "default-id" },
+            new NameIdPair { Name = "Emby", Id = EmbyAuthenticationProvider.ProviderId },
+            new NameIdPair { Name = "JellyfinSecurity", Id = "jf-security-id" },
+        ];
+        var controller = CreateController();
+
+        var response = await controller.GetMigrationStatus(CancellationToken.None);
+
+        Assert.Equal(
+            ["Default", "JellyfinSecurity"],
+            response.Value!.AvailableTargets.Select(target => target.Name).ToList());
+    }
+
+    [Fact]
+    public async Task GetMigrationStatus_ReportsEmptyAvailableTargets_WhenOnlyTheEmbyMethodIsEnabled()
+    {
+        _userManager.AuthenticationProviders =
+        [
+            new NameIdPair { Name = "Emby", Id = EmbyAuthenticationProvider.ProviderId },
+        ];
+        var controller = CreateController();
+
+        var response = await controller.GetMigrationStatus(CancellationToken.None);
+
+        Assert.Empty(response.Value!.AvailableTargets);
+    }
+
+    [Fact]
+    public void RunMigration_Returns204_AndQueuesTheMigrationTask()
+    {
+        var controller = CreateController();
+
+        var result = controller.RunMigration();
+
+        Assert.IsType<NoContentResult>(result);
+        Assert.Equal([typeof(MoveEmbyUsersToDefaultTask)], _taskManager.QueuedTypes);
+    }
+
+    private sealed class OtherScheduledTask : IScheduledTask
+    {
+        public string Name => "Other task";
+
+        public string Key => "OtherTask";
+
+        public string Description => "Some other task, not the migration task.";
+
+        public string Category => "Other";
+
+        public Task ExecuteAsync(IProgress<double> progress, CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => [];
     }
 }

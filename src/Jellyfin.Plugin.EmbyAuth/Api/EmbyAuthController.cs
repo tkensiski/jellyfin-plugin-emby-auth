@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Mime;
@@ -5,6 +6,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations;
 using MediaBrowser.Common.Api;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -19,6 +22,7 @@ namespace Jellyfin.Plugin.EmbyAuth.Api;
 /// <param name="dbContextFactory">The Jellyfin database context factory.</param>
 /// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
 /// <param name="taskManager">The Jellyfin scheduled task manager.</param>
+/// <param name="userManager">The Jellyfin user manager. Used to list the login methods an administrator may pick as the migration target.</param>
 [ApiController]
 [Authorize(Policy = Policies.RequiresElevation)]
 [Route("EmbyAuth")]
@@ -26,11 +30,13 @@ namespace Jellyfin.Plugin.EmbyAuth.Api;
 public sealed class EmbyAuthController(
     IDbContextFactory<JellyfinDbContext> dbContextFactory,
     EmbyVerifiedPasswords verifiedPasswords,
-    ITaskManager taskManager)
+    ITaskManager taskManager,
+    IUserManager userManager)
     : ControllerBase
 {
     /// <summary>
-    /// Lists the users on the Emby login method and whether each user is ready to move to the Default login method.
+    /// Reports the migration status: the read failure, the per-user state, the migration task's state, and the
+    /// login methods an administrator may pick as the migration target.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The migration status.</returns>
@@ -42,7 +48,19 @@ public sealed class EmbyAuthController(
         await using (dbContext.ConfigureAwait(false))
         {
             var users = await EmbyLoginMethodUsers.ListAsync(dbContext, verifiedPasswords, cancellationToken).ConfigureAwait(false);
-            return new MigrationStatus(!verifiedPasswords.RecordsAvailable(), users.Select(user => new MigrationUser(user.Username, user.State == MigrationUserState.Ready)).ToList());
+            var taskWorker = taskManager.ScheduledTasks.FirstOrDefault(worker => worker.ScheduledTask is MoveEmbyUsersToDefaultTask);
+            var task = taskWorker is null
+                ? null
+                : new MigrationTaskInfo(taskWorker.State, taskWorker.CurrentProgress, taskWorker.LastExecutionResult?.EndTimeUtc, taskWorker.LastExecutionResult?.Status);
+            var availableTargets = userManager.GetAuthenticationProviders()
+                .Where(provider => provider.Id != EmbyAuthenticationProvider.ProviderId)
+                .ToList();
+
+            return new MigrationStatus(
+                !verifiedPasswords.RecordsAvailable(),
+                task,
+                users.Select(user => new MigrationUser(user.Username, user.State)).ToList(),
+                availableTargets);
         }
     }
 
@@ -60,22 +78,35 @@ public sealed class EmbyAuthController(
 }
 
 /// <summary>
+/// The migration task's state, as Jellyfin's scheduled task manager reports it.
+/// </summary>
+/// <param name="State">The task's current state.</param>
+/// <param name="Progress">The task's progress while it runs. Absent while the task does not run.</param>
+/// <param name="LastEndTimeUtc">When the task's last run ended. Absent if the task has never run.</param>
+/// <param name="LastResult">The result of the task's last run. Absent if the task has never run.</param>
+public sealed record MigrationTaskInfo(TaskState State, double? Progress, DateTime? LastEndTimeUtc, TaskCompletionStatus? LastResult);
+
+/// <summary>
 /// The migration status.
 /// </summary>
+/// <remarks>
+/// One response carries everything the Migration section of the settings page needs, rather than a second
+/// endpoint for the pickable login methods: the page needs both at the same page load, and a second endpoint
+/// would add a second round trip and a second failure-message path for data it needs at the same moment.
+/// </remarks>
 /// <param name="RecordsUnavailable">
-/// Whether Jellyfin could not read the record of passwords Emby verified on this call. While <c>true</c>, the
-/// readiness of every user in <see cref="Users"/> is unknown; the condition is not sticky, and the next call
-/// reads the file again.
+/// Whether Jellyfin could not read the record of passwords Emby verified on this call. While <c>true</c>, every
+/// user in <see cref="Users"/> with a saved password reports <see cref="MigrationUserState.Unknown"/>; the
+/// condition is not sticky, and the next call reads the file again.
 /// </param>
+/// <param name="Task">The migration task's state, or absent if no scheduled-task worker is registered for it.</param>
 /// <param name="Users">The users on the Emby login method, sorted by name.</param>
-public sealed record MigrationStatus(bool RecordsUnavailable, IReadOnlyList<MigrationUser> Users);
+/// <param name="AvailableTargets">The login methods Jellyfin reports as enabled, with this plugin's own Emby method removed.</param>
+public sealed record MigrationStatus(bool RecordsUnavailable, MigrationTaskInfo? Task, IReadOnlyList<MigrationUser> Users, IReadOnlyList<NameIdPair> AvailableTargets);
 
 /// <summary>
 /// A user on the Emby login method.
 /// </summary>
 /// <param name="Name">The Jellyfin user name.</param>
-/// <param name="ReadyToMove">
-/// Whether Emby verified the saved password, so that the next migration run moves the user to the Default login method.
-/// If not, the user must log in to Jellyfin once while Emby runs, or an administrator must set a new password.
-/// </param>
-public sealed record MigrationUser(string Name, bool ReadyToMove);
+/// <param name="State">The user's readiness to move to the Default login method.</param>
+public sealed record MigrationUser(string Name, MigrationUserState State);
