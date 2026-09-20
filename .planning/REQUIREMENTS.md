@@ -18,7 +18,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Verified Password Records
 
-- [ ] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure.
+- [x] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure.
 - [x] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it.
 - [ ] **FPRT-03**: When the fingerprint file cannot be read, the Migration section of the settings page tells the administrator and points to the Jellyfin log.
 
@@ -31,15 +31,15 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 ### Migration Target
 
 - [ ] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. Two settings carry it: **Migration target** governs the move after a login and the migration task, and **Password-set target** governs the move after a password that an administrator sets in Jellyfin. Password-set target offers the same choices plus "Same as the migration target", which is its default. Both offer "Remain on Emby Login", which means no path moves anyone. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses the setting that governs it.
-- [ ] **MIGR-02**: `EmbyAuthenticationProvider` stays `internal`. A public class enters the `GetExports<IAuthenticationProvider>()` scan that another plugin can run, which can send a password to Emby for a user that this plugin does not serve. A unit test fails if the class becomes public.
+- [x] **MIGR-02**: `EmbyAuthenticationProvider` stays `internal`. A public class enters the `GetExports<IAuthenticationProvider>()` scan that another plugin can run, which can send a password to Emby for a user that this plugin does not serve. A unit test fails if the class becomes public.
 
 ### Documentation
 
-- [ ] **DOCS-01**: `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
+- [x] **DOCS-01**: `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
 - [ ] **DOCS-02**: `README.md` gives the manifest URL and the steps to install and update the plugin from the Jellyfin catalog.
 - [ ] **DOCS-03**: `README.md` states the tested Jellyfin and Emby versions, and that `targetAbi` sets only the minimum Jellyfin version.
 - [ ] **DOCS-04**: The Jellyfin version bump rule in `CLAUDE.md` names every pin, including the test project's `Jellyfin.Controller` reference and the `targetAbi` values in `tests/scripts/package.bats`.
-- [ ] **DOCS-05**: `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account that has no saved password, and names the three places this shapes the plugin: the account that a failed password save leaves behind is deleted (AUTH-04), the settings page warns before a move (AUTH-06), and the plugin is an interim tool whose end state is users on a login method that checks a password the user chose.
+- [x] **DOCS-05**: `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account that has no saved password, and names the three places this shapes the plugin: the account that a failed password save leaves behind is deleted (AUTH-04), the settings page warns before a move (AUTH-06), and the plugin is an interim tool whose end state is users on a login method that checks a password the user chose.
 
 ### Test Coverage
 
@@ -104,19 +104,19 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-04 | Phase 1 | Complete |
 | AUTH-05 | Phase 4 | Pending |
 | AUTH-06 | Phase 3 | Pending |
-| FPRT-01 | Phase 3 | Pending |
+| FPRT-01 | Phase 3 | Complete |
 | FPRT-02 | Phase 2 | Complete |
 | FPRT-03 | Phase 3 | Pending |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 3 | Pending |
 | MIGR-01 | Phase 3 | Pending |
-| MIGR-02 | Phase 3 | Pending |
-| DOCS-01 | Phase 3 | Pending |
+| MIGR-02 | Phase 3 | Complete |
+| DOCS-01 | Phase 3 | Complete |
 | DOCS-02 | Phase 6 | Pending |
 | DOCS-03 | Phase 5 | Pending |
 | DOCS-04 | Phase 6 | Pending |
-| DOCS-05 | Phase 3 | Pending |
+| DOCS-05 | Phase 3 | Complete |
 | TEST-01 | Phase 1 | Complete |
 | TEST-02 | Phase 3 | Pending |
 | TEST-03 | Phase 3 | Pending |
