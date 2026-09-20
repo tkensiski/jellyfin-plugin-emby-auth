@@ -47,7 +47,7 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
 - Never put a password or the API key in a log or exception message.
 - Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.
 - Pin exact versions. Look up the current stable version before a bump.
-- A Jellyfin version bump changes three pins together: `Jellyfin.Controller` and `Jellyfin.Model`, the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`, and the target framework.
+- A Jellyfin version bump changes four pins together: `Jellyfin.Controller` and `Jellyfin.Model`, `Microsoft.Data.Sqlite.Core` in the plugin project, the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`, and the target framework. `Microsoft.Data.Sqlite.Core`'s version must equal the one in `/jellyfin/jellyfin.deps.json` inside the pinned image — a version above the host's stops the plugin loading.
 - Keep `README.md` and `docs/` accurate when behavior changes. Keep the README short, and put details in `docs/`.
 
 Path-scoped rules add details: `.claude/rules/plugin.md` for `src/` and `tests/`, and `.claude/rules/e2e.md` for `e2e/`.

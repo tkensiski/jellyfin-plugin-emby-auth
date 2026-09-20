@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -148,5 +149,79 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         store.Record(userId, HashA);
 
         Assert.False(store.Matches(userId, differentCaseHash));
+    }
+
+    [Fact]
+    public void StoreThatCannotBeOpened_MatchesNothing_AndLogsOneError()
+    {
+        var blockingFilePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-blocking-{Guid.NewGuid():N}");
+        File.WriteAllText(blockingFilePath, "not a directory");
+        try
+        {
+            var unreachableDatabasePath = Path.Combine(blockingFilePath, "fingerprints.db");
+            var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+            var store = new EmbyVerifiedPasswords(unreachableDatabasePath, logger);
+
+            Assert.False(store.Matches(Guid.NewGuid(), HashA));
+            Assert.False(store.RecordsAvailable());
+            Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+        }
+        finally
+        {
+            File.Delete(blockingFilePath);
+        }
+    }
+
+    [Fact]
+    public void RecordsAvailable_IsFalse_WhenTheDatabaseFileIsNotADatabase()
+    {
+        File.WriteAllText(_databasePath, NotADatabase);
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+
+        Assert.False(CreateStore(logger).RecordsAvailable());
+        Assert.Contains(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Record_LogsOneError_AndDoesNotThrow_WhenTheDatabaseFileIsNotADatabase()
+    {
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+        var store = CreateStore(logger);
+        var userId = Guid.NewGuid();
+
+        // Construct on a healthy database first, so construction itself logs nothing. Corrupting the file only
+        // after construction means the single log entry asserted on below can come only from Record's own write
+        // failure, not from a second construction-time initialization attempt.
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        File.WriteAllText(_databasePath, NotADatabase);
+
+        store.Record(userId, HashA);
+
+        Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+        Assert.False(store.Matches(userId, HashA));
+    }
+
+    [Fact]
+    public void NoLogEntryNamesAHashOrAFingerprint()
+    {
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+        var store = CreateStore(logger);
+
+        // Drives both failing paths above (Record's write failure and RecordsAvailable's read failure) against
+        // the same corrupted database, with a known hash constant, so a fingerprint or hash leak in either
+        // method's log message would be caught here.
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        File.WriteAllText(_databasePath, NotADatabase);
+        store.Record(Guid.NewGuid(), HashA);
+        _ = store.RecordsAvailable();
+
+        var fingerprint = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(HashA)));
+        Assert.NotEmpty(logger.Entries);
+        Assert.DoesNotContain(
+            logger.Entries,
+            entry =>
+                entry.Contains(HashA, StringComparison.Ordinal) ||
+                entry.Contains(HashA.ToLowerInvariant(), StringComparison.Ordinal) ||
+                entry.Contains(fingerprint, StringComparison.Ordinal));
     }
 }
