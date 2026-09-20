@@ -9,9 +9,9 @@ The plugin adds a Jellyfin login method named **Emby**. It handles a login in tw
 3. **Emby check.** The plugin sends the name and password to Emby (`POST /Users/AuthenticateByName`). If Emby refuses the login or does not answer within 5 seconds, Jellyfin refuses the login. If Emby accepts, the plugin ends the Emby session that the login opened.
 4. **Account rules.** Jellyfin refuses the login if Emby returns a different user name, or if the Jellyfin account uses another login method. If no Jellyfin account exists, the plugin creates one. The [Account access](settings.md#account-access) setting decides the access of the new account.
 5. **Password copy.** The plugin saves a Jellyfin hash of the password on the account. It also records a fingerprint of that hash, so that it can later tell a password that Emby verified from a password that an administrator set.
-6. **Move to Default.** The [Migration behavior](settings.md#migration-behavior) setting decides when the user moves to the Default login method.
+6. **Move to the migration target.** The [Migration behavior](settings.md#migration-behavior) setting decides when the user moves, and the [Migration target](settings.md#migration-target) setting decides which login method the user moves to.
 
-A Quick Connect login does not check a password, so it never moves a user to Default.
+A Quick Connect login does not check a password, so it never moves a user.
 
 ### The account-creation window
 
@@ -25,7 +25,7 @@ If that save fails, the plugin deletes the new account and refuses the login. If
 
 For a user on the Emby login method, a password change in Jellyfin works like this:
 
-- **New password:** the plugin saves it and moves the user to Default at once.
+- **New password:** the plugin saves it and moves the user to the [Password-set target](settings.md#password-set-target) at once.
 - **Password reset:** the plugin removes the saved password. The user stays on the Emby login method, so Emby checks the next login.
 
 ## Security notes
@@ -43,12 +43,12 @@ Jellyfin's Default login method opens an account that has no saved password with
 ## Limits
 
 - A new account has a brief moment on the Default login method with no password before the plugin saves the Emby-verified hash. See [The account-creation window](#the-account-creation-window).
-- After a user moves to Default, a password change on Emby does not change the Jellyfin password.
+- After a user moves off the Emby login method, a password change on Emby does not change the Jellyfin password.
 - An Emby user without a password cannot log in through the plugin. Set a password in Jellyfin for that user.
 - Logins with an Emby Connect email address, or any name other than the Emby user name, are refused.
 - A new Emby user can log in only after the plugin reads the Emby user list again, up to 60 seconds later. If the plugin cannot read the list, it refuses the Emby check for 30 seconds, then tries again.
 - Jellyfin counts each refused login toward the lockout limit of the account, if the account has one. This includes logins that fail because Emby is down.
 - If Jellyfin does not allow an Emby user name, the plugin cannot create the account. Rename the user on Emby.
-- If Jellyfin cannot read the fingerprint file, the plugin logs an error. While the read fails, the plugin records no verified password and moves no user to the Default login method; a user who logs in during that time shows in the migration list as needing one login while Emby runs. The plugin keeps the records that are in the file — it does not replace the file while it cannot read it — and reads the file again on the next login, so a temporary problem, such as a file that is locked while Jellyfin starts, clears on its own and does not need a Jellyfin restart.
+- If Jellyfin cannot read the fingerprint file, the plugin logs an error. While the read fails, the plugin records no verified password and moves no user; a user who logs in during that time shows in the migration list as needing one login while Emby runs. The plugin keeps the records that are in the file — it does not replace the file while it cannot read it — and reads the file again on the next login, so a temporary problem, such as a file that is locked while Jellyfin starts, clears on its own and does not need a Jellyfin restart.
 - If the fingerprint file cannot be written, the plugin logs an error, keeps the record in memory, and still moves the affected user. Only the on-disk copy is behind until the next successful write; a Jellyfin restart before that write loses the record, and the user must log in through Emby once more.
 - In a rare timing case, another session of the user can save an older copy of the account and put the user back on the Emby login method. Step 2 of [Shut down Emby](migration.md#shut-down-emby) finds these users.
