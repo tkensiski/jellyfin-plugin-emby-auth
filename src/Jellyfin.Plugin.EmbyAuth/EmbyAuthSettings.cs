@@ -80,6 +80,16 @@ internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey, MigrationM
             return "The account access setting is not valid.";
         }
 
+        if (string.IsNullOrWhiteSpace(configuration.MigrationTarget))
+        {
+            return "The migration target setting is not set.";
+        }
+
+        if (configuration.PasswordSetTarget.Length > 0 && string.IsNullOrWhiteSpace(configuration.PasswordSetTarget))
+        {
+            return "The password-set target setting is blank.";
+        }
+
         return null;
     }
 }

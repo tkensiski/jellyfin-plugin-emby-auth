@@ -64,9 +64,9 @@ public class EmbyAuthSettingsTests
     }
 
     [Theory]
-    [InlineData(null, Skip = "RED until this task's GREEN commit adds the migration target shape check")]
-    [InlineData("", Skip = "RED until this task's GREEN commit adds the migration target shape check")]
-    [InlineData("   ", Skip = "RED until this task's GREEN commit adds the migration target shape check")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
     public void Rejects_BlankMigrationTarget(string? target)
     {
         var ok = EmbyAuthSettings.TryCreate(Config(migrationTarget: target), out var settings, out var problem);
@@ -86,7 +86,7 @@ public class EmbyAuthSettingsTests
         Assert.Equal(string.Empty, settings!.PasswordSetTarget);
     }
 
-    [Fact(Skip = "RED until this task's GREEN commit adds the password-set target shape check")]
+    [Fact]
     public void Rejects_WhitespaceOnlyPasswordSetTarget()
     {
         var ok = EmbyAuthSettings.TryCreate(Config(passwordSetTarget: "   "), out var settings, out var problem);
