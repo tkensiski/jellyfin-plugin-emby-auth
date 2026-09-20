@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Account Creation and Login Security** - Account creation leaves no open account, and only Emby decides a login on the Emby login method (completed 2026-09-17)
 - [x] **Phase 2: Safe Failures for the Fingerprint File and Settings** - An unreadable fingerprint file keeps its records, and the settings page reports load and save failures (completed 2026-09-19)
 - [x] **Phase 3: Migration Status and Target** - The Migration section shows the real task state and fingerprint file problems, the login method that users move to is a setting, and the migration code has unit tests (completed 2026-09-20)
-- [ ] **Phase 4: The Fingerprint Store, and Emby Traffic Under Failure** - The fingerprint records move to SQLite so a read takes no lock, Emby sessions always end, and concurrent and misconfigured logins have tests
+- [x] **Phase 4: The Fingerprint Store, and Emby Traffic Under Failure** - The fingerprint records move to SQLite so a read takes no lock, Emby sessions always end, and concurrent and misconfigured logins have tests (completed 2026-09-20)
 - [ ] **Phase 5: Public Repository** - Releases require a passing CI run, the history has no secrets, and the maintainer approves the switch to public
 - [ ] **Phase 6: Catalog Install and First Public Release** - An administrator installs and updates the plugin from the manifest URL, and version 1.0.0.0 is published
 
@@ -207,6 +207,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
-| 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | In Progress|  |
+| 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | Complete    | 2026-09-20 |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
