@@ -278,4 +278,19 @@ public class EmbyUserDirectoryTests
         Assert.Equal(EmbyUserStatus.Active, retryStatus);
         Assert.Equal(2, handler.Requests.Count);
     }
+
+    [Fact]
+    public async Task SingleCaller_OnAFreshSnapshot_DoesNotWaitOnTheGuard()
+    {
+        var handler = new StubHttpMessageHandler().Then(UserList);
+        var directory = CreateDirectory(handler);
+        await directory.GetStatusAsync(Settings, "alice", CancellationToken.None);
+
+        handler.HoldResponses();
+
+        var status = await directory.GetStatusAsync(Settings, "ivy", CancellationToken.None);
+
+        Assert.Equal(EmbyUserStatus.Disabled, status);
+        Assert.Single(handler.Requests);
+    }
 }
