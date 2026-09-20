@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
-status: executing
-stopped_at: Completed 04-07-PLAN.md
-last_updated: "2026-09-20T22:00:25.832Z"
+status: verifying
+stopped_at: Completed 04-08-PLAN.md
+last_updated: "2026-09-20T22:09:29.236Z"
 last_activity: 2026-09-20
 last_activity_desc: Completed 04-04-PLAN.md (TEST-05 unit half)
-state_head: b736d087e30773a029a1a41644afdc7e5c89302f
+state_head: e0422695c1d48cc2bc0d60c6516c89694d4fc218
 progress:
   total_phases: 6
   completed_phases: 3
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 
 Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
 Plan: 8 of 8
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-09-20 — Completed 04-04-PLAN.md (TEST-05 unit half)
 
 Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
@@ -81,6 +81,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 04 P05 | 35min | 2 tasks | 8 files |
 | Phase 04 P06 | 50min | 3 tasks | 4 files |
 | Phase 04 P07 | 45min | 2 tasks | 3 files |
+| Phase 04-emby-traffic-under-load-and-failure P08 | 35 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,8 @@ Recent decisions affecting current work:
 - [Phase 04]: The second bella concurrent-login burst tolerates 200 or 401 (never 500) rather than strict all-200, after mise run e2e deterministically reproduced a 401 caused by JellyfinSecurity's TwoFactorAuthProvider's own IP-based app-password rate limiter tripping under genuine 5-way concurrency — Traced via the live Jellyfin log to a third-party plugin mounted for Phase 3's MIGR-01/02 verification, unrelated to this plugin; the exactly-one-account and never-500 invariants stayed strict
 - [Phase 04]: [Phase 04] docker compose exec cannot remove a file from a stopped container; fingerprint_store_remove and fingerprint_store_push's wal/shm cleanup instead run rm -f through a throwaway container sharing the stopped Jellyfin container's volumes via docker run --volumes-from, using nginx:1.30.5-alpine (already pinned for emby-proxy) — Confirmed empirically: docker compose exec refuses a stopped service (service is not running); --volumes-from attaches regardless of running state, and reusing the already-pinned image adds no new dependency
 - [Phase 04]: [Phase 04] 80-fingerprint-store.bats builds its legacy JSON fixture from a real record the plugin just wrote, never a hand-authored one — A fingerprint is a SHA-256 of a freshly salted Jellyfin password hash, so it cannot be constructed any other way and still mean anything as a genuine pre-upgrade file
+- [Phase 04-emby-traffic-under-load-and-failure]: Task 1 and Task 2's docs/how-it-works.md edits landed in one commit (3ddb2b5), since both tasks touch the same file and the workspace CLAUDE.md asks for batched edits to a single file — Minimizes pre-commit hook runs; CHANGELOG.md, the Task-2-only artifact, still got its own commit (e042269)
+- [Phase 04-emby-traffic-under-load-and-failure]: The read-failure Limits entry says the migration list reports readiness unknown, not needing an Emby login, correcting the plan's own must_haves wording against EmbyLoginMethodUsers.DetermineState — RecordsAvailable()==false maps to MigrationUserState.Unknown, not NeedsEmbyLogin (EmbyLoginMethodUsers.cs:98-103); docs/migration.md already documents this as readiness unknown, so the plan's literal phrase would have misstated a verified-but-unreported user as needing to log in again
 
 ### Pending Todos
 
@@ -162,6 +165,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T22:00:25.672Z
-Stopped at: Completed 04-07-PLAN.md
+Last session: 2026-09-20T22:09:29.102Z
+Stopped at: Completed 04-08-PLAN.md
 Resume file: None

@@ -13,7 +13,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **AUTH-02**: The `JellyfinPasswordFirst` migration behavior ("Check the saved Jellyfin password first") no longer exists in the settings, the settings page, the docs, or the tests.
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
-- [ ] **AUTH-05**: The plugin ends the Emby session whenever it can read an access token in Emby's response, including a login response that has no user name. A success response whose body the plugin cannot read hides its token; the docs state that limit.
+- [x] **AUTH-05**: The plugin ends the Emby session whenever it can read an access token in Emby's response, including a login response that has no user name. A success response whose body the plugin cannot read hides its token; the docs state that limit.
 - [x] **AUTH-06**: An account on the Emby login method may have no saved password, and the plugin does not invent one. The saved hash plays no part in an Emby login method login (AUTH-01), so a missing password costs the user nothing while Emby checks the login. The settings page names every account on the Emby login method that has no saved password, warns that Jellyfin's Default login method opens such an account with a blank password, and recommends setting a password before the account moves. The plugin does not refuse the move and does not write a password the user cannot type.
 
 ### Verified Password Records
@@ -21,7 +21,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure. *(Describes the JSON file store. FPRT-04 replaces that store, so Phase 4 restates this guarantee for a durable per-record commit and updates the log message, the XML doc, and the docs to match.)*
 - [x] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it. *(Describes the JSON file store, where one write rewrote every record. FPRT-04 removes the whole-file rewrite, so this failure mode stops being reachable rather than being handled.)*
 - [x] **FPRT-03**: When the fingerprint records cannot be read, the Migration section of the settings page tells the administrator and points to the Jellyfin log.
-- [ ] **FPRT-04**: The fingerprint records live in a plugin-owned SQLite database in the plugin data folder, not a JSON file. A read takes no lock of the plugin's own. A record commits durably as it is written, so no accepted login depends on a later write to survive a restart. On first start the plugin imports an existing fingerprint JSON file once, and a unit test covers the import. The plugin references the same `Microsoft.Data.Sqlite` version the target Jellyfin image ships and binds to Jellyfin's copy rather than shipping its own.
+- [x] **FPRT-04**: The fingerprint records live in a plugin-owned SQLite database in the plugin data folder, not a JSON file. A read takes no lock of the plugin's own. A record commits durably as it is written, so no accepted login depends on a later write to survive a restart. On first start the plugin imports an existing fingerprint JSON file once, and a unit test covers the import. The plugin references the same `Microsoft.Data.Sqlite` version the target Jellyfin image ships and binds to Jellyfin's copy rather than shipping its own.
 
 ### Settings Page
 
@@ -54,7 +54,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 ### Performance
 
 - [x] **PERF-01**: Concurrent logins that find an expired user list snapshot send one Emby user list request between them, not one each. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
-- [ ] **PERF-02**: Each known cost that this version does not remove is named in `docs/how-it-works.md` with the reason it stays: the Emby calls that run inside Jellyfin's login lock, and the Jellyfin account save that every accepted login performs. Neither has a fix the plugin can apply, so each is documented rather than measured.
+- [x] **PERF-02**: Each known cost that this version does not remove is named in `docs/how-it-works.md` with the reason it stays: the Emby calls that run inside Jellyfin's login lock, and the Jellyfin account save that every accepted login performs. Neither has a fix the plugin can apply, so each is documented rather than measured.
 
 ### Release and Tooling
 
@@ -103,12 +103,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-02 | Phase 1 | Complete |
 | AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
-| AUTH-05 | Phase 4 | Pending |
+| AUTH-05 | Phase 4 | Complete |
 | AUTH-06 | Phase 3 | Complete |
 | FPRT-01 | Phase 3 | Complete |
 | FPRT-02 | Phase 2 | Complete |
 | FPRT-03 | Phase 3 | Complete |
-| FPRT-04 | Phase 4 | Pending |
+| FPRT-04 | Phase 4 | Complete |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 3 | Complete |
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-05 | Phase 4 | Complete |
 | TEST-06 | Phase 4 | Complete |
 | PERF-01 | Phase 4 | Complete |
-| PERF-02 | Phase 4 | Pending |
+| PERF-02 | Phase 4 | Complete |
 | REL-01 | Phase 5 | Pending |
 | REL-02 | Phase 5 | Pending |
 | REL-03 | Phase 5 | Pending |
