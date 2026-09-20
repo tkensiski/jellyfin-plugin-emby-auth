@@ -24,6 +24,13 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// </summary>
     public const string VerifiedPasswordsDatabaseFileName = "Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.db";
 
+    /// <summary>
+    /// The name of the legacy JSON file, in the plugin's configuration folder, that recorded verified-password
+    /// fingerprints before the plugin moved to the SQLite store. The plugin reads this file at most once, to
+    /// import its records into the database, and never writes to it.
+    /// </summary>
+    public const string LegacyVerifiedPasswordsFileName = "Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json";
+
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
@@ -38,6 +45,11 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
                 services.GetRequiredService<IApplicationPaths>().PluginsPath,
                 Path.GetFileNameWithoutExtension(typeof(EmbyVerifiedPasswords).Assembly.Location),
                 VerifiedPasswordsDatabaseFileName),
+            // The same configuration-folder path the old JSON-backed store wrote to, so a real upgrade finds
+            // the file a prior version left behind.
+            Path.Combine(
+                services.GetRequiredService<IApplicationPaths>().PluginConfigurationsPath,
+                LegacyVerifiedPasswordsFileName),
             services.GetRequiredService<ILogger<EmbyVerifiedPasswords>>()));
         serviceCollection.AddSingleton<Func<PluginConfiguration?>>(_ => () => EmbyAuthPlugin.Instance?.Configuration);
         serviceCollection.AddSingleton<IAuthenticationProvider>(services => new EmbyAuthenticationProvider(

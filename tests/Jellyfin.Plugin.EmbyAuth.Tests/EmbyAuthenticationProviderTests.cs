@@ -388,7 +388,7 @@ public class EmbyAuthenticationProviderTests
         existingUser.AddDefaultPermissions();
         existingUser.AddDefaultPreferences();
         existingUser.Password = savedHash;
-        new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(existingUser.Id, savedHash);
+        new EmbyVerifiedPasswords(verifiedPasswordsPath, verifiedPasswordsPath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance).Record(existingUser.Id, savedHash);
 
         await provider.Authenticate("alice", "alice-pass", existingUser);
         await provider.Authenticate("alice", "alice-pass", existingUser);
@@ -408,7 +408,7 @@ public class EmbyAuthenticationProviderTests
         await provider.Authenticate("alice", "alice-pass", null);
 
         var savedHash = userManager.LastUpdatedUser!.Password;
-        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, verifiedPasswordsPath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance);
         Assert.True(freshVerifiedPasswords.Matches(userManager.LastUpdatedUser.Id, savedHash));
     }
 
@@ -422,7 +422,7 @@ public class EmbyAuthenticationProviderTests
         await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", null));
 
         var expectedHash = new FakeCryptoProvider().CreatePasswordHash("alice-pass").ToString();
-        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        var freshVerifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, verifiedPasswordsPath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance);
         Assert.False(freshVerifiedPasswords.Matches(userManager.LastCreatedUser!.Id, expectedHash));
     }
 
@@ -585,7 +585,7 @@ public class EmbyAuthenticationProviderTests
         var embyClient = new EmbyClient(new StubHttpClientFactory(handler), NullLogger<EmbyClient>.Instance);
         var userDirectory = new EmbyUserDirectory(embyClient, _clock, NullLogger<EmbyUserDirectory>.Instance);
         verifiedPasswordsPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        var verifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        var verifiedPasswords = new EmbyVerifiedPasswords(verifiedPasswordsPath, verifiedPasswordsPath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance);
         var services = new ServiceCollection()
             .AddSingleton<IUserManager>(userManager)
             .BuildServiceProvider();

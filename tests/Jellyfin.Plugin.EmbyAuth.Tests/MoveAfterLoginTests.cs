@@ -55,8 +55,11 @@ public sealed class MoveAfterLoginTests
     private static AuthenticationResultEventArgs EventFor(Guid userId) =>
         new(new AuthenticationResult { User = new UserDto { Id = userId } });
 
-    private static EmbyVerifiedPasswords NewVerifiedPasswords() =>
-        new(Path.Combine(Path.GetTempPath(), Path.GetRandomFileName()), NullLogger<EmbyVerifiedPasswords>.Instance);
+    private static EmbyVerifiedPasswords NewVerifiedPasswords()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        return new(databasePath, databasePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance);
+    }
 
     private static MoveAfterLogin CreateConsumer(SqliteJellyfinDbContextFactory factory, EmbyVerifiedPasswords verifiedPasswords, PluginConfiguration? configuration, CapturingLogger<MoveAfterLogin> logger) =>
         new(verifiedPasswords, factory, () => configuration, logger);

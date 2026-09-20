@@ -35,7 +35,7 @@ public sealed class EmbyLoginMethodUsersTests : IDisposable
     }
 
     private EmbyVerifiedPasswords CreateVerifiedPasswords() =>
-        new(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance);
+        new(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance);
 
     private async Task SeedUserAsync(string username, string authenticationProviderId, string? passwordHash)
     {
@@ -207,7 +207,7 @@ public sealed class EmbyLoginMethodUsersTests : IDisposable
         // Construct on a healthy database first, so its own EnsureInitialized() succeeds and logs nothing.
         // Corrupting the file only after construction means the single log entry this test asserts on below can
         // come only from RecordsAvailable() itself, not from construction-time initialization.
-        var verifiedPasswords = new EmbyVerifiedPasswords(_filePath, logger);
+        var verifiedPasswords = new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", logger);
         Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
         File.WriteAllText(_filePath, UnreadableContents);
         var context = _dbContextFactory.CreateDbContext();

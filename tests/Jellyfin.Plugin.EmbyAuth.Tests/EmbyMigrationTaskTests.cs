@@ -28,7 +28,7 @@ public sealed class EmbyMigrationTaskTests : IDisposable
     private EmbyMigrationTask CreateTask(string migrationTarget, CapturingLogger<EmbyMigrationTask> logger) =>
         new(
             _dbContextFactory,
-            new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance),
+            new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance),
             () => Configuration(migrationTarget),
             logger);
 
@@ -71,7 +71,7 @@ public sealed class EmbyMigrationTaskTests : IDisposable
         const string passwordHash = "hash-a";
         const string target = "Jellyfin.Plugin.EmbyAuth.Tests.AnotherLoginMethod";
         var userId = await SeedUserAsync(passwordHash);
-        new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
+        new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
         var task = CreateTask(target, new CapturingLogger<EmbyMigrationTask>());
         var progress = new RecordingProgress();
 
@@ -101,7 +101,7 @@ public sealed class EmbyMigrationTaskTests : IDisposable
     {
         const string passwordHash = "hash-a";
         var userId = await SeedUserAsync(passwordHash);
-        new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
+        new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
         var logger = new CapturingLogger<EmbyMigrationTask>();
         var task = CreateTask(PluginConfiguration.RemainOnEmbyLoginMethod, logger);
         var progress = new RecordingProgress();
@@ -119,7 +119,7 @@ public sealed class EmbyMigrationTaskTests : IDisposable
     {
         const string passwordHash = "hash-a";
         var userId = await SeedUserAsync(passwordHash);
-        new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
+        new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance).Record(userId, passwordHash);
         var logger = new CapturingLogger<EmbyMigrationTask>();
         var task = CreateTask("   ", logger);
         var progress = new RecordingProgress();

@@ -48,7 +48,7 @@ public sealed class EmbyAuthControllerTests : IDisposable
         var seedPath = Path.Combine(Path.GetTempPath(), $"emby-auth-controller-tests-seed-{Guid.NewGuid():N}.db");
         try
         {
-            new EmbyVerifiedPasswords(seedPath, NullLogger<EmbyVerifiedPasswords>.Instance).Record(Guid.NewGuid(), "hash");
+            new EmbyVerifiedPasswords(seedPath, seedPath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance).Record(Guid.NewGuid(), "hash");
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             return File.ReadAllBytes(seedPath);
         }
@@ -61,12 +61,12 @@ public sealed class EmbyAuthControllerTests : IDisposable
     }
 
     private EmbyAuthController CreateController() =>
-        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager, _userManager);
+        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager, _userManager);
 
     private EmbyMigrationTask CreateMigrationTask() =>
         new(
             _dbContextFactory,
-            new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance),
+            new EmbyVerifiedPasswords(_filePath, _filePath + ".legacy.json", NullLogger<EmbyVerifiedPasswords>.Instance),
             () => new PluginConfiguration(),
             NullLogger<EmbyMigrationTask>.Instance);
 

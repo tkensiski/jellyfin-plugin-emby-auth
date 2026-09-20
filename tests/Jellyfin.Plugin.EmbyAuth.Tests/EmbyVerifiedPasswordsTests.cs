@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,6 +24,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
     private const string NotADatabase = "not a database";
 
     private readonly string _databasePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-{Guid.NewGuid():N}.db");
+    private readonly string _legacyFilePath = Path.Combine(Path.GetTempPath(), $"emby-auth-tests-legacy-{Guid.NewGuid():N}.json");
 
     public void Dispose()
     {
@@ -29,10 +32,48 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         File.Delete(_databasePath);
         File.Delete(_databasePath + "-wal");
         File.Delete(_databasePath + "-shm");
+        File.Delete(_legacyFilePath);
     }
 
     private EmbyVerifiedPasswords CreateStore(ILogger<EmbyVerifiedPasswords>? logger = null) =>
-        new(_databasePath, logger ?? NullLogger<EmbyVerifiedPasswords>.Instance);
+        new(_databasePath, _legacyFilePath, logger ?? NullLogger<EmbyVerifiedPasswords>.Instance);
+
+    private static string Fingerprint(string passwordHash) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(passwordHash)));
+
+    private void WriteLegacyFile(Dictionary<Guid, string> records) =>
+        File.WriteAllText(_legacyFilePath, JsonSerializer.Serialize(records));
+
+    private long GetUserVersion()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA user_version;";
+        return (long)command.ExecuteScalar()!;
+    }
+
+    private void SetUserVersion(int version)
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = $"PRAGMA user_version = {version};";
+        command.ExecuteNonQuery();
+    }
+
+    private void DeleteRow(Guid userId)
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = "DELETE FROM VerifiedPasswords WHERE UserId = $userId;";
+        command.Parameters.AddWithValue("$userId", userId.ToString());
+        command.ExecuteNonQuery();
+    }
 
     [Fact]
     public void Matches_TheRecordedHash()
@@ -160,7 +201,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         {
             var unreachableDatabasePath = Path.Combine(blockingFilePath, "fingerprints.db");
             var logger = new CapturingLogger<EmbyVerifiedPasswords>();
-            var store = new EmbyVerifiedPasswords(unreachableDatabasePath, logger);
+            var store = new EmbyVerifiedPasswords(unreachableDatabasePath, unreachableDatabasePath + ".legacy.json", logger);
 
             Assert.False(store.Matches(Guid.NewGuid(), HashA));
             Assert.False(store.RecordsAvailable());
@@ -223,5 +264,131 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
                 entry.Contains(HashA, StringComparison.Ordinal) ||
                 entry.Contains(HashA.ToLowerInvariant(), StringComparison.Ordinal) ||
                 entry.Contains(fingerprint, StringComparison.Ordinal));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_MakesEveryLegacyRecordMatch_OnFirstStart()
+    {
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        WriteLegacyFile(new Dictionary<Guid, string>
+        {
+            [userA] = Fingerprint(HashA),
+            [userB] = Fingerprint(HashB),
+        });
+
+        var store = CreateStore();
+
+        Assert.True(store.Matches(userA, HashA));
+        Assert.True(store.Matches(userB, HashB));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_DoesNotRunASecondTime()
+    {
+        var userA = Guid.NewGuid();
+        var userB = Guid.NewGuid();
+        WriteLegacyFile(new Dictionary<Guid, string>
+        {
+            [userA] = Fingerprint(HashA),
+            [userB] = Fingerprint(HashB),
+        });
+        CreateStore();
+
+        DeleteRow(userA);
+
+        var secondStore = CreateStore();
+
+        Assert.False(secondStore.Matches(userA, HashA));
+        Assert.True(secondStore.Matches(userB, HashB));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_DoesNotOverwriteARecordTheStoreAlreadyWrote()
+    {
+        var userId = Guid.NewGuid();
+        var store = CreateStore();
+        store.Record(userId, HashB);
+
+        SetUserVersion(0);
+        WriteLegacyFile(new Dictionary<Guid, string> { [userId] = Fingerprint(HashA) });
+
+        var secondStore = CreateStore();
+
+        Assert.True(secondStore.Matches(userId, HashB));
+        Assert.False(secondStore.Matches(userId, HashA));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_LeavesTheLegacyFileUnchanged()
+    {
+        WriteLegacyFile(new Dictionary<Guid, string> { [Guid.NewGuid()] = Fingerprint(HashA) });
+        var bytesBefore = File.ReadAllBytes(_legacyFilePath);
+
+        CreateStore();
+
+        Assert.True(File.Exists(_legacyFilePath));
+        Assert.Equal(bytesBefore, File.ReadAllBytes(_legacyFilePath));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_MarksItselfDone_WhenNoLegacyFileExists()
+    {
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+
+        CreateStore(logger);
+
+        Assert.DoesNotContain(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+        Assert.Equal(1, GetUserVersion());
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_ImportsNothing_AndLogsOneError_WhenTheLegacyFileCannotBeRead()
+    {
+        File.WriteAllText(_legacyFilePath, "not json");
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+
+        var store = CreateStore(logger);
+
+        Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+        Assert.Equal(0, GetUserVersion());
+
+        var userId = Guid.NewGuid();
+        store.Record(userId, HashA);
+        Assert.True(store.Matches(userId, HashA));
+
+        var validUserId = Guid.NewGuid();
+        WriteLegacyFile(new Dictionary<Guid, string> { [validUserId] = Fingerprint(HashB) });
+        var thirdStore = CreateStore();
+
+        Assert.True(thirdStore.Matches(validUserId, HashB));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_ImportsNothing_WhenOneEntryInTheFileIsUnusable()
+    {
+        var userId = Guid.NewGuid();
+        File.WriteAllText(
+            _legacyFilePath,
+            $$"""{"{{userId}}":"{{Fingerprint(HashA)}}","not-a-user-id":"{{Fingerprint(HashB)}}"}""");
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+
+        var store = CreateStore(logger);
+
+        Assert.False(store.Matches(userId, HashA));
+        Assert.Equal(0, GetUserVersion());
+        Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+    }
+
+    [Fact(Skip = "04-05: pending the one-time legacy-file import")]
+    public void Import_LeavesAUsableStore_WhenItFails()
+    {
+        File.WriteAllText(_legacyFilePath, "not json");
+        var store = CreateStore();
+
+        var userId = Guid.NewGuid();
+        store.Record(userId, HashA);
+
+        Assert.True(store.Matches(userId, HashA));
     }
 }
