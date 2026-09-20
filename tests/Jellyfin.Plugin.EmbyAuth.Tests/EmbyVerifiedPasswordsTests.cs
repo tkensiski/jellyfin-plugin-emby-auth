@@ -176,4 +176,90 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         var reloaded = CreateStore();
         Assert.All(userIds, id => Assert.True(reloaded.Matches(id, HashA)));
     }
+
+    [Fact(Skip = "RED: awaiting the corrected write-failure log text (Task 1 GREEN commit)")]
+    public void WriteFailure_KeepsTheRecordInMemory_AndLogsExactlyOneErrorSayingSo()
+    {
+        var userId = Guid.NewGuid();
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+        var store = CreateStore(logger);
+
+        WithBlockedWrite(_filePath, () => store.Record(userId, HashA));
+
+        Assert.True(store.Matches(userId, HashA));
+        var errorEntries = logger.Entries.Where(entry => entry.StartsWith("Error:", StringComparison.Ordinal)).ToList();
+        Assert.Single(errorEntries);
+        Assert.Contains("in memory", errorEntries[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WriteFailure_LeavesTheFilesPreviousContentsUnchanged()
+    {
+        var store = CreateStore();
+        store.Record(Guid.NewGuid(), HashA);
+        var contentsBeforeFailure = File.ReadAllText(_filePath);
+
+        WithBlockedWrite(_filePath, () => store.Record(Guid.NewGuid(), HashB));
+
+        Assert.Equal(contentsBeforeFailure, File.ReadAllText(_filePath));
+    }
+
+    [Fact]
+    public void WriteFailure_DoesNotLogASecondTime_ForTheSameUserAndHash()
+    {
+        var userId = Guid.NewGuid();
+        var logger = new CapturingLogger<EmbyVerifiedPasswords>();
+        var store = CreateStore(logger);
+
+        WithBlockedWrite(_filePath, () =>
+        {
+            store.Record(userId, HashA);
+            store.Record(userId, HashA);
+        });
+
+        Assert.Single(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Record_Throws_ForAnEmptyOrNullHash(string? hash)
+    {
+        var store = CreateStore();
+
+        Assert.ThrowsAny<ArgumentException>(() => store.Record(Guid.NewGuid(), hash!));
+
+        Assert.False(File.Exists(_filePath));
+    }
+
+    [Fact]
+    public void Fingerprint_IsCaseSensitive()
+    {
+        var store = CreateStore();
+        var userId = Guid.NewGuid();
+        var differentCaseHash = HashA.ToLowerInvariant();
+
+        store.Record(userId, HashA);
+
+        Assert.False(store.Matches(userId, differentCaseHash));
+    }
+
+    /// <summary>
+    /// Creates a directory at the exact path <see cref="EmbyVerifiedPasswords.Record"/> writes its temporary file to,
+    /// so <c>File.WriteAllText</c> throws <see cref="UnauthorizedAccessException"/> against that path, then removes
+    /// the directory once <paramref name="action"/> returns.
+    /// </summary>
+    private static void WithBlockedWrite(string filePath, Action action)
+    {
+        var temporaryPath = filePath + ".tmp";
+        Directory.CreateDirectory(temporaryPath);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            Directory.Delete(temporaryPath);
+        }
+    }
 }
