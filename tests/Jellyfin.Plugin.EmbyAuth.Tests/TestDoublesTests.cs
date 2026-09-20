@@ -58,7 +58,7 @@ public sealed class TestDoublesTests
         var moveContext = factory.CreateDbContext();
         await using (moveContext)
         {
-            var moved = await DefaultLoginMethod.MoveAsync(moveContext, userId, passwordHash, CancellationToken.None);
+            var moved = await LoginMethodMove.MoveAsync(moveContext, userId, passwordHash, LoginMethodMove.DefaultProviderId, CancellationToken.None);
             Assert.True(moved);
         }
 
@@ -66,7 +66,7 @@ public sealed class TestDoublesTests
         await using (readContext)
         {
             var read = await readContext.Users.SingleAsync(user => user.Id == userId, CancellationToken.None);
-            Assert.Equal(DefaultLoginMethod.ProviderId, read.AuthenticationProviderId);
+            Assert.Equal(LoginMethodMove.DefaultProviderId, read.AuthenticationProviderId);
         }
     }
 

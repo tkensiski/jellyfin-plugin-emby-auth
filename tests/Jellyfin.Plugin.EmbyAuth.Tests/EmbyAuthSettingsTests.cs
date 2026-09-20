@@ -11,7 +11,7 @@ public class EmbyAuthSettingsTests
         string? apiKey = "0123456789abcdef",
         MigrationMode mode = MigrationMode.MoveAfterFirstLogin,
         AccountAccess access = AccountAccess.CopyEmbyRemoteAccess,
-        string? migrationTarget = DefaultLoginMethod.ProviderId,
+        string? migrationTarget = LoginMethodMove.DefaultProviderId,
         string? passwordSetTarget = "") => new()
         {
             EmbyServerUrl = url!,
@@ -59,7 +59,7 @@ public class EmbyAuthSettingsTests
     {
         var configuration = new PluginConfiguration();
 
-        Assert.Equal(DefaultLoginMethod.ProviderId, configuration.MigrationTarget);
+        Assert.Equal(LoginMethodMove.DefaultProviderId, configuration.MigrationTarget);
         Assert.Equal(string.Empty, configuration.PasswordSetTarget);
     }
 

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Authentication;
@@ -32,14 +33,15 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton(services => new EmbyVerifiedPasswords(
             Path.Combine(services.GetRequiredService<IApplicationPaths>().PluginConfigurationsPath, VerifiedPasswordsFileName),
             services.GetRequiredService<ILogger<EmbyVerifiedPasswords>>()));
+        serviceCollection.AddSingleton<Func<PluginConfiguration?>>(_ => () => EmbyAuthPlugin.Instance?.Configuration);
         serviceCollection.AddSingleton<IAuthenticationProvider>(services => new EmbyAuthenticationProvider(
             services,
             services.GetRequiredService<ICryptoProvider>(),
             services.GetRequiredService<EmbyClient>(),
             services.GetRequiredService<EmbyUserDirectory>(),
             services.GetRequiredService<EmbyVerifiedPasswords>(),
-            () => EmbyAuthPlugin.Instance?.Configuration,
+            services.GetRequiredService<Func<PluginConfiguration?>>(),
             services.GetRequiredService<ILogger<EmbyAuthenticationProvider>>()));
-        serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, MoveToDefaultLoginMethod>();
+        serviceCollection.AddScoped<IEventConsumer<AuthenticationResultEventArgs>, MoveAfterLogin>();
     }
 }

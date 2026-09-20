@@ -134,7 +134,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         user.Password = cryptoProvider.CreatePasswordHash(newPassword).ToString();
-        user.AuthenticationProviderId = DefaultLoginMethod.ProviderId;
+        user.AuthenticationProviderId = LoginMethodMove.DefaultProviderId;
         LogPasswordSetInJellyfin(logger, user.Username);
         return Task.CompletedTask;
     }

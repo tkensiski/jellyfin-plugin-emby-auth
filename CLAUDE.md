@@ -28,8 +28,8 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
   - `EmbyClient.cs` — the only code that sends requests to Emby.
   - `EmbyUserDirectory.cs` — the cached Emby user list.
   - `EmbyVerifiedPasswords.cs` — the file of fingerprints of password hashes that Emby verified.
-  - `DefaultLoginMethod.cs` — the single-column move to Default.
-  - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
+  - `LoginMethodMove.cs` — the single-column move, and resolving the configured migration target.
+  - `MoveAfterLogin.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
   - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
   - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
   - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.

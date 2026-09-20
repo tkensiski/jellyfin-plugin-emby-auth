@@ -67,7 +67,7 @@ public sealed partial class MoveEmbyUsersToDefaultTask : IScheduledTask
             {
                 var candidate = candidates[index];
                 if (candidate.State == MigrationUserState.Ready
-                    && await DefaultLoginMethod.MoveAsync(dbContext, candidate.Id, candidate.PasswordHash!, cancellationToken).ConfigureAwait(false))
+                    && await LoginMethodMove.MoveAsync(dbContext, candidate.Id, candidate.PasswordHash!, LoginMethodMove.DefaultProviderId, cancellationToken).ConfigureAwait(false))
                 {
                     moved++;
                 }

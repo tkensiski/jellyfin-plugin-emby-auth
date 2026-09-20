@@ -184,7 +184,7 @@ public class EmbyAuthenticationProviderTests
         var userManager = new FakeUserManager();
         var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
         var provider = CreateProvider(handler, userManager, out _);
-        var resolvedUser = new User("alice", DefaultLoginMethod.ProviderId, "reset-provider");
+        var resolvedUser = new User("alice", LoginMethodMove.DefaultProviderId, "reset-provider");
         resolvedUser.AddDefaultPermissions();
         resolvedUser.AddDefaultPreferences();
 

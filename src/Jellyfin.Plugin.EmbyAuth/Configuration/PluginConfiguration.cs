@@ -72,7 +72,7 @@ public class PluginConfiguration : BasePluginConfiguration
     /// to Jellyfin's Default login method, so an install that predates this setting keeps today's behaviour with
     /// no administrator action.
     /// </summary>
-    public string MigrationTarget { get; set; } = DefaultLoginMethod.ProviderId;
+    public string MigrationTarget { get; set; } = LoginMethodMove.DefaultProviderId;
 
     /// <summary>
     /// Gets or sets the login method that the move happening when an administrator sets a password in Jellyfin
