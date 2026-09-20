@@ -30,7 +30,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Migration Target
 
-- [ ] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses this setting, including the move after a password that an administrator sets in Jellyfin.
+- [ ] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. Two settings carry it: **Migration target** governs the move after a login and the migration task, and **Password-set target** governs the move after a password that an administrator sets in Jellyfin. Password-set target offers the same choices plus "Same as the migration target", which is its default. Both offer "Remain on Emby Login", which means no path moves anyone. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses the setting that governs it.
 - [ ] **MIGR-02**: `EmbyAuthenticationProvider` stays `internal`. A public class enters the `GetExports<IAuthenticationProvider>()` scan that another plugin can run, which can send a password to Emby for a user that this plugin does not serve. A unit test fails if the class becomes public.
 
 ### Documentation

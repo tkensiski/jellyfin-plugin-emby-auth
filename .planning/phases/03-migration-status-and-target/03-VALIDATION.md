@@ -42,16 +42,26 @@ Task IDs are assigned by the planner. Seed rows below carry the requirement-to-c
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | TBD | TBD | FPRT-01 | — | Write failure never drops the verified-password record | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter EmbyVerifiedPasswordsTests` | ✅ | ⬜ pending |
-| TBD | TBD | TBD | FPRT-03 | — | Read failure surfaces as an explicit unavailable state, never as "no users need migrating" | unit + jsdom | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` · `node --test tests/js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | UI-03 | — | Migration list reflects real task state, not a fixed 3 s guess | jsdom | `node --test tests/js` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | MIGR-01 | TBD | Target login method restricted to methods Jellyfin reports as enabled; anything else refused | unit + e2e | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` · `bats e2e/50-migration-target.bats` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | MIGR-02 | TBD | `EmbyAuthenticationProvider` stays internal | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter EmbyAuthenticationProviderVisibilityTests` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | AUTH-06 | TBD | No-password accounts are named and warned about, never blocked and never given an untypeable password | unit + jsdom + e2e | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx` · `node --test tests/js` · `bats e2e/50-migration-target.bats` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | TEST-02 | — | Move classes exercised against a real relational provider | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "LoginMethodMoveTests\|EmbyLoginMethodUsersTests\|EmbyMigrationTaskTests"` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | TEST-03 | — | Controller status, run request, and task state covered | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter EmbyAuthControllerTests` | ❌ W0 | ⬜ pending |
-| TBD | TBD | TBD | DOCS-01 | — | N/A | doc-content | see Manual-Only below | ✅ | ⬜ pending |
-| TBD | TBD | TBD | DOCS-05 | — | N/A | doc-content | see Manual-Only below | ❌ | ⬜ pending |
+| 01-T1 | 03-01 | 1 | TEST-02, TEST-03 | T-03-SC | The SQLite seam can run `ExecuteUpdateAsync`, which the EF Core InMemory provider cannot | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~TestDoublesTests"` | ❌ W0 → created by this task | ⬜ pending |
+| 01-T2 | 03-01 | 1 | FPRT-03 | T-03-06, T-03-07 | Read failure surfaces as an explicit unavailable state, never as "no users need migrating" | unit + jsdom | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyAuthControllerTests"` · `node --test` | ❌ W0 → created by 01-T1 | ⬜ pending |
+| 01-T3 | 03-01 | 1 | TEST-02 | — | Move classes exercised against a real relational provider, before they are renamed | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~DefaultLoginMethodTests\|FullyQualifiedName~EmbyLoginMethodUsersTests"` | ❌ W0 → created by 01-T1 | ⬜ pending |
+| 02-T1 | 03-02 | 2 | FPRT-01 | T-03-09 | Write failure never drops the verified-password record, and the log says so | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyVerifiedPasswordsTests"` | ✅ | ⬜ pending |
+| 02-T2 | 03-02 | 2 | MIGR-02 | T-03-08 | `EmbyAuthenticationProvider` stays internal, and no type joins the exported surface unrecorded | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~TypeVisibilityTests"` | ❌ W0 | ⬜ pending |
+| 02-T3 | 03-02 | 2 | DOCS-01, DOCS-05 | T-03-03 | The documented behaviour matches the code | doc-content | `rg -q -i 'blank password' docs/how-it-works.md` · `test "$(rg -c 'migration\.md#shut-down-emby' docs/how-it-works.md)" = "1"` | ✅ | ⬜ pending |
+| 03-T1 | 03-03 | 2 | AUTH-06, FPRT-03 | — | A missing saved password is reported as such whatever the fingerprint file is doing | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyLoginMethodUsersTests"` | ❌ W0 | ⬜ pending |
+| 03-T2 | 03-03 | 2 | UI-03, MIGR-01, TEST-03 | T-03-02, T-03-05, T-03-06 | The task state and the enabled-method list are server-derived, behind the elevation policy | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyAuthControllerTests"` | ❌ W0 | ⬜ pending |
+| 03-T3 | 03-03 | 2 | AUTH-06 | T-03-10 | Every user-derived string is rendered with textContent | jsdom + e2e | `node --test` · `mise run e2e` | ✅ | ⬜ pending |
+| 04-T1 | 03-04 | 3 | MIGR-01 | T-03-01 | A blank target is refused by shape validation without echoing the value | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyAuthSettingsTests"` | ✅ | ⬜ pending |
+| 04-T2 | 03-04 | 3 | MIGR-01, TEST-02 | T-03-04, T-03-11, T-03-12 | The verified-password gate and the single-column update survive the generalization | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~LoginMethodMoveTests\|FullyQualifiedName~MoveAfterLoginTests"` | ❌ W0 | ⬜ pending |
+| 04-T3 | 03-04 | 3 | MIGR-01, TEST-02, AUTH-06 | T-03-04, T-03-11 | The task moves only ready accounts, to the configured target | unit + e2e | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyMigrationTaskTests"` · `mise run e2e` | ❌ W0 | ⬜ pending |
+| 05-T1 | 03-05 | 4 | UI-03 | — | The list reflects real task state, not a fixed 3 s guess, and never stacks requests | jsdom | `node --test` | ✅ | ⬜ pending |
+| 05-T2 | 03-05 | 4 | MIGR-01, FPRT-03 | T-03-02, T-03-04, T-03-10 | The dropdown is fed only by the server-filtered list, and nothing is silently selected | jsdom | `node --test` | ✅ | ⬜ pending |
+| 05-T3 | 03-05 | 4 | AUTH-06 | T-03-03, T-03-05 | No-password accounts are warned about in wording that claims nothing unverified | jsdom | `node --test` | ✅ | ⬜ pending |
+| 06-T1 | 03-06 | 4 | MIGR-01 | T-03-01, T-03-02, T-03-05 | A target Jellyfin does not report as enabled is refused server-side, with nothing written | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~MigrationTargetValidationTests\|FullyQualifiedName~EmbyAuthPluginTests"` | ❌ W0 | ⬜ pending |
+| 06-T2 | 03-06 | 4 | MIGR-01, AUTH-06 | T-03-03, T-03-04 | A password set in Jellyfin goes to the password-set target and is never refused | unit | `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx --filter "FullyQualifiedName~EmbyAuthenticationProviderTests"` | ✅ | ⬜ pending |
+| 07-T1 | 03-07 | 5 | MIGR-01 | T-03-13, T-03-14 | The second login method is installed from a checksum-pinned download and is inert unconfigured | e2e | `mise run e2e` · `scripts/dev-env.sh up && scripts/dev-env.sh down` | ❌ W0 | ⬜ pending |
+| 07-T2 | 03-07 | 5 | MIGR-01, AUTH-06 | T-03-01, T-03-03, T-03-06, T-03-15 | A real migration to a non-Default method hands over, and a real server refuses a bad target | e2e | `bats e2e/50-migration-target.bats` | ❌ W0 | ⬜ pending |
+| 07-T3 | 03-07 | 5 | MIGR-01, AUTH-06 | — | The documentation matches the shipped settings, task name, and response | doc-content | `rg -q 'Migration target' docs/settings.md README.md` · `! rg -q 'ReadyToMove' docs/ README.md CHANGELOG.md` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -59,11 +69,11 @@ Task IDs are assigned by the planner. Seed rows below carry the requirement-to-c
 
 ## Wave 0 Requirements
 
-- [ ] `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs` — add the `IJellyfinDatabaseProvider` fake, the SQLite in-memory `JellyfinDbContext` factory, the `ITaskManager` fake, and the `IScheduledTaskWorker` fake; extend `FakeUserManager` with the enabled-login-method list
-- [ ] `tests/Jellyfin.Plugin.EmbyAuth.Tests/Jellyfin.Plugin.EmbyAuth.Tests.csproj` — add `Microsoft.EntityFrameworkCore.Sqlite` `10.0.11` (matches the version `Jellyfin.Database.Implementations` `12.1.0` already resolves)
-- [ ] `tests/js/testHelpers.js` — mock-timer helpers for the polling tests, if `flush()` alone is not enough
-- [ ] `e2e/50-migration-target.bats` — new file for the non-Default target move and the no-password account assertion
-- [ ] `e2e/compose.yaml` / `e2e/setup_suite.bash` — JellyfinSecurity plugin mount plus the pinned-zip download and checksum step
+- [ ] `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs` — add the `IJellyfinDatabaseProvider` fake, the SQLite in-memory `JellyfinDbContext` factory, the `ITaskManager` fake, and the `IScheduledTaskWorker` fake; extend `FakeUserManager` with the enabled-login-method list — **plan 03-01, task 1**
+- [ ] `tests/Jellyfin.Plugin.EmbyAuth.Tests/Jellyfin.Plugin.EmbyAuth.Tests.csproj` — add `Microsoft.EntityFrameworkCore.Sqlite` `10.0.11` (matches the version `Jellyfin.Database.Implementations` `12.1.0` already resolves) — **plan 03-01, task 1**
+- [ ] `tests/js/testHelpers.js` — a per-call scripted response for `getJSON`, and a helper pairing `mock.timers.tick` with `flush`, for the polling tests — **plan 03-05, task 1**
+- [ ] `e2e/50-migration-target.bats` — new file for the non-Default target move, the no-password account assertion, and the server-side target refusal — **plan 03-07, task 2**
+- [ ] `e2e/compose.yaml` / `e2e/setup_suite.bash` / `scripts/fetch-jellyfinsecurity.sh` — JellyfinSecurity plugin mount plus the pinned-zip download and checksum step — **plan 03-07, task 1**
 
 ---
 

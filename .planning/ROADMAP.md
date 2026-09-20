@@ -94,13 +94,37 @@ Plans:
   3. When Jellyfin cannot write the fingerprint file, the log message, the XML doc, and `docs/how-it-works.md` say that the record stays in memory until Jellyfin restarts, and a unit test covers the write failure.
   4. `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
   5. `dotnet test` runs unit tests for the move classes, `EmbyLoginMethodUsers`, and `MoveEmbyUsersToDefaultTask` against an SQLite in-memory `JellyfinDbContext`, and for `EmbyAuthController`: the migration status, the run request, and the task state.
-  6. An administrator chooses the login method that users move to. The settings page offers only the login methods that Jellyfin reports as enabled, and a value that is not one of them is refused with a message. Every move uses the chosen method, including the move after a password that an administrator sets in Jellyfin. The class and task names no longer say "Default".
-  7. An e2e test moves a user to a second login method that is not Jellyfin's Default, and that user then logs in with the password that Emby verified.
+  6. An administrator chooses the login method that users move to, through two settings: **Migration target** for the move after a login and for the migration task, and **Password-set target** for the move after a password that an administrator sets in Jellyfin. Password-set target also offers "Same as the migration target", which is its default. Both offer "Remain on Emby Login", and while a setting holds that value no path moves anyone through it. The settings page offers only the login methods that Jellyfin reports as enabled, and a value that is not one of them is refused with a message. Every move uses the setting that governs it. The class names, the task name, and the task key no longer say "Default".
+  7. An e2e test installs JellyfinSecurity v2.6.1 (the `-jf12` build, pinned and checksum-verified) beside this plugin in the shared e2e stack, moves a user to it, and that user then logs in with the password that Emby verified. The test stops at the hand-over.
   8. A unit test fails if `EmbyAuthenticationProvider` becomes public, and a comment on the class says why it stays internal.
   9. The migration list names every account on the Emby login method that has no saved password, and the Migration section warns that Jellyfin's Default login method opens such an account with a blank password and recommends setting one before the account moves. The plugin neither refuses the move nor writes a password the user cannot type. An e2e test shows that a user with no saved password still logs in through Emby, and that the migration list names that account.
   10. `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account with no saved password, and connects that behavior to the deleted account after a failed password save, to the settings page warning, and to the plugin's role as an interim migration tool.
 
-**Plans**: TBD
+**Plans**: 7 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — The unit-test seam for the database and the task manager, then one end-to-end path: an unreadable fingerprint file reaches the Migration section
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — FPRT-01's write-failure correction in the log, the XML doc, and `docs/how-it-works.md`; the MIGR-02 visibility guard; DOCS-05 and the DOCS-01 verification
+- [ ] 03-03-PLAN.md — The migration response completed: one state per account, the task state, and the login methods an administrator may pick
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-04-PLAN.md — The move target becomes a setting: the two settings, the three renames, the new task key, and every move path
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 03-05-PLAN.md — The settings page: the polling loop, the target dropdown above **Run migration now**, and the no-saved-password warning
+- [ ] 03-06-PLAN.md — The plugin refuses a target Jellyfin does not report as enabled, and a password set in Jellyfin follows the password-set target
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 03-07-PLAN.md — JellyfinSecurity in the end-to-end stack, the hand-over test, and the documentation
+
 **UI hint**: yes
 
 ### Phase 4: Emby Traffic Under Load and Failure
@@ -157,7 +181,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
-| 3. Migration Status and Target | 0/TBD | Not started | - |
+| 3. Migration Status and Target | 0/7 | Planned     | - |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
