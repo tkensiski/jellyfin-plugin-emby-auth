@@ -140,6 +140,32 @@ public class EmbyClientTests
         Assert.Equal("alice", login?.Name);
     }
 
+    [Fact]
+    public async Task Login_NamesTheTypedUserName_WhenTheSignOutFailsForAResponseWithoutAUserName()
+    {
+        var handler = new StubHttpMessageHandler()
+            .Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":""},"AccessToken":"logout-token-789"}"""))
+            .Then(() => throw new HttpRequestException("Connection refused"));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Null(login);
+        Assert.Contains(_logger.Entries, entry => entry.Contains("alice", StringComparison.Ordinal));
+        Assert.All(_logger.Entries, entry => Assert.DoesNotContain("logout-token-789", entry, StringComparison.Ordinal));
+        AssertNoSecretsLogged();
+    }
+
+    [Fact]
+    public async Task Login_DoesNotEndASession_WhenEmbyReturnsNoToken()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":"alice"}}"""));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Equal(new EmbyLogin("alice", EnableRemoteAccess: false), login);
+        Assert.Single(handler.Requests);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
