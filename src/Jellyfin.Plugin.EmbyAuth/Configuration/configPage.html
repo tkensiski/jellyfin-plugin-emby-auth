@@ -37,7 +37,12 @@
                             <option value="MoveAfterFirstLogin">Move each user to Jellyfin after the first login</option>
                             <option value="KeepEmbyInCharge">Keep Emby in charge until the migration task runs</option>
                         </select>
-                        <div class="fieldDescription">With the second choice, users stay on the Emby login method until you run the migration. Use "Run migration now" below.</div>
+                        <div class="fieldDescription">This setting answers when a move happens; the migration target in the Migration section below answers where. With the second choice, users stay on the Emby login method until you run the migration. While the migration target is Remain on Emby Login, this setting has no effect, because no path moves anyone.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="PasswordSetTarget">Password-set target</label>
+                        <select is="emby-select" id="PasswordSetTarget" name="PasswordSetTarget" class="emby-select-withcolor emby-select"></select>
+                        <div class="fieldDescription">Governs the move that happens when an administrator sets a password for a user in Jellyfin. Leaving it at the first entry makes the migration target above govern that move too.</div>
                     </div>
                     <div class="selectContainer">
                         <label class="selectLabel" for="AccountAccess">Account access</label>
@@ -59,6 +64,7 @@
                 <div class="verticalSection readOnlyContent">
                     <h2 class="sectionTitle">Migration</h2>
                     <p id="EmbyAuthMigrationSummary"></p>
+                    <p id="EmbyAuthMigrationWarning"></p>
                     <ul id="EmbyAuthMigrationUsers"></ul>
                     <div class="selectContainer">
                         <label class="selectLabel" for="EmbyAuthMigrationTarget">Migration target</label>
@@ -119,8 +125,7 @@
             // method removed. Default is rendered first when present, then the fixed Remain entry, then the
             // rest labelled "Move to {name}" -- never built from markup, since a login method's name comes
             // from another plugin and is not this plugin's to trust.
-            function buildEmbyAuthTargetOptions(select, availableTargets) {
-                select.replaceChildren();
+            function appendEmbyAuthTargetChoices(select, availableTargets) {
                 var targets = availableTargets || [];
                 var defaultTarget = null;
                 targets.forEach(function (target) {
@@ -140,6 +145,20 @@
                         appendEmbyAuthTargetOption(select, target.Id, 'Move to ' + target.Name);
                     }
                 });
+            }
+
+            function buildEmbyAuthTargetOptions(select, availableTargets) {
+                select.replaceChildren();
+                appendEmbyAuthTargetChoices(select, availableTargets);
+            }
+
+            // The password-set target offers the same choices as the migration target, plus a first entry
+            // meaning "no override" -- the empty value PluginConfiguration.PasswordSetTarget already treats
+            // that way -- so an install that predates this setting keeps today's behaviour untouched.
+            function buildEmbyAuthPasswordSetTargetOptions(select, availableTargets) {
+                select.replaceChildren();
+                appendEmbyAuthTargetOption(select, '', 'Same as the migration target');
+                appendEmbyAuthTargetChoices(select, availableTargets);
             }
 
             // Selects the saved value if it is one of the select's own options. Otherwise -- the saved login
@@ -170,6 +189,44 @@
                 buildEmbyAuthTargetOptions(select, availableTargets);
                 var savedValue = currentPluginConfig ? currentPluginConfig.MigrationTarget : '';
                 return selectEmbyAuthTargetValue(select, savedValue);
+            }
+
+            function renderEmbyAuthPasswordSetTargetSelection(availableTargets) {
+                var select = document.querySelector('#PasswordSetTarget');
+                buildEmbyAuthPasswordSetTargetOptions(select, availableTargets);
+                var savedValue = currentPluginConfig ? currentPluginConfig.PasswordSetTarget : '';
+                selectEmbyAuthTargetValue(select, savedValue);
+            }
+
+            // The plugin never claims a behaviour it has not verified (AUTH-06, D-18). The specific
+            // blank-password claim is made only about Jellyfin's own Default login method, verified at
+            // DefaultAuthenticationProvider.cs:61-68; any other method gets the "cannot tell" wording; Remain
+            // on Emby Login gets no warning at all, because no account reaches another method. The plugin
+            // neither refuses the move nor invents a password -- this states the risk and a recommendation.
+            function embyAuthNoPasswordWarningText(users, migrationTarget) {
+                if (migrationTarget === EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD) {
+                    return '';
+                }
+
+                var names = users
+                    .filter(function (user) { return user.State === 'NoPassword'; })
+                    .map(function (user) { return user.Name; });
+                if (names.length === 0) {
+                    return '';
+                }
+
+                var who = names.join(', ');
+                if (migrationTarget === EMBY_AUTH_DEFAULT_PROVIDER_ID) {
+                    return 'Jellyfin\'s Default login method opens an account with no saved password when a blank password is sent. Set a password for these accounts before they move: ' + who + '.';
+                }
+
+                return 'The plugin cannot tell how the migration target treats an account with no saved password. Set a password for these accounts before they move: ' + who + '.';
+            }
+
+            function renderEmbyAuthMigrationWarning(users, migrationTarget) {
+                var warningElement = document.querySelector('#EmbyAuthMigrationWarning');
+                var text = embyAuthNoPasswordWarningText(users, migrationTarget);
+                showEmbyAuthMessage(warningElement, text, Boolean(text));
             }
 
             var lastObservedTaskEndTime = null;
@@ -271,6 +328,8 @@
                     });
 
                     var targetKnown = renderEmbyAuthMigrationTargetSelection(status.AvailableTargets);
+                    renderEmbyAuthPasswordSetTargetSelection(status.AvailableTargets);
+                    renderEmbyAuthMigrationWarning(status.Users, currentPluginConfig ? currentPluginConfig.MigrationTarget : '');
                     if (!targetKnown && !status.RecordsUnavailable) {
                         showEmbyAuthMessage(summary, 'The saved migration target is not a login method Jellyfin reports as enabled. See the Jellyfin log.', true);
                     }
@@ -283,6 +342,7 @@
 
             function clearEmbyAuthMigration() {
                 showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationSummary'), '', false);
+                showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationWarning'), '', false);
                 document.querySelector('#EmbyAuthMigrationUsers').replaceChildren();
             }
 
@@ -368,6 +428,7 @@
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
                         config.EmbyApiKey = document.querySelector('#EmbyApiKey').value;
                         config.MigrationMode = document.querySelector('#MigrationMode').value;
+                        config.PasswordSetTarget = document.querySelector('#PasswordSetTarget').value;
                         config.AccountAccess = document.querySelector('#AccountAccess').value;
                         return ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);

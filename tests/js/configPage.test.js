@@ -672,6 +672,110 @@ test('submitting the settings form leaves the migration target unchanged', async
   assert.equal(api.updateCalls[0].MigrationTarget, DEFAULT_PROVIDER_ID);
 });
 
+test('a no-saved-password account with the Default target gets the blank-password warning', async (t) => {
+  const users = [{ Name: 'nopass', State: 'NoPassword' }];
+  const { document, window, close } = buildDom({ users });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const warning = document.querySelector('#EmbyAuthMigrationWarning');
+  assert.match(warning.textContent, /blank password/i);
+  assert.match(warning.textContent, /nopass/);
+});
+
+test('a no-saved-password account with another target gets the cannot-tell warning', async (t) => {
+  const users = [{ Name: 'nopass', State: 'NoPassword' }];
+  const availableTargets = [
+    { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
+    { Name: 'JellyfinSecurity', Id: 'jellyfin-security-provider-id' },
+  ];
+  const { document, window, close } = buildDom({
+    users,
+    availableTargets,
+    config: { MigrationTarget: 'jellyfin-security-provider-id' },
+  });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const warning = document.querySelector('#EmbyAuthMigrationWarning');
+  assert.match(warning.textContent, /cannot tell|does not know/i);
+  assert.doesNotMatch(warning.textContent, /blank password/i);
+});
+
+test('a no-saved-password account with the Remain target gets no warning', async (t) => {
+  const users = [{ Name: 'nopass', State: 'NoPassword' }];
+  const { document, window, close } = buildDom({
+    users,
+    config: { MigrationTarget: REMAIN_ON_EMBY_LOGIN_METHOD },
+  });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const warning = document.querySelector('#EmbyAuthMigrationWarning');
+  assert.equal(warning.textContent, '');
+});
+
+test('no no-saved-password accounts means no warning, whatever the target', async (t) => {
+  const users = [{ Name: 'ready1', State: 'Ready' }];
+  const { document, window, close } = buildDom({ users });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const warning = document.querySelector('#EmbyAuthMigrationWarning');
+  assert.equal(warning.textContent, '');
+});
+
+test('the no-saved-password warning never claims the plugin refuses the move', async (t) => {
+  const users = [{ Name: 'nopass', State: 'NoPassword' }];
+  const { document, window, close } = buildDom({ users });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const warning = document.querySelector('#EmbyAuthMigrationWarning');
+  assert.doesNotMatch(warning.textContent, /refuse|refuses|will not move|blocks/i);
+});
+
+test('the password-set dropdown defaults to Same as the migration target', async (t) => {
+  const { document, window, close } = buildDom({});
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const options = selectOptions(document.querySelector('#PasswordSetTarget'));
+  assert.equal(options[0].value, '');
+  assert.equal(options[0].text, 'Same as the migration target');
+  assert.equal(options[0].selected, true);
+});
+
+test('submitting the settings form saves the picked password-set target', async (t) => {
+  const availableTargets = [
+    { Name: 'Default', Id: DEFAULT_PROVIDER_ID },
+    { Name: 'JellyfinSecurity', Id: 'jellyfin-security-provider-id' },
+  ];
+  const { document, window, api } = buildDom({ availableTargets });
+
+  firePageshow(document, window);
+  await flush();
+
+  document.querySelector('#PasswordSetTarget').value = 'jellyfin-security-provider-id';
+  fireSubmit(document, window);
+  await flush();
+
+  assert.equal(api.updateCalls.length, 1);
+  assert.equal(api.updateCalls[0].PasswordSetTarget, 'jellyfin-security-provider-id');
+});
+
 test('the settings status sits with the Save control', () => {
   const { document, window } = buildDom({});
 
