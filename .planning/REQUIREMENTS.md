@@ -53,7 +53,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Performance
 
-- [ ] **PERF-01**: Concurrent logins that find an expired user list snapshot send one Emby user list request between them, not one each. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
+- [x] **PERF-01**: Concurrent logins that find an expired user list snapshot send one Emby user list request between them, not one each. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
 - [ ] **PERF-02**: Each known cost that this version does not remove is named in `docs/how-it-works.md` with the reason it stays: the Emby calls that run inside Jellyfin's login lock, and the Jellyfin account save that every accepted login performs. Neither has a fix the plugin can apply, so each is documented rather than measured.
 
 ### Release and Tooling
@@ -125,7 +125,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-04 | Phase 2 | Complete |
 | TEST-05 | Phase 4 | Pending |
 | TEST-06 | Phase 4 | Pending |
-| PERF-01 | Phase 4 | Pending |
+| PERF-01 | Phase 4 | Complete |
 | PERF-02 | Phase 4 | Pending |
 | REL-01 | Phase 5 | Pending |
 | REL-02 | Phase 5 | Pending |
