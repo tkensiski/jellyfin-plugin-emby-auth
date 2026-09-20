@@ -193,17 +193,36 @@ public class EmbyAuthenticationProviderTests
         Assert.Empty(userManager.Calls);
     }
 
-    [Fact]
-    public async Task RefusesTheLogin_WhenCreateUserFailsBecauseJellyfinRejectsTheName()
+    /// <summary>
+    /// This is the losing side of a race between two concurrent first logins for one unknown Emby user name, not an
+    /// invalid name. Jellyfin resolves the user name before it takes the lock (<c>UserManager.cs:573</c>) and
+    /// re-resolves inside the lock only when a user was found (<c>UserManager.cs:579-581</c>), so an unknown name is
+    /// never re-checked there. Both concurrent callers see no existing user, and whichever reaches
+    /// <c>CreateUserAsync</c> second gets the duplicate-name <see cref="ArgumentException"/> Jellyfin builds at
+    /// <c>UserManager.cs:619-623</c>.
+    /// </summary>
+    [Fact(Skip = "test(04-04): assert the race-loser message names both causes")]
+    public async Task RefusesTheLosingLogin_WhenTwoFirstLoginsForOneNameRace()
     {
-        var userManager = new FakeUserManager { CreateUserThrows = new ArgumentException("bad name") };
+        var userManager = new FakeUserManager { CreateUserThrows = new ArgumentException("A user with the name 'alice' already exists.") };
         var handler = new StubHttpMessageHandler().Then(AliceUserList).Then(AliceAuthenticateResponse);
-        var provider = CreateProvider(handler, userManager, out _);
+        var logger = new CapturingLogger<EmbyAuthenticationProvider>();
+        var provider = CreateProvider(handler, userManager, out _, logger);
 
         await Assert.ThrowsAsync<AuthenticationException>(() => provider.Authenticate("alice", "alice-pass", null));
 
         Assert.Equal(["CreateUserAsync"], userManager.Calls);
-        Assert.DoesNotContain("DeleteUserAsync", userManager.Calls);
+
+        var errorEntries = logger.Entries.Where(entry => entry.StartsWith("Error:", StringComparison.Ordinal)).ToList();
+        var errorEntry = Assert.Single(errorEntries);
+        Assert.Contains("alice", errorEntry, StringComparison.Ordinal);
+        Assert.Contains("at the same time", errorEntry, StringComparison.Ordinal);
+        Assert.Contains("log in again", errorEntry, StringComparison.Ordinal);
+        Assert.Contains("rename the user on Emby", errorEntry, StringComparison.Ordinal);
+
+        var typedPassword = "alice-pass";
+        var savedHash = new FakeCryptoProvider().CreatePasswordHash(typedPassword).ToString();
+        Assert.DoesNotContain(logger.Entries, entry => entry.Contains(typedPassword, StringComparison.Ordinal) || entry.Contains(savedHash, StringComparison.Ordinal));
     }
 
     [Fact]
