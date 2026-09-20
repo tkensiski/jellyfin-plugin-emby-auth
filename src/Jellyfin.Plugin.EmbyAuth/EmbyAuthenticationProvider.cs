@@ -19,6 +19,12 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// <summary>
 /// A Jellyfin login method that checks passwords against Emby and saves a Jellyfin copy of each password that Emby accepts.
 /// </summary>
+/// <remarks>
+/// This class stays internal. A public class would enter the <c>GetExports&lt;IAuthenticationProvider&gt;()</c> scan
+/// another plugin can run, which would let that plugin send a password to Emby for a user this plugin does not
+/// serve. <c>TypeVisibilityTests</c> fails if this class, or any other type in this assembly, becomes public
+/// without a recorded reason.
+/// </remarks>
 /// <param name="serviceProvider">The service provider. The user manager is resolved on each login because it depends on all login methods.</param>
 /// <param name="cryptoProvider">The Jellyfin password hasher.</param>
 /// <param name="embyClient">The Emby client.</param>
