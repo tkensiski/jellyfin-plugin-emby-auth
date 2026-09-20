@@ -142,7 +142,7 @@ Plans:
   6. Concurrent logins that find an expired user list snapshot send one Emby user list request between them. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
   7. `docs/how-it-works.md` names the two costs this version does not remove — the Emby calls that run inside Jellyfin's login lock, and Jellyfin's own account save on every accepted login — and says why neither has a fix the plugin can apply.
 
-**Plans**: 4/8 plans executed
+**Plans**: 5/8 plans executed
 
 Plans:
 **Wave 1**
@@ -154,7 +154,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-05-PLAN.md — FPRT-04: the legacy fingerprint file is imported once, and never again
+- [x] 04-05-PLAN.md — FPRT-04: the legacy fingerprint file is imported once, and never again
 - [ ] 04-06-PLAN.md — TEST-05 and TEST-06 end to end: concurrent first logins, and invalid settings on a running server
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -207,6 +207,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
-| 4. The Fingerprint Store, and Emby Traffic Under Failure | 4/8 | In Progress|  |
+| 4. The Fingerprint Store, and Emby Traffic Under Failure | 5/8 | In Progress|  |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |

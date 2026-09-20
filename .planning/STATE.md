@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
 status: executing
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-09-20T20:15:58Z"
+stopped_at: Completed 04-05-PLAN.md
+last_updated: "2026-09-20T20:50:03.372Z"
 last_activity: 2026-09-20
 last_activity_desc: Completed 04-04-PLAN.md (TEST-05 unit half)
-state_head: 0af8ad9
+state_head: 8fbd372898e3cf417e16e9789ab03d2902e52747
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 22
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
-Plan: 5 of 8
+Plan: 6 of 8
 Status: Ready to execute
 Last activity: 2026-09-20 — Completed 04-04-PLAN.md (TEST-05 unit half)
 
@@ -78,6 +78,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 04 P02 | 8min | 2 tasks | 2 files |
 | Phase 04 P03 | 55min | 3 tasks | 4 files |
 | Phase 04 P04 | ~7min | 2 tasks | 2 files |
+| Phase 04 P05 | 35min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Recent decisions affecting current work:
 - [Phase 04]: [Phase 04] The two-settings concurrency test groups its ten callers contiguously (five then five) rather than interleaved, since SemaphoreSlim's async waiters release in FIFO order in this runtime -- a contiguous grouping is what guarantees exactly two requests
 - [Phase 04]: [Phase 04] LogCreateAccountFailed's reworded message states both causes of a failed account creation (a benign concurrent race, or a name Jellyfin rejects) rather than branching on the exception's message string — Jellyfin throws ArgumentException for a duplicate name and an invalid name alike (D-04); the exact wording is the contract plan 04-06 asserts against a live server, recorded verbatim in 04-04-SUMMARY.md
 - [Phase 04]: [Phase 04] TEST-05 stays Pending in REQUIREMENTS.md after 04-04, by design — 04-06 also declares TEST-05 for the end-to-end half, and the shared-ID convention (#2388) blocks Complete until every declaring plan has a SUMMARY
+- [Phase 04]: [Phase 04] Task 1's RED commit ships the widened three-arg constructor wired to ImportLegacyRecords, with the method body an inert stub, rather than a pre-implementation compile error — Widening the constructor's argument count is signature-incompatible, so no test file referencing the new shape can compile against the old two-arg constructor at all; confirmed red locally against the stub before committing, per repo convention
+- [Phase 04]: [Phase 04] Task 2 landed no separate commit; its two tests joined Task 1's RED/GREEN pair since they belong to the same test file and TDD cycle — Task 2's own acceptance criterion requires src/ unchanged for its contribution; its value is the three break-then-restore proofs recorded in 04-05-SUMMARY.md, not new production code
 
 ### Pending Todos
 
@@ -154,6 +157,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T20:15:58Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-09-20T20:50:03.241Z
+Stopped at: Completed 04-05-PLAN.md
 Resume file: None
