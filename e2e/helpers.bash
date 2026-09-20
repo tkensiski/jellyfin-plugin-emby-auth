@@ -12,6 +12,8 @@ export EMBY_PROVIDER=Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider
 export DEFAULT_PROVIDER=Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider
 export PLUGIN_ID=e973e09a-e8b4-40c1-9be2-8e51342de1f9
 export COMPOSE_FILE="$E2E_DIR/compose.yaml"
+# The Emby URL the plugin is configured with, as Jellyfin's container reaches the proxy.
+export EMBY_INTERNAL_URL="http://emby-proxy:8096"
 
 auth_header() {
 	local token="${1:-}"
@@ -221,6 +223,27 @@ emby_login_requests() {
 		sleep 1
 	done
 	echo "The marker request did not appear in the proxy log within 20 seconds." >&2
+	return 1
+}
+
+# jellyfin_log_lines PATTERN -> prints every Jellyfin log line containing the fixed string PATTERN.
+# Jellyfin's log reaches `docker compose logs` a moment after the request that produced it, so this
+# retries for up to ten seconds before giving up. The caller asserts the log level itself by looking
+# for the Serilog level token (for example "[ERR]") in the returned lines, which lets this one helper
+# serve both an Error-level assertion and a plain presence check.
+jellyfin_log_lines() {
+	local pattern="$1"
+	local logs matches
+	for _ in $(seq 1 10); do
+		logs="$(docker compose -f "$COMPOSE_FILE" logs jellyfin 2>&1)"
+		matches="$(grep -F "$pattern" <<<"$logs" || true)"
+		if [[ -n "$matches" ]]; then
+			printf '%s\n' "$matches"
+			return 0
+		fi
+		sleep 1
+	done
+	echo "No Jellyfin log line matched '$pattern' within 10 seconds." >&2
 	return 1
 }
 

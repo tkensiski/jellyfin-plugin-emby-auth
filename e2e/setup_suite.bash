@@ -24,10 +24,10 @@ setup_suite() {
 	export EMBY_TOKEN JF_TOKEN EMBY_API_KEY
 
 	api POST "$JELLYFIN/Plugins/$PLUGIN_ID/Configuration" "$JF_TOKEN" \
-		"$(jq -cn --arg k "$EMBY_API_KEY" '{EmbyServerUrl: "http://emby-proxy:8096", EmbyApiKey: $k}')" >/dev/null
+		"$(jq -cn --arg u "$EMBY_INTERNAL_URL" --arg k "$EMBY_API_KEY" '{EmbyServerUrl: $u, EmbyApiKey: $k}')" >/dev/null
 
 	local name
-	for name in alice carol dave erin gina henry ivy jack kate leo mia nora oscar paul quinn rex sam tina uma vic wes yara zack; do
+	for name in alice bella carol chris dana dave elton erin gina henry ivy jack kate leo mia nora oscar paul quinn rex sam tina uma vic wes yara zack; do
 		set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" "$name")" "$name-emby-pass"
 	done
 	create_user "$EMBY" "$EMBY_TOKEN" frank >/dev/null
