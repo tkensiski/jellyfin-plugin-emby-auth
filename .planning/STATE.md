@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 03
 current_phase_name: Migration Status and Target
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-09-20T04:11:44.658Z"
+stopped_at: Completed 03-04-PLAN.md
+last_updated: "2026-09-20T04:50:26.461Z"
 last_activity: 2026-09-19
 last_activity_desc: Phase 03 execution started
-state_head: 9614dd9a98e05f5fb0d9d50edbfea6c58db2ca3f
+state_head: 604d859396e89146d317fda3bee8749edc9622e5
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 14
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 03 (Migration Status and Target) — EXECUTING
-Plan: 4 of 7
+Plan: 5 of 7
 Status: Ready to execute
 Last activity: 2026-09-19 — Phase 03 execution started
 
@@ -69,6 +69,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 03 P01 | 34min | 3 tasks | 11 files |
 | Phase 03 P02 | 16min | 3 tasks | 5 files |
 | Phase 03 P03 | 25min | 3 tasks | 10 files |
+| Phase 03-migration-status-and-target P04 | 36min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03]: MIGR-02's TypeVisibilityTests guard covers the whole plugin assembly's exported surface, not only EmbyAuthenticationProvider, resolving the plan's discretion question — a guard on one class catches one mistake, and the rule in .claude/rules/plugin.md is already assembly-wide
 - [Phase 03]: [Phase 03]: Confirmed MIGR-02's red run via a compile-error demonstration rather than a passing-build failing-test result — making EmbyAuthenticationProvider public alone fails to compile (CS0051), and making its two internal dependencies public as well cascades into further compile errors instead of converging on a green build; all three files reverted to byte-identical content
 - [Phase 03]: [Phase 03]: NoPassword takes precedence over Unknown on MigrationUserState, and the task's scheduled-task worker is found by ScheduledTask type, never by IScheduledTaskWorker.Id — AUTH-06 requires every no-password account named even while the fingerprint file cannot be read; Id is a Jellyfin-assigned REST-route identifier, not the plugin's own task Key, so an Id comparison would silently match nothing
+- [Phase 03]: [Phase 03] Task 1's RED commit uses Skip-marked shape-validation tests rather than a non-compiling commit, because prek's pre-commit hook runs mise run test and would block a build failure — Same convention Phase 01 established for the identical hook constraint (STATE.md)
+- [Phase 03]: [Phase 03] MoveTargetKind (Move/Remain/Invalid) replaces a nullable string for a resolved move target — Remain (deliberate, silent) and Invalid (misconfiguration, one Error log) need different treatment; collapsing them would either spam the log or hide a real misconfiguration
+- [Phase 03]: [Phase 03] LoginMethodMove.ResolveMigrationTarget/ResolvePasswordSetTarget do not check whether Jellyfin currently reports the configured target as enabled; a target that disappears after being saved still resolves to Move and gets written unconditionally — Deliberately deferred to plan 06's save-time refusal per this plan's own Task 1 action text; the runtime skip-and-log behavior for an already-saved, now-disappeared target is not yet implemented anywhere
 
 ### Pending Todos
 
@@ -128,6 +132,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T04:11:44.588Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-09-20T04:50:26.386Z
+Stopped at: Completed 03-04-PLAN.md
 Resume file: None

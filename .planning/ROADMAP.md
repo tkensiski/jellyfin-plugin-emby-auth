@@ -114,7 +114,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 03-04-PLAN.md — The move target becomes a setting: the two settings, the three renames, the new task key, and every move path
+- [x] 03-04-PLAN.md — The move target becomes a setting: the two settings, the three renames, the new task key, and every move path
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
