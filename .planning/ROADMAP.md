@@ -100,12 +100,12 @@ Plans:
   9. The migration list names every account on the Emby login method that has no saved password, and the Migration section warns that Jellyfin's Default login method opens such an account with a blank password and recommends setting one before the account moves. The plugin neither refuses the move nor writes a password the user cannot type. An e2e test shows that a user with no saved password still logs in through Emby, and that the migration list names that account.
   10. `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account with no saved password, and connects that behavior to the deleted account after a failed password save, to the settings page warning, and to the plugin's role as an interim migration tool.
 
-**Plans**: 7 plans
+**Plans**: 1/7 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — The unit-test seam for the database and the task manager, then one end-to-end path: an unreadable fingerprint file reaches the Migration section
+- [x] 03-01-PLAN.md — The unit-test seam for the database and the task manager, then one end-to-end path: an unreadable fingerprint file reaches the Migration section
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -181,7 +181,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 |-------|----------------|--------|-----------|
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
-| 3. Migration Status and Target | 0/7 | Planned     | - |
+| 3. Migration Status and Target | 1/7 | In Progress|  |
 | 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
