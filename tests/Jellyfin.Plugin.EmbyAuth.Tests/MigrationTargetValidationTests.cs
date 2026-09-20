@@ -31,7 +31,7 @@ public sealed class MigrationTargetValidationTests
         Assert.Null(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not accept the no-move sentinel yet.")]
+    [Fact]
     public void ReturnsNull_ForAMigrationTarget_EqualToTheNoMoveSentinel_EvenWhenTheEnabledListIsEmpty()
     {
         var problem = MigrationTargetValidation.FindProblem(Config(migrationTarget: PluginConfiguration.RemainOnEmbyLoginMethod), []);
@@ -39,7 +39,7 @@ public sealed class MigrationTargetValidationTests
         Assert.Null(problem);
     }
 
-    [Theory(Skip = "Task 1 GREEN: FindProblem does not refuse a blank migration target yet.")]
+    [Theory]
     [InlineData(null)]
     [InlineData("")]
     [InlineData("   ")]
@@ -50,7 +50,7 @@ public sealed class MigrationTargetValidationTests
         Assert.NotNull(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not refuse an absent target yet.")]
+    [Fact]
     public void ReturnsAProblem_ForAMigrationTarget_NotInTheEnabledList()
     {
         var problem = MigrationTargetValidation.FindProblem(Config(migrationTarget: "unknown-id"), EnabledMethods);
@@ -58,7 +58,7 @@ public sealed class MigrationTargetValidationTests
         Assert.NotNull(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not refuse this plugin's own provider id yet.")]
+    [Fact]
     public void ReturnsAProblem_ForAMigrationTarget_EqualToThisPluginsOwnProviderId_EvenWhenItIsInTheEnabledList()
     {
         var problem = MigrationTargetValidation.FindProblem(Config(migrationTarget: EmbyAuthenticationProvider.ProviderId), EnabledMethods);
@@ -74,7 +74,7 @@ public sealed class MigrationTargetValidationTests
         Assert.Null(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not check a non-empty password-set target yet.")]
+    [Fact]
     public void ReturnsAProblem_ForANonEmptyPasswordSetTarget_NotInTheEnabledList()
     {
         var problem = MigrationTargetValidation.FindProblem(Config(passwordSetTarget: "unknown-id"), EnabledMethods);
@@ -90,7 +90,7 @@ public sealed class MigrationTargetValidationTests
         Assert.Null(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not refuse a target when the enabled list is empty yet.")]
+    [Fact]
     public void ReturnsAProblem_WhenTheEnabledListIsEmpty_AndTheTargetIsNotTheSentinel()
     {
         var problem = MigrationTargetValidation.FindProblem(Config(), []);
@@ -98,7 +98,7 @@ public sealed class MigrationTargetValidationTests
         Assert.NotNull(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: FindProblem does not refuse a missing configuration yet.")]
+    [Fact]
     public void ReturnsAProblem_ForANullConfiguration()
     {
         var problem = MigrationTargetValidation.FindProblem(null, EnabledMethods);
@@ -106,7 +106,7 @@ public sealed class MigrationTargetValidationTests
         Assert.NotNull(problem);
     }
 
-    [Fact(Skip = "Task 1 GREEN: no problem messages exist yet to check for leaked values.")]
+    [Fact]
     public void NoProblemMessage_ContainsTheOffendingValueOrAnyProviderId()
     {
         var offendingValue = "unknown-id";

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Jellyfin.Plugin.EmbyAuth.Configuration;
 using MediaBrowser.Model.Dto;
 
@@ -24,6 +25,40 @@ internal static class MigrationTargetValidation
     public static string? FindProblem(PluginConfiguration? configuration, IReadOnlyList<NameIdPair> enabledLoginMethods)
     {
         ArgumentNullException.ThrowIfNull(enabledLoginMethods);
-        return null;
+        if (configuration is null)
+        {
+            return "The plugin settings are not loaded.";
+        }
+
+        return FindTargetProblem("migration target", configuration.MigrationTarget, enabledLoginMethods)
+            ?? FindPasswordSetTargetProblem(configuration.PasswordSetTarget, enabledLoginMethods);
+    }
+
+    private static string? FindPasswordSetTargetProblem(string? passwordSetTarget, IReadOnlyList<NameIdPair> enabledLoginMethods) =>
+        string.IsNullOrEmpty(passwordSetTarget)
+            ? null
+            : FindTargetProblem("target used when a password is set in Jellyfin", passwordSetTarget, enabledLoginMethods);
+
+    private static string? FindTargetProblem(string settingName, string? target, IReadOnlyList<NameIdPair> enabledLoginMethods)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return $"The {settingName} is not set.";
+        }
+
+        var trimmed = target.Trim();
+        if (trimmed == PluginConfiguration.RemainOnEmbyLoginMethod)
+        {
+            return null;
+        }
+
+        if (trimmed == EmbyAuthenticationProvider.ProviderId)
+        {
+            return $"The {settingName} is set to this plugin's own Emby login method. Use Remain on Emby Login instead.";
+        }
+
+        return enabledLoginMethods.Any(method => method.Id == trimmed)
+            ? null
+            : $"The {settingName} is not a login method Jellyfin reports as enabled.";
     }
 }
