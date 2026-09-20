@@ -48,8 +48,8 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **TEST-02**: Unit tests cover `MoveAfterLogin`, `LoginMethodMove`, `EmbyLoginMethodUsers`, and `EmbyMigrationTask` against an SQLite in-memory `JellyfinDbContext`.
 - [x] **TEST-03**: Unit tests cover `EmbyAuthController`: the migration status, the run request, and the task state.
 - [x] **TEST-04**: Automated tests run the settings page JavaScript: load, save, their error messages, the migration list, and **Run migration now**.
-- [ ] **TEST-05**: A test covers concurrent first logins through Jellyfin.
-- [ ] **TEST-06**: An e2e test covers invalid settings on a running server: logins on the Emby login method are refused, and the Jellyfin log names the problem at Error level.
+- [x] **TEST-05**: A test covers concurrent first logins through Jellyfin.
+- [x] **TEST-06**: An e2e test covers invalid settings on a running server: logins on the Emby login method are refused, and the Jellyfin log names the problem at Error level.
 
 ### Performance
 
@@ -123,8 +123,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-02 | Phase 3 | Complete |
 | TEST-03 | Phase 3 | Complete |
 | TEST-04 | Phase 2 | Complete |
-| TEST-05 | Phase 4 | Pending |
-| TEST-06 | Phase 4 | Pending |
+| TEST-05 | Phase 4 | Complete |
+| TEST-06 | Phase 4 | Complete |
 | PERF-01 | Phase 4 | Complete |
 | PERF-02 | Phase 4 | Pending |
 | REL-01 | Phase 5 | Pending |
