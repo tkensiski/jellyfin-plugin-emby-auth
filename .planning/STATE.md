@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
 status: executing
-stopped_at: Completed 04-03-PLAN.md
-last_updated: "2026-09-20T20:08:53.775Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-09-20T20:15:58Z"
 last_activity: 2026-09-20
-last_activity_desc: Phase 04 execution started
-state_head: 6853182ce8d6dca4b94a9b49e02abb6f53bb133a
+last_activity_desc: Completed 04-04-PLAN.md (TEST-05 unit half)
+state_head: 0af8ad9
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 22
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
-Last activity: 2026-09-20 — Phase 04 execution started
+Last activity: 2026-09-20 — Completed 04-04-PLAN.md (TEST-05 unit half)
 
 Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
 
@@ -77,6 +77,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 04 P01 | 18min | 2 tasks | 8 files |
 | Phase 04 P02 | 8min | 2 tasks | 2 files |
 | Phase 04 P03 | 55min | 3 tasks | 4 files |
+| Phase 04 P04 | ~7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,8 @@ Recent decisions affecting current work:
 - [Phase 04]: [Phase 04] EmbyUserDirectory now implements IDisposable to release the new SemaphoreSlim (CA1001), an unplanned Rule-3 fix -- the DI container already disposes it as an AddSingleton, so this closes a real resource leak the compiler caught, not new scope
 - [Phase 04]: [Phase 04] The fresh-snapshot fast-path test relies on an empty, held response queue so a wrongly-guarded caller fails deterministically (hang or InvalidOperationException-turned-Unavailable) rather than depending on a timeout
 - [Phase 04]: [Phase 04] The two-settings concurrency test groups its ten callers contiguously (five then five) rather than interleaved, since SemaphoreSlim's async waiters release in FIFO order in this runtime -- a contiguous grouping is what guarantees exactly two requests
+- [Phase 04]: [Phase 04] LogCreateAccountFailed's reworded message states both causes of a failed account creation (a benign concurrent race, or a name Jellyfin rejects) rather than branching on the exception's message string — Jellyfin throws ArgumentException for a duplicate name and an invalid name alike (D-04); the exact wording is the contract plan 04-06 asserts against a live server, recorded verbatim in 04-04-SUMMARY.md
+- [Phase 04]: [Phase 04] TEST-05 stays Pending in REQUIREMENTS.md after 04-04, by design — 04-06 also declares TEST-05 for the end-to-end half, and the shared-ID convention (#2388) blocks Complete until every declaring plan has a SUMMARY
 
 ### Pending Todos
 
@@ -151,6 +154,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T20:08:53.645Z
-Stopped at: Completed 04-03-PLAN.md
+Last session: 2026-09-20T20:15:58Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
