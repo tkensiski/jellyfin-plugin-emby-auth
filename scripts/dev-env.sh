@@ -27,6 +27,7 @@ usage() {
 
 up() {
 	dotnet publish "$REPO_ROOT/src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj" -c Release -o "$REPO_ROOT/artifacts/plugin"
+	"$REPO_ROOT/scripts/fetch-jellyfinsecurity.sh" fetch
 	docker compose -f "$COMPOSE_FILE" down --volumes
 	docker compose -f "$COMPOSE_FILE" up -d
 	echo "Waiting for Emby and Jellyfin to start..."

@@ -10,6 +10,7 @@ setup_suite() {
 	source "$(dirname "${BASH_SOURCE[0]}")/helpers.bash"
 
 	dotnet publish "$E2E_DIR/../src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj" -c Release -o "$E2E_DIR/../artifacts/plugin" >&3
+	"$E2E_DIR/../scripts/fetch-jellyfinsecurity.sh" fetch >&3
 	docker compose -f "$COMPOSE_FILE" down --volumes >&3 2>&1
 	docker compose -f "$COMPOSE_FILE" up -d >&3 2>&1
 	wait_until Emby emby_ready
@@ -26,7 +27,7 @@ setup_suite() {
 		"$(jq -cn --arg k "$EMBY_API_KEY" '{EmbyServerUrl: "http://emby-proxy:8096", EmbyApiKey: $k}')" >/dev/null
 
 	local name
-	for name in alice carol dave erin gina henry ivy jack kate leo mia nora oscar paul quinn rex sam tina uma vic wes; do
+	for name in alice carol dave erin gina henry ivy jack kate leo mia nora oscar paul quinn rex sam tina uma vic wes yara zack; do
 		set_password "$EMBY" "$EMBY_TOKEN" "$(create_user "$EMBY" "$EMBY_TOKEN" "$name")" "$name-emby-pass"
 	done
 	create_user "$EMBY" "$EMBY_TOKEN" frank >/dev/null

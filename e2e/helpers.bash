@@ -138,6 +138,16 @@ precreate_on_emby_method() {
 	set_login_method "$JF_TOKEN" "$id" "$EMBY_PROVIDER"
 }
 
+# precreate_on_emby_method_without_password NAME -> creates a Jellyfin account on the Emby login method with no saved password.
+# This deliberately produces the account state AUTH-06's migration test needs: a user on the Emby login
+# method whose account has never had a Jellyfin password set, so the migration list names them as such
+# and the migration task must not move them.
+precreate_on_emby_method_without_password() {
+	local name="$1" id
+	id="$(create_user "$JELLYFIN" "$JF_TOKEN" "$name")"
+	set_login_method "$JF_TOKEN" "$id" "$EMBY_PROVIDER"
+}
+
 # precreate_admin_on_emby_method NAME -> creates a Jellyfin administrator with the password NAME-jf-pass on the Emby login method.
 precreate_admin_on_emby_method() {
 	local name="$1" id
@@ -147,7 +157,8 @@ precreate_admin_on_emby_method() {
 }
 
 reset_plugin_config() {
-	set_plugin_config "$JF_TOKEN" '.MigrationMode = "MoveAfterFirstLogin" | .AccountAccess = "CopyEmbyRemoteAccess"'
+	set_plugin_config "$JF_TOKEN" \
+		".MigrationMode = \"MoveAfterFirstLogin\" | .AccountAccess = \"CopyEmbyRemoteAccess\" | .MigrationTarget = \"$DEFAULT_PROVIDER\" | .PasswordSetTarget = \"\""
 }
 
 # set_plugin_config TOKEN JQ_FILTER -> applies JQ_FILTER to the plugin settings and saves them.
