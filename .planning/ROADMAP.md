@@ -142,7 +142,28 @@ Plans:
   6. Concurrent logins that find an expired user list snapshot send one Emby user list request between them. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
   7. `docs/how-it-works.md` names the two costs this version does not remove — the Emby calls that run inside Jellyfin's login lock, and Jellyfin's own account save on every accepted login — and says why neither has a fix the plugin can apply.
 
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — Tracer: the fingerprint store becomes SQLite, proven by one record written and read back inside the running plugin
+- [ ] 04-02-PLAN.md — AUTH-05: every access token the plugin can read ends its Emby session
+- [ ] 04-03-PLAN.md — PERF-01: concurrent readers on an expired user list snapshot send one Emby request
+- [ ] 04-04-PLAN.md — TEST-05's unit half: the race-loser path, and the reworded account-creation message
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-05-PLAN.md — FPRT-04: the legacy fingerprint file is imported once, and never again
+- [ ] 04-06-PLAN.md — TEST-05 and TEST-06 end to end: concurrent first logins, and invalid settings on a running server
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-07-PLAN.md — The JSON-to-SQLite upgrade proven against the real server
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 04-08-PLAN.md — PERF-02 and the documentation: the two costs that stay, the sign-out limit, and the new store
 
 > **Scope change, 2026-09-20 (planning).** This phase previously promised a k6 and toxiproxy load test with a written pass-or-fail threshold per item (old criteria 4 and 5, PERF-01 and PERF-02). It was cut. Of the four costs it would have measured, the two inside the plugin now get fixed outright — the user list stampede by a single-flight guard, and the fingerprint write by leaving the lock entirely (criteria 1 and 6) — and building the rig to justify those fixes was more work than the fixes. The other two lie outside the plugin: the Emby calls inside Jellyfin's login lock have no fix while the plugin must call Emby, and the per-login account save is Jellyfin's own `UpdateUserAsync`. Both are documented instead (criterion 7). The store swap leads the phase so the concurrency and settings tests are written once, against SQLite, rather than written against the file store and then rewritten.
 
@@ -186,6 +207,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 1. Account Creation and Login Security | 4/4 | Complete    | 2026-09-17 |
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
-| 4. Emby Traffic Under Load and Failure | 0/TBD | Not started | - |
+| 4. Emby Traffic Under Load and Failure | 0/8 | Not started | - |
 | 5. Public Repository | 0/TBD | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
