@@ -6,6 +6,8 @@
 
 Each item states how it was established: **confirmed** (read in the code or measured with a command), **documented** (the README, `docs/`, or a rules file already states it), or **unverified** (inferred; the note says what would verify it).
 
+This file is a snapshot of what was established on the analysis date. An entry that a later phase proves wrong keeps its original text and gains a dated **Correction** note, so the record of what was believed at map time survives.
+
 ## Known Bugs
 
 **A failed fingerprint write does not behave as the log and docs say:**
@@ -72,16 +74,19 @@ All items here are unmeasured. No load test exists.
 - Cause: Jellyfin calls login methods inside a lock, and all logins for unknown names share one lock key (`.claude/rules/plugin.md:14`). A login that reaches Emby can send up to three requests, each on a client with a 5-second `Timeout`: the user list on a cache miss, `AuthenticateByName`, and `Sessions/Logout`. The provider passes `CancellationToken.None`, so a login cannot be cancelled early.
 - Impact (unverified): when Emby is slow but still answers, first logins of new users wait for each other. After a failed user list read, the 30-second retry delay (`EmbyUserDirectory.cs:44`) makes later logins fail fast. A hang in `AuthenticateByName` alone has no such delay.
 - The 5-second limit is fixed in code and documented (`docs/how-it-works.md:10`).
+- **Correction (2026-09-20, Phase 4 discussion):** "all logins for unknown names share one lock key" is right, and its converse matters as much. Jellyfin locks on `user?.Id ?? Guid.Empty` (`UserManager.cs:573`, tag `v12.1`), so a **known** name takes its own user ID and repeat logins for different users do not wait for each other at all. This bottleneck is therefore a first-login condition only, which is the opposite of the condition under which the next entry can occur.
 
 **User list refresh:**
 - Files: `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs:55-83`
 - Cause: each refresh downloads the full Emby user list (line 62), and each login searches it linearly (line 76). Concurrent logins that find an expired snapshot each send their own request (lines 58-64); there is no single-flight guard. The snapshot is an immutable record swapped through a `volatile` field (line 46), so readers always see a consistent list.
 - Impact (unverified): duplicate list requests when the cache expires. The effect grows with the number of Emby users and concurrent logins.
+- **Correction (2026-09-20, Phase 4 discussion):** concurrent **first** logins cannot produce this stampede, because they serialize on the shared `Guid.Empty` lock (see the correction above). It needs concurrent logins for users who already have accounts, which lock on their own IDs and so run in parallel. A load-test scenario that drives first logins measures the entry above, not this one.
 
 **Fingerprint file writes hold the lock:**
 - Files: `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs:45-64`, `EmbyVerifiedPasswords.cs:81-84`
 - Cause: `Record` rewrites the whole JSON file inside the same lock that `Matches` uses. Every successful Emby login calls `Record`, unless the fingerprint is unchanged (lines 48-51). The migration status call and the migration task call `Matches` once per user on the Emby login method (`EmbyLoginMethodUsers.cs:46-51`).
 - Impact (unverified): `Matches` calls wait for disk writes. `ConcurrentRecords_AreAllKept` tests correctness under concurrency, not latency.
+- **Correction (2026-09-20, Phase 4 discussion):** "unless the fingerprint is unchanged" describes an exception that almost never applies. The fingerprint is a SHA-256 of the password **hash**, and `CreatePasswordHash` calls `GenerateSalt()` on every call (`Emby.Server.Implementations/Cryptography/CryptographyProvider.cs:18-30`, `:89-95`, tag `v12.1`), so the hash string differs on every login even for the same password. The skip therefore does not fire for a repeat login, and the file is fully read, modified, serialized, written, and moved under the lock on **every** accepted Emby login. Treat the write path as the normal path, not the exception.
 
 ## Security Considerations
 

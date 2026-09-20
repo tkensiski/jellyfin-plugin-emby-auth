@@ -13,7 +13,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **AUTH-02**: The `JellyfinPasswordFirst` migration behavior ("Check the saved Jellyfin password first") no longer exists in the settings, the settings page, the docs, or the tests.
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
-- [ ] **AUTH-05**: The plugin ends the Emby session whenever Emby returns an access token, including a login response that has no user name.
+- [ ] **AUTH-05**: The plugin ends the Emby session whenever it can read an access token in Emby's response, including a login response that has no user name. A success response whose body the plugin cannot read hides its token; the docs state that limit.
 - [x] **AUTH-06**: An account on the Emby login method may have no saved password, and the plugin does not invent one. The saved hash plays no part in an Emby login method login (AUTH-01), so a missing password costs the user nothing while Emby checks the login. The settings page names every account on the Emby login method that has no saved password, warns that Jellyfin's Default login method opens such an account with a blank password, and recommends setting a password before the account moves. The plugin does not refuse the move and does not write a password the user cannot type.
 
 ### Verified Password Records
@@ -52,8 +52,8 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Performance
 
-- [ ] **PERF-01**: A load test runs from a mise task against the Docker Compose stack with a separate pool of test accounts, and measures logins with a slow Emby server, concurrent first logins, user list cache expiry, and fingerprint file writes.
-- [ ] **PERF-02**: Each of the three bottlenecks (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock) is fixed, or accepted in the docs with the measured numbers.
+- [ ] **PERF-01**: A load test runs from a mise task against the Docker Compose stack with a separate pool of test accounts, and measures logins with a slow Emby server, concurrent first logins, user list cache expiry, fingerprint file writes, and the Jellyfin account save that every accepted login performs.
+- [ ] **PERF-02**: A pass-or-fail threshold is written for each measured item before the load test runs. Each of the four items (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock, and the per-login Jellyfin account save) is then fixed, or accepted in `docs/performance.md` with its measured number and the environment that number was measured in.
 
 ### Release and Tooling
 
@@ -143,4 +143,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-18 — AUTH-06 rewritten to allow an empty saved password and warn instead, and DOCS-05 added for Jellyfin's blank-password behavior*
+*Last updated: 2026-09-20 — AUTH-05 limited to a token the plugin can read, and PERF-01 and PERF-02 extended to a fourth measured item with a threshold written before the run (Phase 4 discussion)*

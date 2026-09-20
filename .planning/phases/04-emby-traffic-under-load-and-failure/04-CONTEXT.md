@@ -60,12 +60,12 @@ The maintainer did not select these two areas, so the researcher and the planner
 </decisions>
 
 <roadmap_change_required>
-## Required Changes to the Roadmap
+## Required Changes to the Roadmap — APPLIED 2026-09-20
 
-Make these before planning, so the plan is verified against criteria the plugin will actually meet.
+**Both changes are already made. No action is needed here; this section records what changed and why.**
 
-1. **Criterion 1 overclaims.** It reads "Whenever Emby returns an access token, the plugin sends `POST /Sessions/Logout`". D-02 states that a success response whose body cannot be parsed hides its token from the plugin, so the criterion is false for that case. Reword it to cover every token the plugin can read, and add that `docs/how-it-works.md` states the unreadable-response limit. AUTH-05 in `.planning/REQUIREMENTS.md` carries the same wording and needs the same change.
-2. **Criteria 4 and 5 name three bottlenecks; the phase now reports four.** D-13 adds the per-login account save and fingerprint write as a measured item with its own threshold and verdict. Add it to criterion 4's list of reported numbers and to criterion 5's fix-or-accept rule, so the phase is verified against what it delivers. D-11's "thresholds written before the run" belongs in criterion 5 as well, because it is what makes the verdict checkable.
+1. **Criterion 1 overclaimed.** It read "Whenever Emby returns an access token, the plugin sends `POST /Sessions/Logout`". D-02 states that a success response whose body cannot be parsed hides its token from the plugin, so the criterion was false for that case. `ROADMAP.md` §Phase 4 criterion 1 and AUTH-05 in `.planning/REQUIREMENTS.md` now cover every token the plugin **can read**, and both name the unreadable-response limit that `docs/how-it-works.md` must state.
+2. **Criteria 4 and 5 named three bottlenecks; the phase reports four.** D-13 adds the per-login Jellyfin account save as a measured item with its own threshold and verdict. `ROADMAP.md` criterion 4 and PERF-01 now list it among the reported numbers; criterion 5 and PERF-02 now cover four items, require the threshold to be written before the run (D-11), and name `docs/performance.md` with the environment each number was measured in (D-12).
 
 </roadmap_change_required>
 

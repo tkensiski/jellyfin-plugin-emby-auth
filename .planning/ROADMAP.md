@@ -134,11 +134,11 @@ Plans:
 **Requirements**: AUTH-05, TEST-05, TEST-06, PERF-01, PERF-02
 **Success Criteria** (what must be TRUE):
 
-  1. Whenever Emby returns an access token, the plugin sends `POST /Sessions/Logout`, also for a login response that has no user name. A unit test shows the sign-out request for that response.
+  1. Whenever the plugin can read an access token in Emby's response, it sends `POST /Sessions/Logout`, also for a login response that has no user name. A unit test shows the sign-out request for that response. A success response whose body the plugin cannot read hides its token, so one Emby session can stay open; `docs/how-it-works.md` states that limit.
   2. A test sends concurrent first logins through Jellyfin. Each Emby user gets exactly one account, and no login returns HTTP 500.
   3. An e2e test saves invalid settings on a running server. Logins on the Emby login method are then refused, and the Jellyfin log names the problem at Error level.
-  4. A mise task runs the load test against the Docker Compose stack with a separate pool of test accounts, and reports numbers for logins with a slow Emby server, concurrent first logins, user list cache expiry, and fingerprint file writes.
-  5. Each of the three bottlenecks (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock) is fixed, or the docs accept it with the numbers from criterion 4.
+  4. A mise task runs the load test against the Docker Compose stack with a separate pool of test accounts, and reports numbers for logins with a slow Emby server, concurrent first logins, user list cache expiry, fingerprint file writes, and the Jellyfin account save that every accepted login performs.
+  5. The plan states a pass-or-fail threshold for each measured item before the load test runs. Each of the four items (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock, and the per-login Jellyfin account save) is then fixed, or accepted in `docs/performance.md` with its measured number and the environment that number was measured in.
 
 **Plans**: TBD
 
