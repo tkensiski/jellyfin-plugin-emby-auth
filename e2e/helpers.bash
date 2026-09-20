@@ -14,6 +14,13 @@ export PLUGIN_ID=e973e09a-e8b4-40c1-9be2-8e51342de1f9
 export COMPOSE_FILE="$E2E_DIR/compose.yaml"
 # The Emby URL the plugin is configured with, as Jellyfin's container reaches the proxy.
 export EMBY_INTERNAL_URL="http://emby-proxy:8096"
+# The fingerprint store database, inside the Jellyfin container. This is Jellyfin's own
+# DataFolderPath derivation: the plugins directory plus the plugin assembly's file name without
+# its extension (PluginServiceRegistrator.cs).
+export FINGERPRINT_STORE_DB="/config/plugins/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.db"
+# The legacy fingerprint JSON file the plugin read before it moved to the store above, inside the
+# Jellyfin container. This is PluginConfigurationsPath, the plugins directory plus "configurations".
+export LEGACY_FINGERPRINT_FILE="/config/plugins/configurations/Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json"
 
 auth_header() {
 	local token="${1:-}"
@@ -69,6 +76,69 @@ emby_ready() {
 # Jellyfin answers with "Degraded" or a loading message while it starts.
 jellyfin_ready() {
 	[[ "$(curl -s "$JELLYFIN/health")" == "Healthy" ]]
+}
+
+# jellyfin_stop -> stops the Jellyfin container. Stopping sends a termination signal and lets
+# Jellyfin close its SQLite connections, which checkpoints and removes the write-ahead log, so a
+# database copied out afterward is complete. Never copy the database out while Jellyfin runs.
+jellyfin_stop() {
+	docker compose -f "$COMPOSE_FILE" stop jellyfin
+}
+
+# jellyfin_start -> starts the Jellyfin container again and waits for it to become healthy.
+jellyfin_start() {
+	docker compose -f "$COMPOSE_FILE" start jellyfin
+	wait_until Jellyfin jellyfin_ready
+}
+
+# _fingerprint_store_container_command COMMAND... -> runs COMMAND in a throwaway container that
+# shares the Jellyfin container's volumes, using the nginx:1.30.5-alpine image the emby-proxy
+# service already pulls for this stack. `docker compose exec` needs a running container, but a
+# stopped container's data must not be touched by a running Jellyfin, so file removal inside it
+# goes through `--volumes-from` on a throwaway container instead.
+_fingerprint_store_container_command() {
+	local jellyfin_container_id
+	jellyfin_container_id="$(docker compose -f "$COMPOSE_FILE" ps -a -q jellyfin)"
+	docker run --rm --volumes-from "$jellyfin_container_id" nginx:1.30.5-alpine "$@"
+}
+
+# fingerprint_store_pull DEST -> copies the fingerprint store database out of a stopped
+# container into the file DEST on the host. Requires sqlite3 on the host and fails, naming it,
+# rather than skipping: a silent skip would make this test look like it covers the upgrade path
+# when it does not.
+fingerprint_store_pull() {
+	local dest="$1"
+	if ! command -v sqlite3 >/dev/null; then
+		echo "sqlite3 is required on the host to read the fingerprint store and was not found." >&2
+		return 1
+	fi
+	docker compose -f "$COMPOSE_FILE" cp "jellyfin:$FINGERPRINT_STORE_DB" "$dest"
+	if [[ ! -f "$dest" ]]; then
+		echo "fingerprint_store_pull did not produce a file at $dest." >&2
+		return 1
+	fi
+}
+
+# fingerprint_store_push SOURCE -> copies the database file SOURCE from the host back into the
+# container at the fingerprint store path, then removes the write-ahead-log and shared-memory
+# siblings inside the container so a stale log cannot be replayed over the file just pushed.
+fingerprint_store_push() {
+	local source="$1"
+	docker compose -f "$COMPOSE_FILE" cp "$source" "jellyfin:$FINGERPRINT_STORE_DB"
+	_fingerprint_store_container_command sh -c "rm -f '$FINGERPRINT_STORE_DB-wal' '$FINGERPRINT_STORE_DB-shm'"
+}
+
+# fingerprint_store_remove -> removes the database and its write-ahead-log and shared-memory
+# siblings inside the container. This is the state a server upgrading from the JSON store is in.
+fingerprint_store_remove() {
+	_fingerprint_store_container_command sh -c "rm -f '$FINGERPRINT_STORE_DB' '$FINGERPRINT_STORE_DB-wal' '$FINGERPRINT_STORE_DB-shm'"
+}
+
+# legacy_fingerprint_file_write SOURCE -> copies a JSON file from the host into the container at
+# the legacy fingerprint file path.
+legacy_fingerprint_file_write() {
+	local source="$1"
+	docker compose -f "$COMPOSE_FILE" cp "$source" "jellyfin:$LEGACY_FINGERPRINT_FILE"
 }
 
 complete_startup_wizard() {

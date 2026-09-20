@@ -23,6 +23,7 @@ paths:
 - Jellyfin runs at Debug level (`JELLYFIN_Serilog__MinimumLevel__Default` in `compose.yaml`), so the log check also sees the exceptions that Jellyfin logs for refused logins.
 - `EMBY_PORT` and `JELLYFIN_PORT` (default 18096 and 28096) set the host ports in `compose.yaml` and `helpers.bash`. Set both to run the tests while another copy of the containers uses the default ports.
 - Scripts must pass `shellcheck -x` and `shfmt -d`. Inside a test, use `if [[ ... ]]; then ...; return 1; fi` instead of a bare `[[ ... ]]` in a loop.
+- `sqlite3` must be on the host for `80-fingerprint-store.bats`. It is a system tool rather than a mise pin, because macOS and the GitHub runner both ship it. The helper that needs it fails, naming it, rather than skipping when it is absent.
 
 ## Server facts
 
