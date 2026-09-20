@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   buildDom,
   flush,
+  tickPoll,
   firePageshow,
   fireSubmit,
   clickSave,
@@ -21,7 +22,7 @@ const SAVE_FAILURE_MESSAGE = 'Jellyfin cannot save the plugin settings. See the 
 const MIGRATION_READ_FAILURE_MESSAGE =
   'Jellyfin cannot read the migration status. See the Jellyfin log.';
 const MIGRATION_START_FAILURE_MESSAGE = 'Jellyfin did not start the migration. See the Jellyfin log.';
-const MIGRATION_STARTED_MESSAGE = 'The migration runs. This list updates in a few seconds.';
+const MIGRATION_STARTED_MESSAGE = 'The migration runs. This list updates until it finishes.';
 const NO_USERS_MESSAGE = 'No users are on the Emby login method.';
 const EXPECTED_ICON = [{ tagName: 'SPAN', classes: ['material-icons', 'warning'], ariaHidden: 'true', text: '' }];
 const RECORDS_UNAVAILABLE_PATH_PATTERN = /[\\/]/;
@@ -353,6 +354,163 @@ test('a failed Run migration now shows its message', async (t) => {
   const summary = document.querySelector('#EmbyAuthMigrationSummary');
   assert.equal(summary.textContent, MIGRATION_START_FAILURE_MESSAGE);
   assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
+});
+
+test('Run migration now begins polling that issues a second request after one interval', async (t) => {
+  const { document, window, api, interval, close } = buildDom({});
+  t.after(() => close());
+
+  clickRunMigration(document, window);
+  await flush();
+  const callsBefore = api.migrationStatusCalls;
+
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsBefore + 1);
+});
+
+test('polling continues across three consecutive Running responses', async (t) => {
+  const running = { State: 'Running', Progress: 0.1, LastEndTimeUtc: null, LastResult: null };
+  const { document, window, api, interval, close } = buildDom({
+    taskSequence: [running, running, running],
+  });
+  t.after(() => close());
+
+  clickRunMigration(document, window);
+  await flush();
+
+  await tickPoll(interval, 3);
+  const callsAfterThree = api.migrationStatusCalls;
+
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsAfterThree + 1);
+});
+
+test('polling continues when Idle repeats the pre-run end time', async (t) => {
+  const idleUnchanged = {
+    State: 'Idle',
+    Progress: null,
+    LastEndTimeUtc: '2026-09-20T00:00:00Z',
+    LastResult: 'Completed',
+  };
+  const { document, window, api, interval, close } = buildDom({ task: idleUnchanged });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  clickRunMigration(document, window);
+  await flush();
+  const callsBefore = api.migrationStatusCalls;
+
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsBefore + 1);
+});
+
+test('polling stops once Idle reports a new end time', async (t) => {
+  const before = {
+    State: 'Idle',
+    Progress: null,
+    LastEndTimeUtc: '2026-09-20T00:00:00Z',
+    LastResult: 'Completed',
+  };
+  const after = {
+    State: 'Idle',
+    Progress: null,
+    LastEndTimeUtc: '2026-09-20T00:05:00Z',
+    LastResult: 'Completed',
+  };
+  const { document, window, api, interval, close } = buildDom({ task: before });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  api.task = after;
+  clickRunMigration(document, window);
+  await flush();
+
+  await tickPoll(interval);
+  const callsAfterStop = api.migrationStatusCalls;
+
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsAfterStop);
+});
+
+test('polling gives up after about 20 seconds when no run begins', async (t) => {
+  const neverStarted = { State: 'Idle', Progress: null, LastEndTimeUtc: null, LastResult: null };
+  const { document, window, api, interval, close } = buildDom({ task: neverStarted });
+  t.after(() => close());
+
+  clickRunMigration(document, window);
+  await flush();
+
+  await tickPoll(interval, 10);
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.match(summary.textContent, /log/i);
+
+  const callsAfterTimeout = api.migrationStatusCalls;
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsAfterTimeout);
+});
+
+test('the page never stacks a second migration-status request while one is pending', async (t) => {
+  const { document, window, api, interval, close } = buildDom({ migrationStatusHangs: true });
+  t.after(() => close());
+
+  clickRunMigration(document, window);
+  await flush();
+  const callsBeforePoll = api.migrationStatusCalls;
+
+  await tickPoll(interval, 2);
+
+  assert.equal(api.migrationStatusCalls, callsBeforePoll + 1);
+});
+
+test('polling starts on load when the task is already running', async (t) => {
+  const running = { State: 'Running', Progress: 0.4, LastEndTimeUtc: null, LastResult: null };
+  const { document, window, api, interval, close } = buildDom({ task: running });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+  const callsBefore = api.migrationStatusCalls;
+
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsBefore + 1);
+});
+
+test('pagehide stops polling', async (t) => {
+  const { document, window, api, interval, close } = buildDom({});
+  t.after(() => close());
+
+  clickRunMigration(document, window);
+  await flush();
+
+  document.querySelector('#EmbyAuthConfigPage').dispatchEvent(new window.Event('pagehide'));
+
+  const callsBefore = api.migrationStatusCalls;
+  await tickPoll(interval);
+
+  assert.equal(api.migrationStatusCalls, callsBefore);
+});
+
+test('the section reports the migration task as absent when the response carries no task', async (t) => {
+  const { document, window, close } = buildDom({ task: null });
+  t.after(() => close());
+
+  firePageshow(document, window);
+  await flush();
+
+  const summary = document.querySelector('#EmbyAuthMigrationSummary');
+  assert.match(summary.textContent, /registered/i);
+  assert.match(summary.textContent, /log/i);
 });
 
 test('the settings status sits with the Save control', () => {

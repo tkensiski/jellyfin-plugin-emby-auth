@@ -22,6 +22,14 @@ const DEFAULT_CONFIG = {
 };
 
 /**
+ * The default `Task` field a healthy, never-yet-run install reports: a registered worker,
+ * idle, with no prior run. Used as the stub default so an unrelated test does not have to
+ * pass a `Task` value just to avoid the absent-task condition; a test of that condition
+ * passes `task: null` explicitly.
+ */
+const DEFAULT_TASK = { State: 'Idle', Progress: null, LastEndTimeUtc: null, LastResult: null };
+
+/**
  * Builds a rejection value for a stub method controlled by a failure flag.
  *
  * A flag of `true` rejects with a generic Error. A flag that is already an
@@ -50,7 +58,12 @@ function rejectionFor(flag, genericMessage) {
  * @param {boolean} [options.recordsUnavailable] - the `RecordsUnavailable` flag `getJSON('EmbyAuth/Migration')`
  *   resolves with, settable at any time on the returned stub.
  * @param {object | null} [options.task] - the `Task` field `getJSON('EmbyAuth/Migration')` resolves with. Defaults
- *   to `null`, matching an install with no registered migration-task worker.
+ *   to an idle, never-run worker (see {@link DEFAULT_TASK}); pass `null` to test the absent-task condition.
+ * @param {Array | null} [options.taskSequence] - when set, advances the `Task` field through this array by
+ *   successive `getJSON` call number (clamped to the last entry once exhausted), so a test can script a sequence
+ *   of task states across successive polls. Takes priority over `options.task` once the first call is made.
+ * @param {boolean} [options.migrationStatusHangs] - makes every `getJSON('EmbyAuth/Migration')` call return a
+ *   promise that never resolves, so a test can prove the page never issues a second request while one is pending.
  * @param {Array} [options.availableTargets] - the `AvailableTargets` field `getJSON('EmbyAuth/Migration')`
  *   resolves with. Defaults to an empty list.
  * @param {boolean | Error} [options.getConfigFails] - makes every `getPluginConfiguration` call reject.
@@ -66,7 +79,9 @@ function stubApiClient(options = {}) {
     config: { ...DEFAULT_CONFIG, ...(options.config ?? {}) },
     users: options.users ?? [],
     recordsUnavailable: options.recordsUnavailable ?? false,
-    task: options.task ?? null,
+    task: options.task !== undefined ? options.task : DEFAULT_TASK,
+    taskSequence: options.taskSequence ?? null,
+    migrationStatusHangs: options.migrationStatusHangs ?? false,
     availableTargets: options.availableTargets ?? [],
     getConfigFails: options.getConfigFails ?? false,
     getConfigFailsFromCall: options.getConfigFailsFromCall ?? null,
@@ -86,10 +101,20 @@ function stubApiClient(options = {}) {
         return Promise.reject(rejectionFor(api.migrationStatusFails, 'migration status failed'));
       }
 
+      if (api.migrationStatusHangs) {
+        return new Promise(() => {});
+      }
+
+      let task = api.task;
+      if (api.taskSequence) {
+        const index = Math.min(api.migrationStatusCalls - 1, api.taskSequence.length - 1);
+        task = api.taskSequence[index];
+      }
+
       return Promise.resolve({
         Users: api.users,
         RecordsUnavailable: api.recordsUnavailable,
-        Task: api.task,
+        Task: task,
         AvailableTargets: api.availableTargets,
       });
     },
@@ -147,19 +172,64 @@ function stubDashboard() {
 }
 
 /**
+ * Installs a controllable fake `setInterval`/`clearInterval` on the window, replacing jsdom's
+ * real timer-driven implementation.
+ *
+ * jsdom implements `window.setInterval` internally by chaining calls to Node's own bare
+ * `setTimeout` (see `jsdom/lib/jsdom/browser/Window.js`'s `timerInitializationSteps`), so
+ * `node:test`'s built-in `mock.timers` — which mocks the global `setInterval` function, not
+ * `setTimeout` — never intercepts it. Overriding the window's own methods directly, before the
+ * page's script runs, sidesteps that implementation detail entirely and leaves the real Node
+ * timers `flush()` depends on untouched.
+ *
+ * @param {import('jsdom').DOMWindow} window - the page's window, patched in place.
+ * @returns {{tick: (ms: number) => void}} `tick(ms)` synchronously runs every registered
+ *   interval's callback once per elapsed `delay`, in registration order.
+ */
+function installFakeInterval(window) {
+  const intervals = new Map();
+  let nextHandle = 1;
+
+  window.setInterval = function (handler, delay) {
+    const handle = nextHandle;
+    nextHandle += 1;
+    intervals.set(handle, { handler, delay, elapsed: 0 });
+    return handle;
+  };
+
+  window.clearInterval = function (handle) {
+    intervals.delete(handle);
+  };
+
+  return {
+    tick(ms) {
+      for (const [handle, interval] of intervals) {
+        interval.elapsed += ms;
+        while (interval.elapsed >= interval.delay && intervals.has(handle)) {
+          interval.elapsed -= interval.delay;
+          interval.handler();
+        }
+      }
+    },
+  };
+}
+
+/**
  * Builds a jsdom window over the shipping settings page, with `ApiClient` and
  * `Dashboard` stubs injected before the page's inline script parses.
  *
  * @param {object} [options] - forwarded to {@link stubApiClient}.
  * @returns {{window: import('jsdom').DOMWindow, document: Document, api: object,
- *   dashboard: object, close: () => void}} the constructed window, its document, the
- *   two stubs, and a `close()` that tears the window down, clearing any pending timer
- *   (Run migration now schedules a 3-second reload on success).
+ *   dashboard: object, interval: {tick: (ms: number) => void}, close: () => void}} the
+ *   constructed window, its document, the two stubs, the fake interval controller (see
+ *   {@link installFakeInterval}), and a `close()` that dispatches `pagehide` (stopping any
+ *   active migration poll through the page's own cleanup listener) before tearing the window down.
  */
 function buildDom(options = {}) {
   const html = fs.readFileSync(PAGE_PATH, 'utf8');
   const api = stubApiClient(options);
   const dashboard = stubDashboard();
+  let interval;
 
   const dom = new JSDOM(html, {
     url: 'http://localhost/web/configurationpage',
@@ -167,6 +237,7 @@ function buildDom(options = {}) {
     beforeParse(window) {
       window.ApiClient = api;
       window.Dashboard = dashboard;
+      interval = installFakeInterval(window);
     },
   });
 
@@ -175,7 +246,13 @@ function buildDom(options = {}) {
     document: dom.window.document,
     api,
     dashboard,
+    interval,
     close() {
+      const pageElement = dom.window.document.querySelector('#EmbyAuthConfigPage');
+      if (pageElement) {
+        pageElement.dispatchEvent(new dom.window.Event('pagehide'));
+      }
+
       dom.window.close();
     },
   };
@@ -299,11 +376,32 @@ function clickRunMigration(document, window) {
     .dispatchEvent(new window.Event('click', { bubbles: true, cancelable: true }));
 }
 
+/**
+ * Advances the page's fake poll interval by one 2-second tick and awaits the real macrotask
+ * boundaries the page's own promise chain still needs to settle.
+ *
+ * The fake interval (see {@link installFakeInterval}, returned from `buildDom` as `interval`)
+ * fires its callback synchronously; `flush()` lets the resolved `ApiClient.getJSON` promise
+ * actually run its `.then()` callbacks before an assertion reads the resulting DOM state.
+ *
+ * @param {{tick: (ms: number) => void}} interval - the fake interval controller `buildDom` returned.
+ * @param {number} [times] - how many 2-second poll intervals to advance. Defaults to 1.
+ * @returns {Promise<void>} resolves once every tick's promise chain has settled.
+ */
+async function tickPoll(interval, times = 1) {
+  for (let i = 0; i < times; i += 1) {
+    interval.tick(2000);
+    // eslint-disable-next-line no-await-in-loop
+    await flush();
+  }
+}
+
 module.exports = {
   buildDom,
   stubApiClient,
   stubDashboard,
   flush,
+  tickPoll,
   firePageshow,
   fireSubmit,
   clickSave,

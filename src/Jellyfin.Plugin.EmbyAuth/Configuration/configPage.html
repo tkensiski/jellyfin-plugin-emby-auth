@@ -98,12 +98,83 @@
                 }
             }
 
+            var lastObservedTaskEndTime = null;
+
+            var embyAuthMigrationPoll = {
+                timer: null,
+                inFlight: false,
+                pollsSinceStart: 0,
+                seenRunning: false,
+                baselineEndTime: null
+            };
+
+            function stopMigrationPolling() {
+                if (embyAuthMigrationPoll.timer !== null) {
+                    clearInterval(embyAuthMigrationPoll.timer);
+                    embyAuthMigrationPoll.timer = null;
+                }
+            }
+
+            function startMigrationPolling(options) {
+                stopMigrationPolling();
+                embyAuthMigrationPoll.pollsSinceStart = 0;
+                embyAuthMigrationPoll.seenRunning = Boolean(options && options.seenRunning);
+                embyAuthMigrationPoll.baselineEndTime = options && options.baselineEndTime !== undefined ? options.baselineEndTime : null;
+                embyAuthMigrationPoll.timer = setInterval(pollMigrationStatus, 2000);
+            }
+
+            // D-03's stop condition compares values instead of clocks: a page that stopped at the first Idle
+            // response after Run migration now would render the old list, because QueueIfNotRunning returns 204
+            // while the task is still Idle. Comparing the last end time observed before the run to the one the
+            // poll now sees closes that window without ever comparing a browser clock to a server timestamp.
+            function pollMigrationStatus() {
+                if (embyAuthMigrationPoll.inFlight) {
+                    return;
+                }
+
+                embyAuthMigrationPoll.inFlight = true;
+                loadEmbyAuthMigration().then(function (status) {
+                    embyAuthMigrationPoll.inFlight = false;
+                    if (!status || !status.Task) {
+                        stopMigrationPolling();
+                        return;
+                    }
+
+                    if (status.Task.State !== 'Idle') {
+                        embyAuthMigrationPoll.seenRunning = true;
+                        return;
+                    }
+
+                    var endTime = status.Task.LastEndTimeUtc || null;
+                    if (endTime !== null && endTime !== embyAuthMigrationPoll.baselineEndTime) {
+                        stopMigrationPolling();
+                        return;
+                    }
+
+                    if (embyAuthMigrationPoll.seenRunning) {
+                        return;
+                    }
+
+                    embyAuthMigrationPoll.pollsSinceStart += 1;
+                    if (embyAuthMigrationPoll.pollsSinceStart >= 10) {
+                        stopMigrationPolling();
+                        showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationSummary'), 'The migration did not start. See the Jellyfin log.', true);
+                    }
+                });
+            }
+
             function loadEmbyAuthMigration() {
                 var summary = document.querySelector('#EmbyAuthMigrationSummary');
                 var list = document.querySelector('#EmbyAuthMigrationUsers');
                 return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
+                    if (status.Task) {
+                        lastObservedTaskEndTime = status.Task.LastEndTimeUtc || null;
+                    }
+
                     if (status.RecordsUnavailable) {
                         showEmbyAuthMessage(summary, 'Jellyfin cannot read the record of passwords Emby verified. The readiness of each account is unknown until it can. See the Jellyfin log for detail.', true);
+                    } else if (!status.Task) {
+                        showEmbyAuthMessage(summary, 'Jellyfin has no scheduled task registered for the migration. See the Jellyfin log.', true);
                     } else if (status.Users.length === 0) {
                         showEmbyAuthMessage(summary, 'No users are on the Emby login method.', false);
                     } else {
@@ -124,6 +195,8 @@
                         item.textContent = user.Name + ': ' + migrationStateText(user.State);
                         list.appendChild(item);
                     });
+
+                    return status;
                 }).catch(function () {
                     showEmbyAuthMessage(summary, 'Jellyfin cannot read the migration status. See the Jellyfin log.', true);
                 });
@@ -146,6 +219,12 @@
                         document.querySelector('#AccountAccess').value = config.AccountAccess;
                         document.querySelector('.button-submit').disabled = false;
                         return loadEmbyAuthMigration();
+                    }).then(function (status) {
+                        // An administrator can start the task from Dashboard > Advanced > Scheduled Tasks with no
+                        // Run click. Follow it the same way, with no start-window cap, since it has already begun.
+                        if (status && status.Task && status.Task.State !== 'Idle' && embyAuthMigrationPoll.timer === null) {
+                            startMigrationPolling({ seenRunning: true, baselineEndTime: status.Task.LastEndTimeUtc || null });
+                        }
                     }).catch(function () {
                         showEmbyAuthMessage(status, 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.', true);
                         document.querySelector('.button-submit').disabled = true;
@@ -155,14 +234,21 @@
                     });
                 });
 
+            document.querySelector('#EmbyAuthConfigPage')
+                .addEventListener('pagehide', function () {
+                    stopMigrationPolling();
+                });
+
             document.querySelector('#EmbyAuthRunMigration')
                 .addEventListener('click', function () {
                     var summary = document.querySelector('#EmbyAuthMigrationSummary');
+                    var baselineEndTime = lastObservedTaskEndTime;
                     ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('EmbyAuth/Migration/Run') }).then(function () {
-                        showEmbyAuthMessage(summary, 'The migration runs. This list updates in a few seconds.', false);
-                        setTimeout(loadEmbyAuthMigration, 3000);
+                        showEmbyAuthMessage(summary, 'The migration runs. This list updates until it finishes.', false);
+                        startMigrationPolling({ seenRunning: false, baselineEndTime: baselineEndTime });
                     }).catch(function () {
                         showEmbyAuthMessage(summary, 'Jellyfin did not start the migration. See the Jellyfin log.', true);
+                        stopMigrationPolling();
                     });
                 });
 
