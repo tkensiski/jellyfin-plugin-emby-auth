@@ -18,9 +18,10 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Verified Password Records
 
-- [x] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure.
-- [x] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it.
-- [x] **FPRT-03**: When the fingerprint file cannot be read, the Migration section of the settings page tells the administrator and points to the Jellyfin log.
+- [x] **FPRT-01**: When the fingerprint file cannot be written, the record stays in memory until Jellyfin restarts; the log message, the XML doc, and `docs/how-it-works.md` say so, and a unit test covers the write failure. *(Describes the JSON file store. FPRT-04 replaces that store, so Phase 4 restates this guarantee for a durable per-record commit and updates the log message, the XML doc, and the docs to match.)*
+- [x] **FPRT-02**: When the fingerprint file cannot be read, a later record does not replace the file and erase the records in it. *(Describes the JSON file store, where one write rewrote every record. FPRT-04 removes the whole-file rewrite, so this failure mode stops being reachable rather than being handled.)*
+- [x] **FPRT-03**: When the fingerprint records cannot be read, the Migration section of the settings page tells the administrator and points to the Jellyfin log.
+- [ ] **FPRT-04**: The fingerprint records live in a plugin-owned SQLite database in the plugin data folder, not a JSON file. A read takes no lock of the plugin's own. A record commits durably as it is written, so no accepted login depends on a later write to survive a restart. On first start the plugin imports an existing fingerprint JSON file once, and a unit test covers the import. The plugin references the same `Microsoft.Data.Sqlite` version the target Jellyfin image ships and binds to Jellyfin's copy rather than shipping its own.
 
 ### Settings Page
 
@@ -52,8 +53,8 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Performance
 
-- [ ] **PERF-01**: A load test runs from a mise task against the Docker Compose stack with a separate pool of test accounts, and measures logins with a slow Emby server, concurrent first logins, user list cache expiry, fingerprint file writes, and the Jellyfin account save that every accepted login performs.
-- [ ] **PERF-02**: A pass-or-fail threshold is written for each measured item before the load test runs. Each of the four items (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock, and the per-login Jellyfin account save) is then fixed, or accepted in `docs/performance.md` with its measured number and the environment that number was measured in.
+- [ ] **PERF-01**: Concurrent logins that find an expired user list snapshot send one Emby user list request between them, not one each. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
+- [ ] **PERF-02**: Each known cost that this version does not remove is named in `docs/how-it-works.md` with the reason it stays: the Emby calls that run inside Jellyfin's login lock, and the Jellyfin account save that every accepted login performs. Neither has a fix the plugin can apply, so each is documented rather than measured.
 
 ### Release and Tooling
 
@@ -107,6 +108,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FPRT-01 | Phase 3 | Complete |
 | FPRT-02 | Phase 2 | Complete |
 | FPRT-03 | Phase 3 | Complete |
+| FPRT-04 | Phase 4 | Pending |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 3 | Complete |
@@ -137,10 +139,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 **Coverage:**
 
-- v1 requirements: 36 total
-- Mapped to phases: 36
+- v1 requirements: 37 total
+- Mapped to phases: 37
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-09-17*
-*Last updated: 2026-09-20 — AUTH-05 limited to a token the plugin can read, and PERF-01 and PERF-02 extended to a fourth measured item with a threshold written before the run (Phase 4 discussion)*
+*Last updated: 2026-09-20 — FPRT-04 replaces the fingerprint JSON file with a plugin-owned SQLite database, and PERF-01 and PERF-02 drop the load test. The two costs the load test would have measured inside the plugin are now fixed outright: the user list stampede gains a single-flight guard (PERF-01), and the fingerprint write stops holding a lock across disk I/O (FPRT-04). The two it would have measured outside the plugin — the Emby calls inside Jellyfin's login lock, and Jellyfin's own per-login account save — have no fix the plugin can apply, so PERF-02 documents them instead. Building a k6 and toxiproxy rig to measure costs whose fixes were already decided was more work than the fixes (Phase 4 planning)*

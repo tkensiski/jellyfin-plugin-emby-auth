@@ -1,5 +1,7 @@
 # Phase 4: Emby Traffic Under Load and Failure - Research
 
+> **⚠ Scope changed after this document was written (2026-09-20, planning).** The load-test harness is cut. Everything in this file about k6, toxiproxy, the account pool, the four numeric thresholds, and the derived bottleneck-4 metric describes work that is **no longer in scope** — keep it for the reasoning, do not plan from it. The phase now leads with replacing the fingerprint JSON file with a plugin-owned SQLite database. **Read `## Addendum: The SQLite Fingerprint Store` at the end of this file first** — it is the current research for the phase. Still in scope and unchanged below: the AUTH-05 sign-out reorder (Finding 3), the TEST-05 unit-half finding (Pitfall 1), and the TEST-06 finding that `UpdateConfiguration` validates only the migration target (Finding 2).
+
 **Researched:** 2026-09-20
 **Domain:** Jellyfin 12.1 authentication plugin (C#/.NET 10) — Emby session hygiene, concurrency correctness, settings-failure e2e coverage, and a k6/toxiproxy load-test harness with four measured bottlenecks
 **Confidence:** HIGH for in-repo code claims (all files read directly this session) and for the two load-test tool pins (verified live against GitHub/GHCR this session); MEDIUM for the numeric pass/fail thresholds, which are a planning decision this research informs but does not set; LOW/ASSUMED for the Jellyfin-core behavior claims that this session did not itself re-verify against Jellyfin source (they were verified with file:line quotes during the `/gsd-discuss-phase` session and are recorded verbatim in `04-CONTEXT.md`)
@@ -607,3 +609,61 @@ This needs no Docker, no Emby, and no Jellyfin container — only a real temp fi
 
 **Research date:** 2026-09-20
 **Valid until:** 30 days for the repo-code findings (stable unless Phases 1-3's code changes further); re-verify the k6/toxiproxy version pins at plan/implementation time regardless of this window, per this repo's own "look up the current stable version" rule
+
+---
+
+## Addendum: The SQLite Fingerprint Store
+
+**Researched:** 2026-09-20, planning session (after the scope change above).
+**Confidence:** HIGH throughout — every version below was read out of the pinned Jellyfin image this session, and every pitfall cites a public failure report or Jellyfin's own source.
+
+### Why the store changes
+
+`EmbyVerifiedPasswords` caches the whole record set in memory (`EmbyVerifiedPasswords.cs:118-121`), so `Matches` does no disk read in the steady state — it is a dictionary lookup. But `Matches` takes the same `_lock` (`:86`) that `Record` holds across `File.WriteAllText` + `File.Move` (`:59-68`). Readers therefore block on the writer's disk I/O. `EmbyLoginMethodUsers.cs:103` calls `Matches` **once per user**, so the migration status page does N lookups, each able to queue behind a login's file rewrite.
+
+The storage format is not the cause; holding a lock across I/O is. A SQLite commit is also I/O, so swapping the engine while keeping the write under a shared lock would change the storage and keep the bottleneck. What removes the contention is that readers stop taking a lock at all.
+
+The stronger reason is durability, not speed. The current design documents three real failure modes in its own comments: a record is **lost** when the file cannot be read (`:37`); a read failure makes `Matches` return `false` for **every** user, so the migration page shows everyone unverified (`:73`, `:101`); and a record held only in memory is **lost if Jellyfin restarts** before the next successful write (`:145`). A per-row durable commit removes all three.
+
+### Prior art — this is a sanctioned pattern
+
+`jellyfin/jellyfin-plugin-playbackreporting`, a first-party plugin in the Jellyfin org already targeting `net10.0`, keeps its own SQLite database with its own tables (`PlaybackActivity`, `UserList`) behind an `ActivityRepository`. It creates tables when absent, validates the schema at startup, and wraps writes in transactions. A plugin owning a SQLite file is normal and supported.
+
+**Plugins must not add tables to Jellyfin's own schema.** Jellyfin's EF migrations live in its per-provider assemblies and are generated with `dotnet ef migrations add … --project Jellyfin.Database.Providers.SqLite`; a plugin cannot contribute one. Jellyfin's plugin-database feature ([PR #14171](https://github.com/jellyfin/jellyfin/pull/14171), the Pgsql plugin) is the unrelated case of a plugin supplying a backend *for* Jellyfin. The correct shape here is a separate plugin-owned database file under `BasePlugin.DataFolderPath`, which `BasePluginOfT.cs` derives as `Path.Combine(ApplicationPaths.PluginsPath, <assembly name>)`.
+
+### Verified versions — read from the pinned image this session
+
+From `/jellyfin/jellyfin.deps.json` inside `jellyfin/jellyfin:12.1.20260915-010956`:
+
+| Package | Version |
+|---|---|
+| `Microsoft.Data.Sqlite.Core` | **10.0.11** |
+| `Microsoft.EntityFrameworkCore.Sqlite` | 10.0.11 |
+| `SQLitePCLRaw.bundle_e_sqlite3` / `.core` / `.lib.e_sqlite3` / `.provider.e_sqlite3` | 2.1.12 |
+| Runtime (`jellyfin.runtimeconfig.json`) | `net10.0`, .NET 10.0.12 |
+
+`libe_sqlite3.so`, `Microsoft.Data.Sqlite.dll`, and the `SQLitePCLRaw.*` assemblies are all present in `/jellyfin/`.
+
+`tests/Jellyfin.Plugin.EmbyAuth.Tests.csproj:10` already pins `Microsoft.EntityFrameworkCore.Sqlite` **10.0.11** — the same version the host ships.
+
+### Pitfalls, each with its failure signature
+
+1. **Reference the host's version exactly, or the plugin will not load.** A plugin (`NotifySync`) shipped broken on Jellyfin 10.11 by bumping `Microsoft.Data.Sqlite` 9.0.2 → 9.0.17 while using `PrivateAssets=All` + `CopyLocalLockFileAssemblies=false`. It bound to the host's copy at runtime, and .NET refuses a host version **lower** than the compiled reference: `FileLoadException` on first SQLite use. Pin **10.0.11** and tie that pin to the `jellyfin/jellyfin` image tag — this makes the `CLAUDE.md` rule "a Jellyfin version bump changes three pins together" a **fourth** pin.
+2. **Do not bundle the native library.** Referencing SQLite without the host's native binary beside the plugin DLL gives `DllNotFoundException: Unable to load DLL 'e_sqlite3'` ([dotnet/efcore#34308](https://github.com/dotnet/efcore/issues/34308)). Binding to Jellyfin's copy avoids it. The csproj already has the idiom: `Jellyfin.Controller` and `Jellyfin.Model` are referenced with `<ExcludeAssets>runtime</ExcludeAssets>` (`Jellyfin.Plugin.EmbyAuth.csproj:10-15`); the SQLite reference takes the same treatment.
+3. **Never enable shared cache.** Jellyfin's own `SqliteDatabaseProvider` carries a comment warning that `sqlite3_enable_shared_cache` is process-global, so *a plugin* enabling it makes Jellyfin's own connections share a cache, and the contention then surfaces as `SQLITE_LOCKED`, which `busy_timeout` does not cover. Jellyfin explicitly anticipates plugins using SQLite in-process.
+4. **Clear pools on unload (lower severity).** `Microsoft.Data.Sqlite` can block `AssemblyLoadContext` unloading ([dotnet/efcore#27498](https://github.com/dotnet/efcore/issues/27498)), and Jellyfin loads plugins into collectible contexts. Jellyfin's own provider calls `SqliteConnection.ClearAllPools()` at shutdown; `OnUninstalling` should do the same.
+
+### Open items for the planner
+
+- **WAL mode.** WAL gives concurrent readers that do not block on the writer, which is the point of the change. Confirm it is set on the plugin's own connection string and that it does not disturb Jellyfin's database — they are separate files, so it should not, but this is worth an explicit check rather than an assumption.
+- **`SQLitePCL.Batteries.Init()`.** The efcore#34308 thread notes provider initialisation is required before first use. Jellyfin already initialises SQLite for itself in the same process, so this is likely unnecessary — verify at implementation time rather than assuming either way.
+- **Import trigger and idempotence.** The import must run once and not re-run. Decide what marks it done — the absence of the JSON file, a row in the database, or a config flag — and make the choice survive a partially completed import.
+- **`FakeUserManager` is unaffected.** The per-login account save is `userManager.UpdateUserAsync` (`EmbyAuthenticationProvider.cs:197`, `:233`), which is Jellyfin's own implementation; `FakeUserManager.UpdateUserAsync` only records the call (`TestDoubles.cs:162-167`). `SqliteJellyfinDbContextFactory` (`TestDoubles.cs:329`) backs `JellyfinDbContext` for `LoginMethodMove.cs:41`, a different code path. Neither is a seam for the fingerprint store; the new store needs its own test double or a temp-file database.
+
+### Sources
+
+- `/jellyfin/jellyfin.deps.json` and `/jellyfin/jellyfin.runtimeconfig.json`, read from `jellyfin/jellyfin:12.1.20260915-010956` — this session
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs`, `Jellyfin.Plugin.EmbyAuth.csproj`, `PluginServiceRegistrator.cs`, `EmbyAuthPlugin.cs`, `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs` — read this session
+- `jellyfin/jellyfin-plugin-playbackreporting` — `ActivityRepository` data-storage design; csproj confirmed `net10.0`
+- `jellyfin/jellyfin` — `MediaBrowser.Common/Plugins/BasePluginOfT.cs` (`DataFolderPath` derivation), `SqliteDatabaseProvider.cs` (shared-cache warning, `ClearAllPools`), `ServiceCollectionExtensions.cs` (plugin database providers), PR #14171
+- `dotnet/efcore` issues [#34308](https://github.com/dotnet/efcore/issues/34308) and [#27498](https://github.com/dotnet/efcore/issues/27498); the `NotifySync` v5.7.13.0 hotfix commit

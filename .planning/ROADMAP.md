@@ -127,20 +127,24 @@ Plans:
 
 **UI hint**: yes
 
-### Phase 4: Emby Traffic Under Load and Failure
+### Phase 4: The Fingerprint Store, and Emby Traffic Under Failure
 
-**Goal**: The plugin behaves predictably toward Emby when Emby is slow, when logins arrive at the same time, and when the settings are invalid, and each known bottleneck has measured numbers. The load test measures the final account creation code from Phase 1 and the final fingerprint code from Phases 2 and 3.
+**Goal**: The fingerprint records move from a JSON file to a plugin-owned SQLite database, so a read takes no lock and a record survives a restart as soon as it is written. On that store, the plugin then behaves predictably toward Emby when logins arrive at the same time and when the settings are invalid, and the one remaining contention point inside the plugin — the user list refresh — sends one request where it used to send one per login.
 **Depends on**: Phase 3
-**Requirements**: AUTH-05, TEST-05, TEST-06, PERF-01, PERF-02
+**Requirements**: FPRT-04, AUTH-05, TEST-05, TEST-06, PERF-01, PERF-02
 **Success Criteria** (what must be TRUE):
 
-  1. Whenever the plugin can read an access token in Emby's response, it sends `POST /Sessions/Logout`, also for a login response that has no user name. A unit test shows the sign-out request for that response. A success response whose body the plugin cannot read hides its token, so one Emby session can stay open; `docs/how-it-works.md` states that limit.
-  2. A test sends concurrent first logins through Jellyfin. Each Emby user gets exactly one account, and no login returns HTTP 500.
-  3. An e2e test saves invalid settings on a running server. Logins on the Emby login method are then refused, and the Jellyfin log names the problem at Error level.
-  4. A mise task runs the load test against the Docker Compose stack with a separate pool of test accounts, and reports numbers for logins with a slow Emby server, concurrent first logins, user list cache expiry, fingerprint file writes, and the Jellyfin account save that every accepted login performs.
-  5. The plan states a pass-or-fail threshold for each measured item before the load test runs. Each of the four items (Emby calls inside the login lock, duplicate user list requests at cache expiry, fingerprint writes under the lock, and the per-login Jellyfin account save) is then fixed, or accepted in `docs/performance.md` with its measured number and the environment that number was measured in.
+  1. The fingerprint records live in a SQLite database in the plugin data folder. `Matches` and `RecordsAvailable` take no lock of the plugin's own, and a record commits durably as it is written. The plugin references the `Microsoft.Data.Sqlite` version the pinned Jellyfin image ships and binds to Jellyfin's copy instead of shipping its own.
+  2. On first start with an existing fingerprint JSON file, the plugin imports every record once, and a later start does not import again. A unit test covers the import, and an e2e test shows a user who was ready to move before the upgrade still ready after it.
+  3. Whenever the plugin can read an access token in Emby's response, it sends `POST /Sessions/Logout`, also for a login response that has no user name. A unit test shows the sign-out request for that response. A success response whose body the plugin cannot read hides its token, so one Emby session can stay open; `docs/how-it-works.md` states that limit.
+  4. A test sends concurrent first logins through Jellyfin. Each Emby user gets exactly one account, and no login returns HTTP 500.
+  5. An e2e test saves invalid settings on a running server. Logins on the Emby login method are then refused, and the Jellyfin log names the problem at Error level.
+  6. Concurrent logins that find an expired user list snapshot send one Emby user list request between them. A unit test drives concurrent readers against an expired snapshot and counts the outgoing requests.
+  7. `docs/how-it-works.md` names the two costs this version does not remove — the Emby calls that run inside Jellyfin's login lock, and Jellyfin's own account save on every accepted login — and says why neither has a fix the plugin can apply.
 
 **Plans**: TBD
+
+> **Scope change, 2026-09-20 (planning).** This phase previously promised a k6 and toxiproxy load test with a written pass-or-fail threshold per item (old criteria 4 and 5, PERF-01 and PERF-02). It was cut. Of the four costs it would have measured, the two inside the plugin now get fixed outright — the user list stampede by a single-flight guard, and the fingerprint write by leaving the lock entirely (criteria 1 and 6) — and building the rig to justify those fixes was more work than the fixes. The other two lie outside the plugin: the Emby calls inside Jellyfin's login lock have no fix while the plugin must call Emby, and the per-login account save is Jellyfin's own `UpdateUserAsync`. Both are documented instead (criterion 7). The store swap leads the phase so the concurrency and settings tests are written once, against SQLite, rather than written against the file store and then rewritten.
 
 ### Phase 5: Public Repository
 
