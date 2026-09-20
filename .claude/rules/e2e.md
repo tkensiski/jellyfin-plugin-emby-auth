@@ -29,4 +29,4 @@ paths:
 - Jellyfin 12.1 starts a setup server first. Wait for `/health` to return `Healthy`, not for `/System/Info/Public`. Emby has no `/health`.
 - Emby and Jellyfin use the same API style. The helpers send `Authorization: MediaBrowser Client=..., Token=...` to both servers.
 - Quick Connect: `POST /QuickConnect/Initiate` (anonymous), `POST /QuickConnect/Authorize?code=&userId=` (admin token), then `POST /Users/AuthenticateWithQuickConnect` with the secret.
-- The migration task has the key `EmbyAuthMoveUsersToDefault`. Start it with `POST /ScheduledTasks/Running/{id}` (`run_migration_task`).
+- The migration task has the key `EmbyAuthMigration`. Start it with `POST /ScheduledTasks/Running/{id}` (`run_migration_task`).

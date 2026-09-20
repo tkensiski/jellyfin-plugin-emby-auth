@@ -19,7 +19,7 @@ Line references are to Jellyfin v12.1 (`Jellyfin.Server.Implementations/Users/Us
 - Quick Connect (`SessionManager.AuthenticateDirect`) publishes the same event without a password check. A user moves only if `EmbyVerifiedPasswords` matches the saved hash.
 - `EventManager` logs and ignores an exception from an event consumer. If the move fails, the login still succeeds.
 - `LoginMethodMove.MoveAsync` changes one column with `ExecuteUpdateAsync`, only while the user is on the Emby login method and still has the verified hash. A full `UpdateUserAsync` there could overwrite concurrent changes, such as an admin disabling the user.
-- Jellyfin discovers scheduled tasks with `Assembly.GetExportedTypes()` (`ApplicationHost`). So `MoveEmbyUsersToDefaultTask` and every type in its constructor must be public. Other plugin types stay internal.
+- Jellyfin discovers scheduled tasks with `Assembly.GetExportedTypes()` (`ApplicationHost`). So `EmbyMigrationTask` and every type in its constructor must be public. Other plugin types stay internal.
 - `UserManager.ChangePassword` calls the assigned login method, then saves the user. An empty password means a reset.
 
 ## Verified passwords

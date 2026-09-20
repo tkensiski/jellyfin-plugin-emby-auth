@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.EmbyAuth.Api;
+using Jellyfin.Plugin.EmbyAuth.Configuration;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -57,8 +58,12 @@ public sealed class EmbyAuthControllerTests : IDisposable
     private EmbyAuthController CreateController() =>
         new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager, _userManager);
 
-    private MoveEmbyUsersToDefaultTask CreateMigrationTask() =>
-        new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), NullLogger<MoveEmbyUsersToDefaultTask>.Instance);
+    private EmbyMigrationTask CreateMigrationTask() =>
+        new(
+            _dbContextFactory,
+            new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance),
+            () => new PluginConfiguration(),
+            NullLogger<EmbyMigrationTask>.Instance);
 
     [Fact]
     public async Task GetMigrationStatus_ReportsRecordsUnavailable_WhenTheFingerprintFileCannotBeRead()
@@ -184,7 +189,7 @@ public sealed class EmbyAuthControllerTests : IDisposable
         var result = controller.RunMigration();
 
         Assert.IsType<NoContentResult>(result);
-        Assert.Equal([typeof(MoveEmbyUsersToDefaultTask)], _taskManager.QueuedTypes);
+        Assert.Equal([typeof(EmbyMigrationTask)], _taskManager.QueuedTypes);
     }
 
     private sealed class OtherScheduledTask : IScheduledTask

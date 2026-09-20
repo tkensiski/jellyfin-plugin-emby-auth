@@ -27,8 +27,7 @@ public sealed class TypeVisibilityTests
         // A constructor parameter of the migration task.
         "Jellyfin.Plugin.EmbyAuth.EmbyVerifiedPasswords",
 
-        // Jellyfin discovers scheduled tasks by exported type. Renamed EmbyMigrationTask by plan 04.
-        "Jellyfin.Plugin.EmbyAuth.MoveEmbyUsersToDefaultTask",
+        // Jellyfin discovers scheduled tasks by exported type. Renamed from MoveEmbyUsersToDefaultTask by plan 04.
         "Jellyfin.Plugin.EmbyAuth.EmbyMigrationTask",
 
         // Jellyfin serializes the settings with XmlSerializer, and the settings page reads them.

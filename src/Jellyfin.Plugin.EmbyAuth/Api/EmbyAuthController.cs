@@ -48,7 +48,7 @@ public sealed class EmbyAuthController(
         await using (dbContext.ConfigureAwait(false))
         {
             var users = await EmbyLoginMethodUsers.ListAsync(dbContext, verifiedPasswords, cancellationToken).ConfigureAwait(false);
-            var taskWorker = taskManager.ScheduledTasks.FirstOrDefault(worker => worker.ScheduledTask is MoveEmbyUsersToDefaultTask);
+            var taskWorker = taskManager.ScheduledTasks.FirstOrDefault(worker => worker.ScheduledTask is EmbyMigrationTask);
             var task = taskWorker is null
                 ? null
                 : new MigrationTaskInfo(taskWorker.State, taskWorker.CurrentProgress, taskWorker.LastExecutionResult?.EndTimeUtc, taskWorker.LastExecutionResult?.Status);
@@ -65,14 +65,14 @@ public sealed class EmbyAuthController(
     }
 
     /// <summary>
-    /// Starts the migration task "Move Emby users to the Default login method", unless it already runs.
+    /// Starts the migration task "Finish the Emby migration", unless it already runs.
     /// </summary>
     /// <returns>No content.</returns>
     [HttpPost("Migration/Run")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     public ActionResult RunMigration()
     {
-        taskManager.QueueIfNotRunning<MoveEmbyUsersToDefaultTask>();
+        taskManager.QueueIfNotRunning<EmbyMigrationTask>();
         return NoContent();
     }
 }

@@ -162,9 +162,9 @@ set_plugin_config() {
 run_migration_task() {
 	local token="$1"
 	local task_id before after state
-	task_id="$(api GET "$JELLYFIN/ScheduledTasks" "$token" | jq -r '.[] | select(.Key == "EmbyAuthMoveUsersToDefault") | .Id')"
+	task_id="$(api GET "$JELLYFIN/ScheduledTasks" "$token" | jq -r '.[] | select(.Key == "EmbyAuthMigration") | .Id')"
 	if [[ -z "$task_id" ]]; then
-		echo "Jellyfin has no scheduled task with the key EmbyAuthMoveUsersToDefault." >&2
+		echo "Jellyfin has no scheduled task with the key EmbyAuthMigration." >&2
 		return 1
 	fi
 

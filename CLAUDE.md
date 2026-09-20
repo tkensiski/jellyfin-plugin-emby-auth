@@ -30,7 +30,7 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
   - `EmbyVerifiedPasswords.cs` — the file of fingerprints of password hashes that Emby verified.
   - `LoginMethodMove.cs` — the single-column move, and resolving the configured migration target.
   - `MoveAfterLogin.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
-  - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
+  - `EmbyMigrationTask.cs` — the migration task.
   - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
   - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
