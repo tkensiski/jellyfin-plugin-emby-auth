@@ -1,312 +1,249 @@
+---
+last_mapped_commit: fb0fd999638d88fabb37bd9d449c23226a5b2f8b
+---
+
 # Codebase Structure
 
-**Analysis Date:** 2026-09-16
+**Analysis Date:** 2026-09-20
 
-**Scope:** This document describes commit `ecee1ed` on `main`.
+**Scope:** Full repository at commit fb0fd99 (branch: gsd/phase-04-emby-traffic-under-load-and-failure)
 
 ## Directory Layout
 
 ```
 jellyfin-plugin-emby-auth/
-├── src/Jellyfin.Plugin.EmbyAuth/               # Plugin project
+├── src/Jellyfin.Plugin.EmbyAuth/               # Plugin project (.NET 10 C#)
 │   ├── Api/
-│   │   └── EmbyAuthController.cs               # Admin-only migration API; MigrationStatus and MigrationUser records
+│   │   └── EmbyAuthController.cs               # Admin-only migration API (GET/POST)
 │   ├── Configuration/
-│   │   ├── PluginConfiguration.cs              # Settings model, MigrationMode and AccountAccess enums
-│   │   └── configPage.html                     # Settings page with the Migration section (embedded resource)
-│   ├── AccountAccessPolicy.cs                  # Applies the AccountAccess setting to accounts
-│   ├── DefaultLoginMethod.cs                   # Single-column move to the Default login method
-│   ├── EmbyAuthenticationProvider.cs           # The Emby login method
-│   ├── EmbyAuthPlugin.cs                       # Plugin ID, name, Instance, settings page
-│   ├── EmbyAuthSettings.cs                     # Settings validation
-│   ├── EmbyClient.cs                           # All requests to Emby; EmbyLogin and EmbyUser records
-│   ├── EmbyLoginMethodUsers.cs                 # Users on the Emby login method with readiness; EmbyLoginMethodUser record
+│   │   ├── PluginConfiguration.cs              # Settings model; MigrationMode, AccountAccess enums
+│   │   └── configPage.html                     # Settings page (embedded resource)
+│   ├── AccountAccessPolicy.cs                  # Applies remote access and library access settings
+│   ├── EmbyAuthenticationProvider.cs           # IAuthenticationProvider (the login method)
+│   ├── EmbyAuthPlugin.cs                       # BasePlugin<PluginConfiguration>; plugin ID, name, lifecycle
+│   ├── EmbyAuthSettings.cs                     # Validates PluginConfiguration into a typed record
+│   ├── EmbyClient.cs                           # Only code that contacts Emby; EmbyLogin, EmbyUser records
+│   ├── EmbyLoginMethodUsers.cs                 # Lists users on Emby method with migration state
+│   ├── EmbyMigrationTask.cs                    # IScheduledTask (batch migration)
 │   ├── EmbyUserDirectory.cs                    # Cached Emby user list; EmbyUserStatus enum
-│   ├── EmbyVerifiedPasswords.cs                # Fingerprint file of hashes that Emby verified
-│   ├── Jellyfin.Plugin.EmbyAuth.csproj         # Package pins, AnalysisMode, InternalsVisibleTo, embedded page
-│   ├── LoginDecision.cs                        # Pure account decision; JellyfinAccount and LoginAction
-│   ├── MoveEmbyUsersToDefaultTask.cs           # Migration scheduled task
-│   ├── MoveToDefaultLoginMethod.cs             # Event consumer: move after login
-│   └── PluginServiceRegistrator.cs             # DI registration
+│   ├── EmbyVerifiedPasswords.cs                # Persistent fingerprint file of verified password hashes
+│   ├── LoginDecision.cs                        # Pure function deciding Deny/UseAccount/CreateAccount
+│   ├── LoginMethodMove.cs                      # Conditional single-column database move; MoveTarget enum
+│   ├── MigrationTargetValidation.cs            # Validates move targets against enabled providers
+│   ├── MoveAfterLogin.cs                       # IEventConsumer (move after login event)
+│   ├── PluginServiceRegistrator.cs             # Wires DI container
+│   └── Jellyfin.Plugin.EmbyAuth.csproj         # Package pins, AnalysisMode, embedded page
 │
 ├── tests/
-│   ├── Jellyfin.Plugin.EmbyAuth.Tests/         # Unit tests (xUnit v3)
-│   │   ├── AccountAccessPolicyTests.cs         # AccountAccess on new and existing accounts
-│   │   ├── EmbyAuthSettingsTests.cs            # Settings validation and defaults
-│   │   ├── EmbyClientTests.cs                  # Login, sign-out, user list, timeouts, charset, no secrets in logs
-│   │   ├── EmbyUserDirectoryTests.cs           # Cache duration, settings change, retry delay
-│   │   ├── EmbyVerifiedPasswordsTests.cs       # Records, restart, missing/unreadable file, concurrency
-│   │   ├── Jellyfin.Plugin.EmbyAuth.Tests.csproj # OutputType Exe, xunit.v3 and Jellyfin.Controller pins
-│   │   ├── LoginDecisionTests.cs               # LoginDecision.Decide
-│   │   └── TestDoubles.cs                      # StubHttpMessageHandler, StubHttpClientFactory, ManualTimeProvider, CapturingLogger<T>
+│   ├── Jellyfin.Plugin.EmbyAuth.Tests/         # Unit tests (xUnit v3, .NET 10)
+│   │   ├── AccountAccessPolicyTests.cs
+│   │   ├── EmbyAuthControllerTests.cs          # Migration API (GET status, POST run)
+│   │   ├── EmbyAuthenticationProviderTests.cs  # Login method behavior
+│   │   ├── EmbyAuthPluginTests.cs              # Plugin lifecycle
+│   │   ├── EmbyAuthSettingsTests.cs            # Settings validation
+│   │   ├── EmbyClientTests.cs                  # Emby HTTP calls
+│   │   ├── EmbyLoginMethodUsersTests.cs        # User listing with readiness
+│   │   ├── EmbyMigrationTaskTests.cs           # Migration task execution
+│   │   ├── EmbyUserDirectoryTests.cs           # Caching behavior
+│   │   ├── EmbyVerifiedPasswordsTests.cs       # Fingerprint persistence
+│   │   ├── Jellyfin.Plugin.EmbyAuth.Tests.csproj
+│   │   ├── LoginDecisionTests.cs               # Account decision logic
+│   │   ├── LoginMethodMoveTests.cs             # Database move operations
+│   │   ├── MigrationTargetValidationTests.cs   # Target validation
+│   │   ├── MoveAfterLoginTests.cs              # Event consumer
+│   │   ├── TestDoubles.cs                      # HTTP stub, time provider, logger stub
+│   │   └── TypeVisibilityTests.cs              # Enforces internal types
+│   ├── js/                                     # JavaScript tests (node:test + jsdom)
+│   │   ├── configPage.test.js                  # Settings page tests
+│   │   ├── testHelpers.js                      # Dashboard/ApiClient stubs, DOM helpers
+│   │   └── package.json
 │   └── scripts/
-│       └── package.bats                        # bats tests for scripts/package.sh
+│       └── package.bats                        # Tests for scripts/package.sh
 │
-├── e2e/                                        # End-to-end tests (bats, Docker)
-│   ├── setup_suite.bash                        # Publishes the plugin, starts containers, configures plugin, creates Emby users
-│   ├── helpers.bash                            # Ports, API, readiness, user, plugin-config, and proxy-log helpers
-│   ├── 10-login-checks.bats                    # Settings page, first login, password checks, user list checks, sign-out
-│   ├── 20-accounts.bats                        # Pre-created accounts, remote access, administrators, Quick Connect, password set/reset
-│   ├── 30-migration-modes.bats                 # KeepEmbyInCharge, JellyfinPasswordFirst, migration task, NoLibraries, JellyfinDefaults, migration API
-│   ├── 40-emby-outage.bats                     # Logins while Emby is unreachable
-│   ├── 90-jellyfin-log.bats                    # Runs last: no test password or API key in the Jellyfin log
-│   ├── compose.yaml                            # Emby, emby-proxy (nginx), Jellyfin; host ports from EMBY_PORT and JELLYFIN_PORT
-│   └── emby-proxy.conf                         # nginx config that logs each request body sent to Emby
+├── e2e/                                        # End-to-end tests (bats + Docker)
+│   ├── compose.yaml                            # Emby + Jellyfin containers
+│   ├── helpers.bash                            # Test utilities (API, readiness, proxy)
+│   ├── setup_suite.bash                        # Build, publish, start containers, configure
+│   ├── 10-login-checks.bats                    # Basic login flows
+│   ├── 20-accounts.bats                        # Account behavior
+│   ├── 30-migration-modes.bats                 # Both migration modes
+│   └── proxy/                                  # Logging proxy for Emby requests
+│
+├── docs/                                       # Documentation
+│   ├── how-it-works.md                         # Login flow, migration, verified passwords
+│   ├── settings.md                             # All settings and their effects
+│   ├── migration.md                            # Migration behavior and states
+│   ├── development.md                          # Jellyfin setup, build, test, release
+│   └── project-management.md                   # Issue triage, release process
 │
 ├── scripts/
-│   ├── dev-env.sh                              # Local demo environment: up | status | down
-│   └── package.sh                              # Release zip and manifest: build | check-tag TAG
+│   ├── package.sh                              # Build, test, create zip, manifest
+│   └── dev-env.sh                              # Demo environment (Emby + Jellyfin)
 │
-├── docs/                                       # User and developer documentation
-│   ├── how-it-works.md                         # Login steps, password changes, security notes, limits
-│   ├── settings.md                             # Settings, settings API, migration behavior, account access
-│   ├── migration.md                            # Migration procedure, migration API, Emby shutdown
-│   ├── development.md                          # Commands, e2e tests, demo, releases
-│   └── images/
-│       └── settings-page.png                   # README screenshot of the settings page
-│
+├── README.md                                   # Installation, configuration, quick start
+├── Directory.Build.props                       # Package version, target framework
 ├── .github/workflows/
-│   ├── ci.yml                                  # Jobs lint, test, e2e (one mise task each) and ci-success
-│   └── release.yml                             # On a v* tag: check tag, test, package, create GitHub release
-│
-├── .claude/rules/
-│   ├── plugin.md                               # Jellyfin and Emby behavior the plugin depends on (src/, tests/)
-│   └── e2e.md                                  # e2e layout, conventions, server facts (e2e/)
-│
-├── .planning/codebase/                         # These codebase map documents
-├── artifacts/                                  # Build output (gitignored)
-├── .actrc                                      # act runner image for local CI runs
-├── .gitignore                                  # bin/, obj/, artifacts/, TestResults/
-├── .mise.toml                                  # Pinned tools, env, and the lint, test, package, e2e tasks
-├── .pre-commit-config.yaml                     # Hooks that run mise run lint and mise run test
-├── CLAUDE.md                                   # Commands, CI and release, layout, rules
-├── Directory.Build.props                       # Version, net10.0, Nullable, TreatWarningsAsErrors
-├── global.json                                 # Test runner: Microsoft.Testing.Platform
-├── Jellyfin.Plugin.EmbyAuth.slnx               # Solution (XML): plugin and test projects
-├── LICENSE                                     # GPL-3.0
-└── README.md                                   # Short introduction: install, configure, migrate, links to docs/
+│   ├── ci.yml                                  # Build, lint, test, e2e, release
+│   └── ...
+├── .pre-commit-config.yaml                     # Linting hooks (eslint, prettier, shfmt, etc.)
+└── .mise.toml                                  # Tool versions (dotnet, node, bats, etc.)
 ```
 
 ## Directory Purposes
 
-**src/Jellyfin.Plugin.EmbyAuth/**
-- Purpose: The plugin assembly
-- Contains: Namespace `Jellyfin.Plugin.EmbyAuth` for all files in the project root, `Jellyfin.Plugin.EmbyAuth.Configuration` for the settings model, and `Jellyfin.Plugin.EmbyAuth.Api` for the controller (`Api/EmbyAuthController.cs:14`)
-- Key files: `EmbyAuthenticationProvider.cs` (login method), `EmbyClient.cs` (only Emby contact), `EmbyLoginMethodUsers.cs` (list shared by the task and the API), `PluginServiceRegistrator.cs` (DI)
+**`src/Jellyfin.Plugin.EmbyAuth/`:**
+- Purpose: Plugin source code
+- Contains: C# classes, settings page HTML, project configuration
+- Key files: Entry points (`EmbyAuthenticationProvider`, `MoveAfterLogin`, `EmbyMigrationTask`), core logic (`LoginDecision`, `AccountAccessPolicy`), state (`EmbyUserDirectory`, `EmbyVerifiedPasswords`), external integration (`EmbyClient`, `LoginMethodMove`)
 
-**src/Jellyfin.Plugin.EmbyAuth/Api/**
-- Purpose: The plugin's HTTP API
-- Contains: `EmbyAuthController` with `GET EmbyAuth/Migration` and `POST EmbyAuth/Migration/Run`, both restricted to administrators by `[Authorize(Policy = Policies.RequiresElevation)]` (`EmbyAuthController.cs:23-24, 37, 53`)
+**`tests/Jellyfin.Plugin.EmbyAuth.Tests/`:**
+- Purpose: Unit tests
+- Contains: xUnit v3 tests, test doubles (HTTP stub, time provider, logger)
+- Key files: `TestDoubles.cs` (shared test infrastructure), individual component tests
+- Run: `mise run test`
 
-**src/Jellyfin.Plugin.EmbyAuth/Configuration/**
-- Purpose: Settings model and settings page
-- Contains: `PluginConfiguration.cs` and `configPage.html`, embedded by `Jellyfin.Plugin.EmbyAuth.csproj:22-25` and served by `EmbyAuthPlugin.GetPages` (`EmbyAuthPlugin.cs:43-53`). The page has the settings form and a Migration section that calls the migration API (`configPage.html:47-55, 63-105`).
-- Persistence: Jellyfin saves `PluginConfiguration` with `XmlSerializer` (`PluginConfiguration.cs:57`)
+**`tests/js/`:**
+- Purpose: Settings page JavaScript tests
+- Contains: node:test tests with jsdom, test helpers for Dashboard/ApiClient stubs
+- Key files: `configPage.test.js`, `testHelpers.js`
+- Run: `mise run test` (runs JavaScript tests via node:test)
 
-**tests/Jellyfin.Plugin.EmbyAuth.Tests/**
-- Purpose: Unit tests of the plugin classes that do not need a Jellyfin server
-- Contains: One `{ClassName}Tests.cs` file per tested class, and `TestDoubles.cs`
-- No unit test file exists for `EmbyAuthenticationProvider`, `DefaultLoginMethod`, `MoveToDefaultLoginMethod`, `MoveEmbyUsersToDefaultTask`, `EmbyLoginMethodUsers`, or `EmbyAuthController`. The e2e tests cover their behavior, including the migration API (`e2e/30-migration-modes.bats:95`, `e2e/30-migration-modes.bats:112`).
+**`tests/scripts/`:**
+- Purpose: Shell script tests
+- Contains: bats tests for `scripts/package.sh`
+- Run: `mise run test`
 
-**tests/scripts/**
-- Purpose: bats tests for `scripts/package.sh`: usage errors, zip contents, `meta.json`, `manifest.json`, and `check-tag` (`tests/scripts/package.bats:20-76`)
-- Run by: `mise run test`, after the unit tests (`.mise.toml:28-33`)
+**`e2e/`:**
+- Purpose: End-to-end integration tests
+- Contains: bats tests, Docker Compose file, Emby proxy for logging
+- Key files: `setup_suite.bash` (fixture setup), `helpers.bash` (API utilities), test files
+- Run: `mise run e2e` (requires Docker)
 
-**e2e/**
-- Purpose: End-to-end tests against Emby and Jellyfin containers
-- Contains: Independent `NN-topic.bats` files, `setup_suite.bash`, `helpers.bash`, `compose.yaml`, `emby-proxy.conf`
-- Flow: `setup_suite` starts the servers and creates every Emby user once. Files `10` to `40` create their own Jellyfin accounts in `setup_file` and reset the plugin settings; `90-jellyfin-log.bats` runs last. `teardown_suite` removes the containers unless `KEEP_E2E=1` (`e2e/setup_suite.bash:38-44`, `.claude/rules/e2e.md:10-14`).
-- Ports: `EMBY_PORT` and `JELLYFIN_PORT`, default 18096 and 28096, set the host ports (`e2e/helpers.bash:7-10`, `.claude/rules/e2e.md:24`).
+**`docs/`:**
+- Purpose: User and developer documentation
+- Contains: How-it-works guide, settings reference, migration guide, development setup
+- Key files: `how-it-works.md` (architecture and flow), `settings.md` (all settings), `development.md` (build/test/release)
 
-**scripts/**
-- Purpose:
-  - `dev-env.sh` starts a local demo from `e2e/compose.yaml` under the Compose project name `emby-auth-dev`, on default ports 18196 and 28196, and sources `e2e/helpers.bash` (`scripts/dev-env.sh:4-19, 22`). It requires the action `up`, `status`, or `down` (`scripts/dev-env.sh:75-91`).
-  - `package.sh` builds `jellyfin-plugin-emby-auth_<version>.zip` and `manifest.json` in `artifacts/release/`, or checks that a tag is `v<version>` (`scripts/package.sh:4-13`). It requires the action `build` or `check-tag TAG` (`scripts/package.sh:107-124`).
-- Referenced by: `CLAUDE.md:11, 14, 38`, `.claude/rules/e2e.md:13`, `docs/development.md:14-15`, `.mise.toml:37`, `.github/workflows/release.yml:35`
-
-**docs/**
-- Purpose: User and developer documentation. `README.md` stays short and links here (`README.md:54-61`, `CLAUDE.md:3, 50`).
-- `images/settings-page.png` is the README screenshot, taken from the demo (`CLAUDE.md:39`).
-
-**.github/workflows/**
-- Purpose: CI and releases. `ci.yml` runs on pull requests and on push to `main`, with jobs `lint`, `test`, and `e2e`, each one mise task, and `ci-success`, which requires every job (`ci.yml:5-9, 19-81`). `release.yml` runs on a pushed `v*` tag (`release.yml:6-9, 32-48`).
-- Local runs: `act pull_request -j <job>`, with the runner image in `.actrc` (`CLAUDE.md:13`).
-
-**.claude/rules/**
-- Purpose: Path-scoped instructions: `plugin.md` for `src/` and `tests/`, `e2e.md` for `e2e/`
-
-**.planning/codebase/**
-- Purpose: Codebase map documents written by `/gsd-map-codebase`
-
-**artifacts/**
-- Purpose: Build output (`.gitignore:3`)
-  - `plugin/` receives `dotnet publish` output for the e2e tests and the demo (`e2e/setup_suite.bash:12`, `scripts/dev-env.sh:29`) and is mounted into the Jellyfin container (`e2e/compose.yaml:25`)
-  - `release/` receives the zip and `manifest.json` (`scripts/package.sh:21`)
-  - `package-stage/` holds the publish output and zip contents during `package.sh build` (`scripts/package.sh:22`)
+**`scripts/`:**
+- Purpose: Build and demo automation
+- Contains: `package.sh` (build, test, zip release), `dev-env.sh` (demo environment)
 
 ## Key File Locations
 
 **Entry Points:**
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:60` — `Authenticate(string, string, User?)`, called for each login that the plugin handles
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:125` — `ChangePassword`, called for password changes of users on the Emby login method
-- `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs:31` — `OnEvent`, called after a login
-- `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs:57` — `ExecuteAsync`, called when the migration task runs
-- `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs:39` — `GetMigrationStatus`, `GET /EmbyAuth/Migration`
-- `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs:55` — `RunMigration`, `POST /EmbyAuth/Migration/Run`
-- `src/Jellyfin.Plugin.EmbyAuth/PluginServiceRegistrator.cs:26` — `RegisterServices`, called by Jellyfin at startup
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs` — Login method
+- `src/Jellyfin.Plugin.EmbyAuth/MoveAfterLogin.cs` — Event consumer
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyMigrationTask.cs` — Scheduled task
+- `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs` — API controller
+- `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html` — Settings page
 
 **Configuration:**
-- `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs` — settings model and enums
-- `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html` — settings page and Migration section
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs` — validation
-- `Directory.Build.props`, `global.json`, `.mise.toml`, `.pre-commit-config.yaml` — build and version, test runner, tools and tasks, hooks
+- `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs` — Settings model
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs` — Settings validation
+- `src/Jellyfin.Plugin.EmbyAuth/MigrationTargetValidation.cs` — Target validation
 
 **Core Logic:**
-- `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs` — account decision
-- `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs` — account access
+- `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs` — Account decision (pure function)
+- `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs` — Permission application
+- `src/Jellyfin.Plugin.EmbyAuth/LoginMethodMove.cs` — Database move operation
 
-**External Communication:**
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` — every Emby request
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs` — user list cache
+**State Management:**
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs` — Cached Emby user list
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs` — Verified password fingerprints
 
-**State & Migration:**
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs` — fingerprint file
-- `src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs` — single-column move
-- `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs` — move after login
-- `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs` — users on the Emby login method and the readiness rule (line 51)
-- `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs` — migration task
-- `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs` — migration API
+**External Integration:**
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` — Emby HTTP calls
+- `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs` — Jellyfin user list query
 
-**Testing:**
-- `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs` — HTTP stub, manual clock, capturing logger
-- `e2e/helpers.bash` — shared bats helpers; `COMPOSE_FILE` points to `e2e/compose.yaml` (`e2e/helpers.bash:14`)
-- `tests/scripts/package.bats` — packaging script tests
-
-**Build, CI, and release:**
-- `.mise.toml` — the `lint`, `test`, `package`, and `e2e` tasks that CI runs (`.mise.toml:16-41`)
-- `.github/workflows/ci.yml`, `.github/workflows/release.yml`
-- `scripts/package.sh`
+**Test Infrastructure:**
+- `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs` — HTTP stub, time provider, logger
+- `tests/js/testHelpers.js` — Dashboard/ApiClient stubs
 
 ## Naming Conventions
 
 **Files:**
-- C# files are named after their main type (`EmbyClient.cs` for `EmbyClient`). Small related types share the file: `EmbyLogin` and `EmbyUser` in `EmbyClient.cs`, `EmbyUserStatus` in `EmbyUserDirectory.cs`, `JellyfinAccount` and `LoginAction` in `LoginDecision.cs`, `EmbyLoginMethodUser` in `EmbyLoginMethodUsers.cs`, `MigrationStatus` and `MigrationUser` in `Api/EmbyAuthController.cs`, the two enums in `PluginConfiguration.cs`.
-- Unit test files: `{ClassName}Tests.cs`
-- bats suite files: `setup_suite.bash`, `helpers.bash`
-- bats e2e test files: `NN-topic.bats`, with a two-digit order prefix and a kebab-case topic (`10-login-checks.bats`, `90-jellyfin-log.bats`)
-- bats script test files: named after the script (`tests/scripts/package.bats` for `scripts/package.sh`)
-- Scripts: lowercase `.sh`, kebab-case for more than one word (`scripts/dev-env.sh`, `scripts/package.sh`)
-- Documentation: lowercase kebab-case `.md` in `docs/` (`how-it-works.md`)
+- `{Component}.cs` — Single class or record (e.g., `LoginDecision.cs`)
+- `{Component}Tests.cs` — Unit tests for component (e.g., `LoginDecisionTests.cs`)
+- `{Feature}.bats` — End-to-end test suite (e.g., `10-login-checks.bats`)
+- `{word}Page.html` — Web page resource (e.g., `configPage.html`)
 
 **Directories:**
-- Project directories use the dotted project name (`Jellyfin.Plugin.EmbyAuth`, `Jellyfin.Plugin.EmbyAuth.Tests`); namespace subdirectories are PascalCase (`Api/`, `Configuration/`)
-- Top-level directories are lowercase (`src/`, `tests/`, `e2e/`, `scripts/`, `docs/`, `artifacts/`)
+- `src/` — Source code
+- `tests/` — Test code (all types)
+- `e2e/` — End-to-end tests
+- `docs/` — Documentation
+- `scripts/` — Automation scripts
+- `Api/` — REST API controllers and DTOs
+- `Configuration/` — Settings and UI
 
-**Types:**
-- PascalCase for classes, records, and enums
-- Public: `EmbyAuthPlugin`, `PluginServiceRegistrator`, `MoveEmbyUsersToDefaultTask`, `EmbyVerifiedPasswords`, `PluginConfiguration`, `MigrationMode`, `AccountAccess`, `EmbyAuthController`, `MigrationStatus`, `MigrationUser`. All other types are `internal`.
+**Classes:**
+- `{Feature}{Responsibility}` — e.g., `EmbyAuthenticationProvider`, `LoginMethodMove`
+- `{Feature}Tests` — Unit test class
+- `{Adjective}{Noun}` for enums — e.g., `EmbyUserStatus`, `MigrationUserState`
 
-**Members:**
-- Methods: PascalCase; async methods that the plugin defines end in `Async` (`GetStatusAsync`, `MoveAsync`, `ListAsync`, `CreateAccountAsync`). Jellyfin interface methods keep their names (`Authenticate`, `OnEvent`). Controller actions are named for the action (`GetMigrationStatus`, `RunMigration`).
-- Log methods: `private static partial void Log{Event}` with `[LoggerMessage]` (`LogLoginRejected`, `LogSettingsInvalid`)
-- Private fields: `_camelCase` (`_snapshot`, `_lock`, `_verifiedPasswords`)
-- Parameters and locals: camelCase (`username`, `passwordHash`, `embyLogin`)
-- Unit test methods: PascalCase phrases with underscores (`Login_ReturnsNull_WhenEmbyIsUnreachable`, `Rejects_UnknownMigrationMode`)
-- bats tests: plain-sentence names (`@test "the plugin ends its Emby session after each login"`)
-- Settings page element IDs: PascalCase, prefixed `EmbyAuth` for the Migration section (`EmbyAuthMigrationSummary`, `EmbyAuthRunMigration` in `configPage.html:49-51`)
+**Methods:**
+- `camelCase` — All methods and properties
+- `Async` suffix — Async methods (e.g., `AuthenticateAsync`)
+- `Try{Action}` — Methods that return bool and out param (e.g., `TryCreate`)
 
 ## Where to Add New Code
 
-**Change to the login flow:**
-- Primary code: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs`
-- Account decision: `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs`
-- Unit tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/`
-- End-to-end test: an existing or new `e2e/NN-topic.bats`. `CLAUDE.md:44` requires an end-to-end test for a change that depends on Jellyfin or Emby behavior.
+**New Feature (e.g., email notification on move):**
+- Implementation: `src/Jellyfin.Plugin.EmbyAuth/{Feature}.cs` (new file)
+- Tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/{Feature}Tests.cs` (new file)
+- E2E: Add test case to relevant `.bats` file in `e2e/`
+- Docs: Update `docs/how-it-works.md` or create new doc
 
-**Change to the migration:**
-- Who is listed and who is ready: `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs`, which both the task and the API use
-- The move itself: `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs` and `src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs`
-- End-to-end test: `e2e/30-migration-modes.bats`
+**New Component/Module (e.g., cache invalidation, new validation rule):**
+- Implementation: `src/Jellyfin.Plugin.EmbyAuth/{Component}.cs` (new file if significant, else add to related file)
+- Tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/{Component}Tests.cs`
+- DI registration: Add to `PluginServiceRegistrator.RegisterServices()` if it needs injection
 
-**New API endpoint:**
-- Implementation: `src/Jellyfin.Plugin.EmbyAuth/Api/`, with `[Authorize(Policy = Policies.RequiresElevation)]` and an e2e test that a regular user gets 403 (`.claude/rules/plugin.md:48`)
-- Settings page call: `ApiClient.getJSON(ApiClient.getUrl(...))` or `ApiClient.ajax(...)`; responses have PascalCase names (`.claude/rules/plugin.md:49`)
-- Docs: the Migration API table in `docs/migration.md` (`docs/migration.md:27-34`)
-
-**New class:**
-- Implementation: `src/Jellyfin.Plugin.EmbyAuth/{ClassName}.cs`, `internal` unless Jellyfin must discover it
-- Registration: `PluginServiceRegistrator.RegisterServices` (`PluginServiceRegistrator.cs:26-36`) if it needs DI. A scheduled task is discovered by type and must be public, with public constructor parameter types (`.claude/rules/plugin.md:22`).
-- Tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/{ClassName}Tests.cs`
-
-**New setting:**
-- Property: `PluginConfiguration` in `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs` (keep URLs as strings)
-- Validation: `EmbyAuthSettings.FindProblem` (`EmbyAuthSettings.cs:36`) and the `EmbyAuthSettings` record
-- UI: `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html`; take a new screenshot for `docs/images/settings-page.png` when the page changes (`CLAUDE.md:50`)
+**Settings/Configuration:**
+- Settings property: `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs`
+- Validation: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs` (for basic structure) or `MigrationTargetValidation.cs` (for target validation)
+- UI field: `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html`
 - Tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/EmbyAuthSettingsTests.cs`
-- Docs: `docs/settings.md`
 
-**New script:**
-- Implementation: `scripts/{name}.sh` with an explicit action argument, as `scripts/dev-env.sh:75-91` and `scripts/package.sh:107-124` do
-- Tests: `tests/scripts/{name}.bats`, run by `mise run test` (`.mise.toml:32`)
-- Lint: `mise run lint` runs `shellcheck -x` and `shfmt -d` on `scripts/` and `tests/scripts/` (`.mise.toml:22-23`)
+**Utilities/Helpers:**
+- Shared by multiple components: `src/Jellyfin.Plugin.EmbyAuth/{Utility}.cs`
+- Test helpers: `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs`
+- JavaScript helpers: `tests/js/testHelpers.js`
 
-**Helpers:**
-- Plugin: no shared utility folder; helpers live in the class that uses them
-- Unit tests: `tests/Jellyfin.Plugin.EmbyAuth.Tests/TestDoubles.cs`
-- e2e: `e2e/helpers.bash`. `scripts/dev-env.sh` also uses it, so run `scripts/dev-env.sh up` and `down` after a change (`.claude/rules/e2e.md:13`).
+**Database/ORM:**
+- Query/update logic: `src/Jellyfin.Plugin.EmbyAuth/LoginMethodMove.cs` (or new file for complex queries)
+- Must use `ExecuteUpdateAsync` for moves to avoid overwriting concurrent changes
 
-**Test data:**
-- Unit tests: inline in the test class
-- e2e: create Emby users only in `e2e/setup_suite.bash`, because the plugin caches the Emby user list for 60 seconds; create Jellyfin accounts in the `setup_file` of the `.bats` file that uses them (`.claude/rules/e2e.md:11, 18`)
+**External API (Emby):**
+- All Emby calls: `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` (this is the only file that contacts Emby)
+- New endpoint: Add method to `EmbyClient`, then call from appropriate component
 
 ## Special Directories
 
-**artifacts/:**
-- Purpose: Build output (`plugin/`, `release/`, `package-stage/`)
-- Generated: Yes
-- Committed: No (`.gitignore:3`)
+**`artifacts/`:**
+- Purpose: Build outputs
+- Generated: Yes (by `scripts/package.sh`)
+- Committed: No (.gitignore)
+- Contents: Release zip, manifest, plugin DLL
 
-**bin/, obj/:**
-- Purpose: Per-project build output
-- Generated: Yes (by `dotnet build`)
-- Committed: No (`.gitignore:1-2`)
+**`TestResults/`:**
+- Purpose: Test execution results
+- Generated: Yes (by test runners)
+- Committed: No (.gitignore)
+- Contents: Coverage reports, xUnit XML results
 
-**TestResults/:**
-- Purpose: Test run output
-- Generated: Yes
-- Committed: No (`.gitignore:4`)
+**`.github/workflows/`:**
+- Purpose: CI/CD pipeline
+- Generated: No (hand-written)
+- Committed: Yes
+- Key file: `ci.yml` (build, lint, test, e2e, release)
 
-**.planning/codebase/:**
-- Purpose: Codebase map documents
-- Generated: Yes (by `/gsd-map-codebase`)
-
-## Dependency Resolution
-
-`Jellyfin.Plugin.EmbyAuth.slnx` lists two projects:
-- `src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj` — references `Jellyfin.Controller` and `Jellyfin.Model` 12.1.0 with `ExcludeAssets` `runtime` (`Jellyfin.Plugin.EmbyAuth.csproj:9-16`)
-- `tests/Jellyfin.Plugin.EmbyAuth.Tests/Jellyfin.Plugin.EmbyAuth.Tests.csproj` — references `Jellyfin.Controller` 12.1.0, `xunit.v3` 4.0.1, and the plugin project
-
-The plugin project exposes internal types to the test project with `InternalsVisibleTo` (`Jellyfin.Plugin.EmbyAuth.csproj:19`). `Directory.Build.props` sets the version and the target framework `net10.0` for both projects. Tool versions are pinned in `.mise.toml:1-10`.
-
-## Navigating to Common Tasks
-
-| Task | Navigate To |
-|------|-------------|
-| Change a login check | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:60` |
-| Change which account a login applies to | `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs:40` |
-| Change account access | `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs` |
-| Change an Emby request | `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` |
-| Change the saved-password check | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:80-86` and `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs` |
-| Change cache duration or retry delay | `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs:39, 44` |
-| Change when users move to Default | `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs`, `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs`, `src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs` |
-| Change who counts as ready to move | `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs:51` |
-| Change the migration API or the Migration section | `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs`, `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html:47-55, 63-105` |
-| Add a setting | `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs`, `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs:36`, `Configuration/configPage.html`, `docs/settings.md` |
-| Write a unit test | `tests/Jellyfin.Plugin.EmbyAuth.Tests/{ClassName}Tests.cs` |
-| Write an e2e test | `e2e/NN-topic.bats`, with helpers from `e2e/helpers.bash` |
-| Change packaging or the release | `scripts/package.sh`, `tests/scripts/package.bats`, `.github/workflows/release.yml` |
-| Change a CI step | The mise task in `.mise.toml`, not only `.github/workflows/ci.yml` (`CLAUDE.md:16`) |
+**`.planning/codebase/`:**
+- Purpose: Architecture and codebase documentation
+- Generated: Yes (by `/gsd-map-codebase` command)
+- Committed: Yes
+- Contents: ARCHITECTURE.md, STRUCTURE.md, CONVENTIONS.md, etc.
 
 ---
 
-*Structure analysis: 2026-09-16*
+*Structure analysis: 2026-09-20*

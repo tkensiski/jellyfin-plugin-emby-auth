@@ -1,336 +1,336 @@
-<!-- refreshed: 2026-09-16 -->
+---
+last_mapped_commit: fb0fd999638d88fabb37bd9d449c23226a5b2f8b
+---
+
+<!-- refreshed: 2026-09-20 -->
 # Architecture
 
-**Analysis Date:** 2026-09-16
+**Analysis Date:** 2026-09-20
 
-**Scope:** This document describes commit `ecee1ed` on `main`.
+**Scope:** Full repository at commit fb0fd99 (branch: gsd/phase-04-emby-traffic-under-load-and-failure)
 
 ## System Overview
 
-Jellyfin calls the plugin through four separate entry points: the login method, the event consumer, the migration task, and the migration API. They share `EmbyVerifiedPasswords` and `DefaultLoginMethod`, and only `EmbyClient` contacts Emby.
+A Jellyfin 12.1 plugin that authenticates users against an Emby server on first login, saves the password in Jellyfin, and optionally moves the user off the Emby login method.
 
 ```text
-Jellyfin UserManager            Jellyfin SessionManager          Scheduled task                   Migration API (admin only)
-(login, password change)        (event after a login)            (settings page, Dashboard, API)  (settings page)
-        │                               │                               │                               │
-        ▼                               ▼                               ▼                               ▼
-EmbyAuthenticationProvider      MoveToDefaultLoginMethod         MoveEmbyUsersToDefaultTask       EmbyAuthController
- ├─ EmbyAuthSettings.TryCreate   ├─ EmbyVerifiedPasswords.Matches ├─ EmbyLoginMethodUsers.ListAsync ├─ GET  Migration
- ├─ EmbyVerifiedPasswords.Matches└─ DefaultLoginMethod.MoveAsync  │   └─ EmbyVerifiedPasswords     │   └─ EmbyLoginMethodUsers.ListAsync
- │    (JellyfinPasswordFirst only)                                │       .Matches                  └─ POST Migration/Run
- ├─ EmbyUserDirectory.GetStatusAsync ─► EmbyClient.GetUsersAsync  └─ DefaultLoginMethod.MoveAsync       └─ ITaskManager.QueueIfNotRunning
- │                                      ─► Emby GET /Users                                                  <MoveEmbyUsersToDefaultTask>
- ├─ EmbyClient.AuthenticateAsync ─► Emby POST /Users/AuthenticateByName, POST /Sessions/Logout
- ├─ LoginDecision.Decide
- ├─ AccountAccessPolicy
- ├─ IUserManager (CreateUserAsync, UpdateUserAsync, DeleteUserAsync)
- └─ EmbyVerifiedPasswords.Record ─► Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          Jellyfin Entry Points                           │
+├──────────────────────┬─────────────────────────┬──────────────────────────┤
+│   Login Method       │   Event Consumer        │  Scheduled Task          │
+│ IAuthenticationProvider  IEventConsumer      IScheduledTask             │
+│ (EmbyAuthenticationProvider) (MoveAfterLogin) (EmbyMigrationTask)       │
+│ `src/.../EmbyAuth... `  `src/.../MoveAfter... `  `src/.../EmbyMigrat...  `│
+└──────────────┬───────┴────────────┬────────────┴──────────────┬───────────┘
+               │                    │                          │
+               ▼                    ▼                          ▼
+       ┌───────────────────────────────────────────────────────────────┐
+       │            Core Authentication & Migration Flow               │
+       │                                                               │
+       │  EmbyAuthenticationProvider (login entry)                    │
+       │  ├─ EmbyUserDirectory (check if user exists in Emby)         │
+       │  ├─ EmbyClient (contacts Emby server)                        │
+       │  ├─ LoginDecision (pure function: decide action)             │
+       │  ├─ AccountAccessPolicy (apply permissions)                  │
+       │  └─ EmbyVerifiedPasswords (record verified hashes)           │
+       │                                                               │
+       │  MoveAfterLogin (event consumer: moves after login)           │
+       │  └─ LoginMethodMove (database operation: move user)           │
+       │                                                               │
+       │  EmbyMigrationTask (admin-run migration)                      │
+       │  ├─ EmbyLoginMethodUsers (list users on Emby method)          │
+       │  └─ LoginMethodMove (batch move operation)                    │
+       └───────────────────────────────────────────────────────────────┘
+               │
+               ▼
+       ┌──────────────────┐
+       │  Jellyfin DB     │
+       │  (User table)    │
+       └──────────────────┘
 ```
 
 ## Component Responsibilities
 
-| Component | Visibility | Responsibility | File |
-|-----------|------------|----------------|------|
-| EmbyAuthenticationProvider | internal | The Emby login method. Refuses blank passwords, disabled accounts, and administrators, checks the password against Emby, creates or updates the account, and records the verified hash. Handles password changes in Jellyfin. | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs` |
-| EmbyClient | internal | The only code that sends requests to Emby: login, sign-out, and user list. Sets a 5-second timeout on each client. | `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` |
-| EmbyUserDirectory | internal | Keeps the Emby user list for 60 seconds (30 seconds after a failed read), so that the plugin sends a password to Emby only for an enabled Emby user with exactly that name, ignoring case. | `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs` |
-| LoginDecision | internal | Pure function that returns `Deny`, `UseAccount`, or `CreateAccount` after Emby accepts a login. | `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs` |
-| EmbyVerifiedPasswords | public | Stores a SHA-256 fingerprint of each password hash that Emby verified, in a JSON file keyed by Jellyfin user ID. Public because `MoveEmbyUsersToDefaultTask` takes it in its constructor (`.claude/rules/plugin.md:22`). | `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs` |
-| AccountAccessPolicy | internal | Applies the `AccountAccess` setting: remote access and library access for new accounts, and removal of remote access for existing accounts. | `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs` |
-| DefaultLoginMethod | internal | Holds the Default login method ID and moves one user to it with a single-column `ExecuteUpdateAsync`. | `src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs` |
-| MoveToDefaultLoginMethod | internal | `IEventConsumer<AuthenticationResultEventArgs>`. In `MoveAfterFirstLogin` mode, moves the user to Default after a login if Emby verified the saved hash. | `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs` |
-| EmbyLoginMethodUsers | internal | Lists the users on the Emby login method, sorted by name, with ID, name, saved hash, and whether each user is ready to move. The migration task and the migration API share this list. | `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs` |
-| MoveEmbyUsersToDefaultTask | public | `IScheduledTask` with no default trigger. Moves every ready user from the shared list. Runs with any migration behavior. | `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs` |
-| EmbyAuthController | public | Admin-only migration API: `GET /EmbyAuth/Migration` returns the migration status, and `POST /EmbyAuth/Migration/Run` queues the migration task. Also holds the public `MigrationStatus` and `MigrationUser` records. | `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs` |
-| EmbyAuthSettings | internal | Validates `PluginConfiguration` into a typed record: server URL, API key, and the two enums. | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs` |
-| PluginConfiguration | public | Settings model, and the `MigrationMode` and `AccountAccess` enums. | `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs` |
-| EmbyAuthPlugin | public | `BasePlugin<PluginConfiguration>`: plugin ID, name, the static `Instance`, and the embedded settings page. | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthPlugin.cs` |
-| PluginServiceRegistrator | public | Registers the services with Jellyfin's DI container. The scheduled task and the controller are not registered here; Jellyfin reaches both without it (see DI lifetimes). | `src/Jellyfin.Plugin.EmbyAuth/PluginServiceRegistrator.cs` |
+| Component | Responsibility | File |
+|-----------|----------------|------|
+| **EmbyAuthenticationProvider** | Login method entry point; calls Emby, saves password, creates or logs in users, records verified hashes | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs` |
+| **EmbyClient** | Only code that sends HTTP requests to Emby (`AuthenticateByName`, `GetUsers`, `Sessions/Logout`) | `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs` |
+| **EmbyUserDirectory** | Cached copy of Emby user list; skips sending password to Emby for users that don't exist there | `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs` |
+| **LoginDecision** | Pure function: decides whether to deny login, use existing Jellyfin account, or create new account | `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs` |
+| **AccountAccessPolicy** | Sets or adjusts Jellyfin account permissions based on Emby's remote access setting and `AccountAccess` setting | `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs` |
+| **EmbyVerifiedPasswords** | File-based record of password hashes that Emby verified; prevents moving users with passwords an admin set on a pre-created account | `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs` |
+| **MoveAfterLogin** | Event consumer: moves user to configured migration target after login if `MoveAfterFirstLogin` mode is enabled and Emby verified the password | `src/Jellyfin.Plugin.EmbyAuth/MoveAfterLogin.cs` |
+| **LoginMethodMove** | Database operation: moves a single user off Emby login method using `ExecuteUpdateAsync` with condition checks | `src/Jellyfin.Plugin.EmbyAuth/LoginMethodMove.cs` |
+| **EmbyMigrationTask** | Scheduled task: moves all ready users to configured migration target; can be run manually or on a schedule | `src/Jellyfin.Plugin.EmbyAuth/EmbyMigrationTask.cs` |
+| **EmbyLoginMethodUsers** | Lists users currently on Emby login method with their readiness state (Ready, NeedsEmbyLogin, NoPassword, Unknown) | `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs` |
+| **PluginConfiguration** | Settings model with `MigrationMode`, `AccountAccess`, and move targets | `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs` |
+| **EmbyAuthSettings** | Validated settings record; validates URL, API key, and other required settings | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs` |
+| **MigrationTargetValidation** | Checks move targets against Jellyfin's live enabled-provider list | `src/Jellyfin.Plugin.EmbyAuth/MigrationTargetValidation.cs` |
+| **EmbyAuthController** | Admin-only API endpoints: `GET /EmbyAuth/Migration` (status), `POST /EmbyAuth/Migration/Run` (trigger task) | `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs` |
+| **EmbyAuthPlugin** | Plugin lifecycle and settings validation; refuses settings saves if move targets are not enabled | `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthPlugin.cs` |
+| **PluginServiceRegistrator** | Wires all components into the DI container; registers the four entry points | `src/Jellyfin.Plugin.EmbyAuth/PluginServiceRegistrator.cs` |
 
 ## Pattern Overview
 
-**Overall:** A Jellyfin plugin that adds a login method named **Emby**. The login method checks passwords against Emby, saves a Jellyfin hash of each accepted password, and records a fingerprint of that hash. The user then moves to Jellyfin's Default login method, either after the login (event consumer) or when an administrator runs the migration, from the settings page or as a scheduled task.
+**Overall:** Layered authentication bridge with guarded state and event-driven migration
 
 **Key Characteristics:**
-- Four entry points: the login method (`IAuthenticationProvider`, `IRequiresResolvedUser`), the event consumer, the scheduled task, and the migration API controller.
-- All Emby traffic goes through `EmbyClient` (`EmbyClient.cs:31`). The migration task and the migration API never contact Emby (`docs/migration.md:25`).
-- The user list check runs before the password goes to Emby (`EmbyAuthenticationProvider.cs:88-93`).
-- Every path that moves a user to Default, or accepts a saved password without Emby, checks `EmbyVerifiedPasswords.Matches` (`EmbyAuthenticationProvider.cs:82`, `MoveToDefaultLoginMethod.cs:48`, and `EmbyLoginMethodUsers.cs:51` for the task).
-- Invalid settings refuse every login on the Emby login method (`EmbyAuthenticationProvider.cs:144-153`).
-- Log messages never contain a password or the API key (`EmbyClient.cs:34`, `docs/how-it-works.md:28`), checked by `tests/Jellyfin.Plugin.EmbyAuth.Tests/EmbyClientTests.cs:40-41` and `e2e/90-jellyfin-log.bats`.
+- **Four Jellyfin entry points:** Login method (password validation), event consumer (move after login), scheduled task (batch migration), API controller (migration status and control)
+- **Separation of concerns:** `EmbyClient` is the only code contacting Emby; login decision is a pure function; database moves are conditional operations
+- **Shared state managed explicitly:** Volatile snapshot swap in `EmbyUserDirectory` for cache coherency; lock-guarded file I/O in `EmbyVerifiedPasswords`
+- **One-column database updates:** `ExecuteUpdateAsync` with conditions prevents overwriting concurrent changes (e.g., admin disabling a user)
+- **Jellyfin's login lock:** Plugin runs inside Jellyfin's login lock (all unknown-user logins serialize on `Guid.Empty`); must complete quickly and avoid nested user-manager calls
 
 ## Layers
 
-**Login method:**
-- Purpose: Handle logins and password changes for users on the Emby login method, and logins for names with no Jellyfin account
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs`
-- Contains: `EmbyAuthenticationProvider`, which implements `IAuthenticationProvider` and `IRequiresResolvedUser`. The two-argument `Authenticate` throws `NotSupportedException` (line 56-57), because Jellyfin calls the overload with the resolved user.
-- Depends on: `IServiceProvider` (resolves `IUserManager` per login), `ICryptoProvider`, `EmbyClient`, `EmbyUserDirectory`, `EmbyVerifiedPasswords`, `EmbyAuthSettings`, `EmbyAuthPlugin.Instance`, `LoginDecision`, `AccountAccessPolicy`, `DefaultLoginMethod.ProviderId`
-- Used by: Jellyfin's `UserManager` (`.claude/rules/plugin.md:13`)
+**Jellyfin Integration (Entry Points):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/`
+- **Contains:** `EmbyAuthPlugin`, `PluginServiceRegistrator`, `EmbyAuthenticationProvider`, `MoveAfterLogin`, `EmbyMigrationTask`, `EmbyAuthController`
+- **Depends on:** Everything below
+- **Used by:** Jellyfin itself (via assembly scanning and routing)
+- **Responsibility:** Register with Jellyfin's authentication, event, and task discovery; handle Jellyfin lifecycle
 
-**Decision logic:**
-- Purpose: Decide which account an Emby login applies to
-- Location: `src/Jellyfin.Plugin.EmbyAuth/LoginDecision.cs`
-- Contains: `LoginDecision.Decide` (line 40), the `JellyfinAccount` record, and the `LoginAction` enum
-- Depends on: Nothing
-- Used by: `EmbyAuthenticationProvider.Authenticate` (line 98)
+**Domain Logic (Account Rules & State):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/` (main directory)
+- **Contains:** `LoginDecision`, `AccountAccessPolicy`, `MigrationTargetValidation`
+- **Depends on:** Configuration types
+- **Used by:** `EmbyAuthenticationProvider`, `MoveAfterLogin`, `EmbyMigrationTask`, `PluginServiceRegistrator`
+- **Responsibility:** Make decisions about accounts, apply permissions, validate configuration
 
-**Settings:**
-- Purpose: Hold and validate the plugin settings
-- Location: `src/Jellyfin.Plugin.EmbyAuth/Configuration/PluginConfiguration.cs`, `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthSettings.cs`
-- Contains: `PluginConfiguration`, `EmbyAuthSettings.TryCreate` (line 23) and `FindProblem` (line 36)
-- Depends on: `MediaBrowser.Model.Plugins.BasePluginConfiguration`
-- Used by: `EmbyAuthenticationProvider.GetSettings` (validated settings), `EmbyUserDirectory.GetStatusAsync` (takes `EmbyAuthSettings`), and `MoveToDefaultLoginMethod.OnEvent`, which reads `EmbyAuthPlugin.Instance?.Configuration.MigrationMode` directly (line 34)
+**State Management (Caching & Persistence):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/`
+- **Contains:** `EmbyUserDirectory`, `EmbyVerifiedPasswords`
+- **Depends on:** `EmbyClient`
+- **Used by:** `EmbyAuthenticationProvider`, `MoveAfterLogin`, `EmbyMigrationTask`, `EmbyAuthController`
+- **Responsibility:** Cache Emby user list with TTL; persist and check verified password fingerprints
 
-**Emby integration:**
-- Purpose: Talk to Emby and keep a short-lived copy of the user list
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyClient.cs`, `src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs`
-- Contains: `EmbyClient.AuthenticateAsync` (line 50), `GetUsersAsync` (line 105), `SignOutAsync` (line 165); `EmbyUserDirectory.GetStatusAsync` (line 55) with `CacheDuration` 60 s (line 39) and `RetryDelay` 30 s (line 44)
-- Depends on: `IHttpClientFactory` (`NamedClient.Default`), `TimeProvider`, `ILogger<T>`
-- Used by: `EmbyAuthenticationProvider.Authenticate`
+**External Integration (Emby & Database):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/` (main) + `LoginMethodMove`
+- **Contains:** `EmbyClient`, `LoginMethodMove`, `EmbyLoginMethodUsers`
+- **Depends on:** Jellyfin DB context and HTTP client factory
+- **Used by:** All layers above
+- **Responsibility:** HTTP communication to Emby; conditional database updates; listing Jellyfin users
 
-**Verified passwords:**
-- Purpose: Record which saved hashes came from a password that Emby accepted
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs`
-- Contains: `Record` (line 41), `Matches` (line 73), lazy `Load` (line 90). The file is `Jellyfin.Plugin.EmbyAuth.VerifiedPasswords.json` in Jellyfin's plugin configuration folder (`PluginServiceRegistrator.cs:23, 31-33`).
-- Depends on: File system, `ILogger<EmbyVerifiedPasswords>`
-- Used by: `EmbyAuthenticationProvider`, `MoveToDefaultLoginMethod`, `EmbyLoginMethodUsers`; injected into `MoveEmbyUsersToDefaultTask` and `EmbyAuthController`, which pass it to `EmbyLoginMethodUsers.ListAsync`
-
-**Account access:**
-- Purpose: Apply the `AccountAccess` setting to a Jellyfin `User`
-- Location: `src/Jellyfin.Plugin.EmbyAuth/AccountAccessPolicy.cs`
-- Contains: `ApplyToNewAccount` (line 20), `ApplyToExistingAccount` (line 42)
-- Depends on: Jellyfin's `User` entity and `PermissionKind`/`PreferenceKind`
-- Used by: `EmbyAuthenticationProvider.CreateAccountAsync` (line 183) and `SavePasswordAsync` (line 212)
-
-**Migration:**
-- Purpose: Move users from the Emby login method to Default, and report who is ready
-- Location: `src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs`, `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs`, `src/Jellyfin.Plugin.EmbyAuth/EmbyLoginMethodUsers.cs`, `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs`
-- Contains:
-  - `DefaultLoginMethod.MoveAsync` (line 31) — one `ExecuteUpdateAsync` that changes `AuthenticationProviderId` only while the user is on the Emby login method and still has the given hash
-  - `MoveToDefaultLoginMethod.OnEvent` (line 31) — runs after each login in `MoveAfterFirstLogin` mode
-  - `EmbyLoginMethodUsers.ListAsync` (line 32) — the users on the Emby login method, sorted by `Username` (line 41); a user is ready when the saved hash is not null and `Matches` accepts it (line 51)
-  - `MoveEmbyUsersToDefaultTask.ExecuteAsync` (line 57) — runs when the task is started
-- Depends on: `IDbContextFactory<JellyfinDbContext>`, `EmbyVerifiedPasswords`, `ILogger<T>`
-- Used by: Jellyfin's event system (the consumer is registered in `PluginServiceRegistrator.cs:35`), Jellyfin's scheduled tasks (the task is discovered by type, see Architectural Constraints), and the migration API
-
-**Migration API:**
-- Purpose: Let an administrator see the migration status and start the migration from the settings page
-- Location: `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs` (namespace `Jellyfin.Plugin.EmbyAuth.Api`)
-- Contains: `EmbyAuthController` (line 26), a `ControllerBase` with `[ApiController]`, `[Authorize(Policy = Policies.RequiresElevation)]`, `[Route("EmbyAuth")]`, and `[Produces]` JSON (lines 22-25); the `MigrationStatus` (line 66) and `MigrationUser` (line 76) records
-- Depends on: `IDbContextFactory<JellyfinDbContext>`, `EmbyVerifiedPasswords`, `ITaskManager` (constructor, lines 26-29), `EmbyLoginMethodUsers`
-- Used by: The settings page (`Configuration/configPage.html:63-105`)
+**Configuration (Settings):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/Configuration/`
+- **Contains:** `PluginConfiguration`, `EmbyAuthSettings`
+- **Depends on:** None
+- **Used by:** All layers for settings access and validation
+- **Responsibility:** Define and validate all plugin settings
 
 ## Data Flow
 
-### Primary Request Path (Login)
+### Primary Request Path: User Login
 
-1. **Jellyfin calls the login method.** For a known user name, Jellyfin calls only the login method assigned to the user. For an unknown name, it calls every enabled login method (`.claude/rules/plugin.md:13`).
-2. **Account checks** (`EmbyAuthenticationProvider.cs:62-77`): refuse a blank password, a disabled account, or an administrator account. Emby is not contacted.
-3. **Settings** (`EmbyAuthenticationProvider.cs:79`, `144-153`): validate the settings. If they are not valid, log at Error and refuse.
-4. **Saved password, `JellyfinPasswordFirst` only** (`EmbyAuthenticationProvider.cs:80-86`): if the account has a saved hash, `EmbyVerifiedPasswords.Matches` accepts that hash, and the typed password verifies against it, accept the login without Emby.
-5. **User list** (`EmbyAuthenticationProvider.cs:88-93`, `EmbyUserDirectory.cs:55-83`): read the cached list, or fetch it with `EmbyClient.GetUsersAsync` if there is no snapshot, the server URL or API key changed, or the snapshot expired. Unless the status is `Active`, log at Information and refuse without sending the password.
-6. **Emby login** (`EmbyAuthenticationProvider.cs:95-96`, `EmbyClient.cs:50-96`): `POST /Users/AuthenticateByName` with a buffered body. On success with a user name, end the Emby session with `POST /Sessions/Logout` if Emby returned an access token, then return `EmbyLogin`. A non-success status, no response within 5 seconds, an unreadable response, or a response without a user name returns `null`, and the login is refused.
-7. **Decision** (`EmbyAuthenticationProvider.cs:98-103`, `LoginDecision.cs:40-55`): `Deny` if the typed name and the Emby name differ (ignoring case), or if the existing account uses another login method. `CreateAccount` if no account exists. Otherwise `UseAccount`.
-8. **Save** (`EmbyAuthenticationProvider.cs:105-109`): hash the password and resolve `IUserManager`.
-   - New account (`CreateAccountAsync`, line 168): `CreateUserAsync`, set the Emby login method and the hash, apply `AccountAccessPolicy.ApplyToNewAccount`, then `UpdateUserAsync`. If that save does not complete, the `finally` block deletes the account (line 197-203).
-   - Existing account (`SavePasswordAsync`, line 209): set the hash, apply `AccountAccessPolicy.ApplyToExistingAccount`, then `UpdateUserAsync`.
-9. **Record** (`EmbyAuthenticationProvider.cs:111`, `EmbyVerifiedPasswords.cs:41-65`): store the fingerprint under a lock. If the fingerprint is new, write a `.tmp` file and move it over the JSON file.
-10. **Return** `ProviderAuthenticationResult` to Jellyfin. Jellyfin sets the user's login method to the method that accepted the login (`.claude/rules/plugin.md:18`).
-11. **Event** (`MoveToDefaultLoginMethod.cs:31-58`): `SessionManager` publishes `AuthenticationResultEventArgs` after the login completes. In `MoveAfterFirstLogin` mode, the consumer loads the user if it is on the Emby login method, checks `EmbyVerifiedPasswords.Matches`, and calls `DefaultLoginMethod.MoveAsync`. A Quick Connect login publishes the same event, and the `Matches` check stops a move without a verified password (`.claude/rules/plugin.md:19`).
+1. **Entry:** Jellyfin calls `EmbyAuthenticationProvider.Authenticate(username, password, resolvedUser)` inside the login lock (`Guid.Empty` for unknown users) (`EmbyAuthenticationProvider.cs:69`)
+2. **Validation:** Check blank password, disabled user, administrator status (`EmbyAuthenticationProvider.cs:71-86`)
+3. **User existence:** `EmbyUserDirectory.GetStatusAsync()` checks cached Emby user list, skipping Emby call if user not found or unavailable (`EmbyAuthenticationProvider.cs:89`, `EmbyUserDirectory.cs:55`)
+4. **Emby authentication:** `EmbyClient.AuthenticateAsync()` sends credentials to Emby (`EmbyAuthenticationProvider.cs:96`, `EmbyClient.cs:50`)
+   - Returns `EmbyLogin` record with name and remote-access setting, or null if rejected
+   - Ends Emby session with `Sessions/Logout` (`EmbyClient.cs:94`)
+5. **Account decision:** `LoginDecision.Decide()` pure function decides: Deny (name mismatch or account on different method), UseAccount (existing account), or CreateAccount (`EmbyAuthenticationProvider.cs:99`, `LoginDecision.cs:40`)
+6. **Account handling:**
+   - **CreateAccount path:** Create user via `IUserManager.CreateUserAsync()`, set provider to Emby method, save password hash, apply permissions (`EmbyAuthenticationProvider.cs:176-224`)
+   - **UseAccount path:** Save password hash, apply permissions to existing account (`EmbyAuthenticationProvider.cs:226-242`)
+7. **Record verified hash:** `EmbyVerifiedPasswords.Record()` stores SHA-256 fingerprint of the password hash that Emby just accepted (`EmbyAuthenticationProvider.cs:112`)
+8. **Return:** Jellyfin completes login and sets user's login method to Emby (`EmbyAuthenticationProvider.cs:113`)
 
-### Password Change Path
+**Where Jellyfin's login lock sits:** Steps 1-8 all execute inside Jellyfin's login lock. The plugin minimizes time in the lock by: checking user list cache first, using a 5-second HTTP timeout, failing fast on errors, and keeping logic pure.
 
-1. `UserManager.ChangePassword` calls the assigned login method, then saves the user (`.claude/rules/plugin.md:23`).
-2. `EmbyAuthenticationProvider.ChangePassword` (`EmbyAuthenticationProvider.cs:125-139`):
-   - New password: set the hash and set `AuthenticationProviderId` to `DefaultLoginMethod.ProviderId`. The user moves to Default at once.
-   - Empty password (reset): set `Password` to `null`. The user stays on the Emby login method, so Emby checks the next login.
+### Secondary Path: Move After First Login (Event-Driven)
 
-### Migration Status Path (settings page)
+1. **Trigger:** Jellyfin's `SessionManager` publishes `AuthenticationResultEventArgs` after login completes and lock is released (`MoveAfterLogin.cs` remarks)
+2. **Guard:** Check `MigrationMode.MoveAfterFirstLogin` setting (`MoveAfterLogin.cs:37`)
+3. **Target:** Resolve migration target to login method ID (`LoginMethodMove.ResolveMigrationTarget()`, `MoveAfterLogin.cs:42`)
+4. **Database query:** Query Jellyfin database for user still on Emby method with password (`MoveAfterLogin.cs:58-62`)
+5. **Verify password:** Check `EmbyVerifiedPasswords.Matches()` — only move if Emby verified this password (`MoveAfterLogin.cs:63`)
+6. **Conditional move:** `LoginMethodMove.MoveAsync()` updates one column with condition checks (user still on Emby method and password unchanged) (`MoveAfterLogin.cs:68`, `LoginMethodMove.cs:33`)
+7. **Outcome:** User moved or stays on Emby method; login still succeeds (event consumer exceptions are logged and swallowed by Jellyfin)
 
-1. On `pageshow`, the settings page loads the plugin configuration, then calls `loadEmbyAuthMigration` (`configPage.html:82-94`).
-2. `loadEmbyAuthMigration` sends `GET EmbyAuth/Migration` with `ApiClient.getJSON` (`configPage.html:66`).
-3. `EmbyAuthController.GetMigrationStatus` (`EmbyAuthController.cs:37-47`) creates a database context, calls `EmbyLoginMethodUsers.ListAsync`, and returns `MigrationStatus` with one `MigrationUser(Name, ReadyToMove)` per user. The response has no user IDs or hashes (line 45).
-4. The page shows the count of users and of ready users, and one list item per user, built with `textContent` (`configPage.html:67-76`, `.claude/rules/plugin.md:50`). If the request fails, it shows an error line (`configPage.html:77-79`).
+### Tertiary Path: Manual/Scheduled Migration
 
-### Migration Task Path
+1. **Entry:** Administrator runs "Finish the Emby migration" task via settings page, Scheduled Tasks, or API
+2. **Target:** Resolve migration target (`EmbyMigrationTask.cs:65`)
+3. **List candidates:** `EmbyLoginMethodUsers.ListAsync()` queries all users on Emby method, checks `EmbyVerifiedPasswords.RecordsAvailable()` and `Matches()` to determine readiness state (`EmbyMigrationTask.cs:83`)
+4. **Iterate and move:** For each user with `MigrationUserState.Ready`, call `LoginMethodMove.MoveAsync()` with condition checks (`EmbyMigrationTask.cs:93-107`)
+5. **Report:** Log summary of moved/remaining users and progress
 
-1. The task starts in one of three ways (`MoveEmbyUsersToDefaultTask.cs:17`):
-   - **Run migration now** on the settings page sends `POST EmbyAuth/Migration/Run` (`configPage.html:96-105`). `EmbyAuthController.RunMigration` calls `ITaskManager.QueueIfNotRunning<MoveEmbyUsersToDefaultTask>()` and returns 204 (`EmbyAuthController.cs:53-59`). The page reloads the status after 3 seconds (`configPage.html:100-101`).
-   - Dashboard > Advanced > Scheduled Tasks (`.claude/rules/plugin.md:51`).
-   - `POST /ScheduledTasks/Running/{id}` (`.claude/rules/e2e.md:32`).
-2. The key is `EmbyAuthMoveUsersToDefault` (`MoveEmbyUsersToDefaultTask.cs:45`). `GetDefaultTriggers` returns no triggers (line 54).
-3. `ExecuteAsync` (line 57) gets the users from `EmbyLoginMethodUsers.ListAsync` (line 63).
-4. For each user with `ReadyToMove`, it calls `DefaultLoginMethod.MoveAsync` with the saved hash (lines 69-70). It logs each user that stays (line 76), reports progress (line 79), and logs a summary (line 82).
+### Settings Change Path
+
+1. **Entry:** Administrator changes settings via settings page (calls plugin API) or direct Jellyfin plugin API
+2. **Validation:** `EmbyAuthPlugin.UpdateConfiguration()` calls `MigrationTargetValidation.FindProblem()` against live enabled provider list (`EmbyAuthPlugin.cs:79`)
+3. **Guard:** Refuses save with `ArgumentException` if migration target or password-set target is not an enabled login method (`EmbyAuthPlugin.cs:84`)
+4. **Persist:** Base `UpdateConfiguration()` saves settings if validation passes
+
+### Password Change Path (Administrator or User)
+
+1. **Entry:** Jellyfin calls `ChangePassword(user, newPassword)` inside login lock (`EmbyAuthenticationProvider.cs:132`)
+2. **Reset:** If empty password, clear saved hash and stay on Emby method (`EmbyAuthenticationProvider.cs:135-139`)
+3. **New password:** Hash and save new password (`EmbyAuthenticationProvider.cs:142`)
+4. **Move logic:** Resolve password-set target (falls back to migration target if empty) (`LoginMethodMove.ResolvePasswordSetTarget()`, `EmbyAuthenticationProvider.cs:143`)
+5. **Outcome:**
+   - **MoveTargetKind.Move:** Set `AuthenticationProviderId` to target method (user moves on this call, not in event) (`EmbyAuthenticationProvider.cs:147`)
+   - **MoveTargetKind.Remain:** Leave on Emby method (`EmbyAuthenticationProvider.cs:151`)
+   - **MoveTargetKind.Invalid:** Leave unchanged, log error (`EmbyAuthenticationProvider.cs:154`)
 
 **State Management:**
-- **Jellyfin database** — accounts, `AuthenticationProviderId`, and password hashes. Written through `IUserManager` and `DefaultLoginMethod.MoveAsync`; read by `MoveToDefaultLoginMethod` and `EmbyLoginMethodUsers`.
-- **Verified passwords file** — JSON map of Jellyfin user ID to the SHA-256 fingerprint of the hash. Loaded once on first use and kept in memory (`EmbyVerifiedPasswords.cs:90-113`).
-- **Emby user list** — in-memory `Snapshot` record (`EmbyUserDirectory.cs:88`) with server URL, API key, users, and expiry time.
-- **Settings** — `PluginConfiguration`, saved by Jellyfin with `XmlSerializer` (`PluginConfiguration.cs:57`).
+- **Emby user list:** `EmbyUserDirectory` holds volatile snapshot; cache TTL is 60 seconds (live update on settings change), retry delay 30 seconds on fetch failure (`EmbyUserDirectory.cs:39, 44`)
+- **Verified passwords:** `EmbyVerifiedPasswords` reads JSON file once and caches; non-sticky failed reads retry on next call (`EmbyVerifiedPasswords.cs:116-140`)
+- **Lock in login:** All login flow (steps 1-8 in Primary Request Path) serializes inside Jellyfin's lock; must complete in ~seconds, not minutes
+- **Lock in password save:** `EmbyVerifiedPasswords.Record()` holds lock only for I/O (`EmbyVerifiedPasswords.cs:45-69`)
 
 ## Key Abstractions
 
-**EmbyLogin** (`EmbyClient.cs:21`):
-- Purpose: A login that Emby accepted
-- Fields: `Name` (the Emby user name), `EnableRemoteAccess`
-- Produced by: `EmbyClient.AuthenticateAsync`
+**JellyfinAccount:**
+- **Purpose:** Hold the username and authentication provider ID of a Jellyfin user; used in login decision logic
+- **Examples:** `LoginDecision.cs:10`
+- **Pattern:** Record type; passed by value; immutable
 
-**EmbyUser** (`EmbyClient.cs:28`):
-- Purpose: An entry in the Emby user list
-- Fields: `Name`, `IsDisabled`
-- Produced by: `EmbyClient.GetUsersAsync`, kept in `EmbyUserDirectory`
+**EmbyLogin:**
+- **Purpose:** Hold the response from Emby after accepting a login (username and remote-access setting)
+- **Examples:** `EmbyClient.cs:21`
+- **Pattern:** Record type; returned by Emby client; parsed from JSON response
 
-**JellyfinAccount** (`LoginDecision.cs:10`):
-- Purpose: The account data that `LoginDecision.Decide` needs
-- Fields: `Username`, `AuthenticationProviderId`
+**EmbyUserStatus:**
+- **Purpose:** Report the state of an Emby user (Active, Disabled, NotFound, Unavailable)
+- **Examples:** `EmbyUserDirectory.cs:13-26`
+- **Pattern:** Enum; returned by `GetStatusAsync()` to decide whether to send password
 
-**LoginAction** (`LoginDecision.cs:15`):
-- `Deny`, `UseAccount`, `CreateAccount`
-- Returned by: `LoginDecision.Decide`
+**MigrationUserState:**
+- **Purpose:** Report readiness of a user on Emby method for migration (Ready, NeedsEmbyLogin, NoPassword, Unknown)
+- **Examples:** `EmbyLoginMethodUsers.cs:20-42`
+- **Pattern:** Enum; determines whether migration task moves user; calculated from DB and fingerprint file
 
-**EmbyUserStatus** (`EmbyUserDirectory.cs:13`):
-- `Active` — an enabled Emby user has exactly this name, ignoring case
-- `Disabled` — the Emby user with this name is disabled
-- `NotFound` — no Emby user has this name
-- `Unavailable` — the plugin cannot read the Emby user list
-- Returned by: `EmbyUserDirectory.GetStatusAsync`
+**MoveTarget:**
+- **Purpose:** Represent a resolved move target (Move to X, Remain, or Invalid)
+- **Examples:** `LoginMethodMove.cs:109`
+- **Pattern:** Record struct; discriminates on Kind field; ProviderId is null unless Kind == Move
 
-**EmbyLoginMethodUser** (`EmbyLoginMethodUsers.cs:18`, internal):
-- Purpose: A user on the Emby login method, as the migration sees the user
-- Fields: `Id`, `Username`, `PasswordHash` (nullable), `ReadyToMove`
-- Produced by: `EmbyLoginMethodUsers.ListAsync`
-
-**MigrationStatus** and **MigrationUser** (`EmbyAuthController.cs:66`, `EmbyAuthController.cs:76`, public):
-- Purpose: The response of `GET /EmbyAuth/Migration`
-- Fields: `MigrationStatus.Users`; `MigrationUser.Name`, `MigrationUser.ReadyToMove`. Jellyfin serializes them with PascalCase names (`.claude/rules/plugin.md:49`).
-
-**MigrationMode** (`PluginConfiguration.cs:9`):
-- `MoveAfterFirstLogin` (default) — Emby checks the first login, then the event consumer moves the user to Default
-- `KeepEmbyInCharge` — Emby checks every login until the migration task runs
-- `JellyfinPasswordFirst` — Jellyfin checks the saved password first, Emby only if it does not match, until the migration task runs
-
-**AccountAccess** (`PluginConfiguration.cs:31`):
-- `CopyEmbyRemoteAccess` (default) — new accounts get Jellyfin's default permissions and copy Emby's remote access setting; existing accounts lose remote access when Emby does not allow it
-- `JellyfinDefaults` — new accounts get Jellyfin's default permissions; Emby's remote access setting is ignored
-- `NoLibraries` — like `CopyEmbyRemoteAccess`, but new accounts get no library access until an administrator grants it
+**LoginAction:**
+- **Purpose:** Outcome of login decision (Deny, UseAccount, CreateAccount)
+- **Examples:** `LoginDecision.cs:15-25`
+- **Pattern:** Enum; returned by pure `Decide()` function
 
 ## Entry Points
 
-**EmbyAuthenticationProvider.Authenticate(string, string, User?):**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:60`
-- Triggers: Jellyfin's `UserManager`, for a user on the Emby login method or a name with no Jellyfin account
-- Responsibilities: Account checks, settings, saved-password check, user list, Emby login, decision, save, fingerprint
+**Login Method (IAuthenticationProvider):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs`
+- **Triggers:** Jellyfin calls when a user attempts login on the Emby method, or when Emby is the fallback for an unknown username
+- **Responsibilities:** 
+  - Validate credentials against Emby
+  - Create or update Jellyfin accounts
+  - Save password hashes
+  - Apply account permissions
+  - Record verified passwords
+- **Registered by:** `PluginServiceRegistrator.RegisterServices()` line 37
+- **Jellyfin discovery:** Automatic via `GetExports<IAuthenticationProvider>()`
 
-**EmbyAuthenticationProvider.ChangePassword:**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthenticationProvider.cs:125`
-- Triggers: `UserManager.ChangePassword` for a user on the Emby login method
-- Responsibilities: A new password moves the user to Default; a reset keeps the user on the Emby login method
+**Event Consumer (IEventConsumer<AuthenticationResultEventArgs>):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/MoveAfterLogin.cs`
+- **Triggers:** `SessionManager` publishes after any login completes (including Quick Connect), outside the login lock
+- **Responsibilities:** Move user to configured target if `MoveAfterFirstLogin` mode and password verified by Emby
+- **Registered by:** `PluginServiceRegistrator.RegisterServices()` line 45
+- **Jellyfin discovery:** Automatic via scoped DI registration
 
-**MoveToDefaultLoginMethod.OnEvent:**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/MoveToDefaultLoginMethod.cs:31`
-- Triggers: `AuthenticationResultEventArgs`, which `SessionManager` publishes after a login, including a Quick Connect login
-- Responsibilities: In `MoveAfterFirstLogin` mode, move the user to Default if Emby verified the saved hash
+**Scheduled Task (IScheduledTask):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/EmbyMigrationTask.cs`
+- **Triggers:** Administrator runs manually; no default trigger configured
+- **Responsibilities:** Batch-move all ready users to configured target; report progress
+- **Registered by:** Jellyfin discovers via `Assembly.GetExportedTypes()` reflection (must be `public`)
+- **Jellyfin UI:** Accessible at Dashboard > Advanced > Scheduled Tasks
 
-**MoveEmbyUsersToDefaultTask.ExecuteAsync:**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/MoveEmbyUsersToDefaultTask.cs:57`
-- Triggers: **Run migration now** (through the migration API), Dashboard > Advanced > Scheduled Tasks, or `POST /ScheduledTasks/Running/{id}`
-- Responsibilities: Move every ready user on the Emby login method
+**API Controller (ControllerBase):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs`
+- **Endpoints:**
+  - `GET /EmbyAuth/Migration` — Return migration status (users, task state, available targets)
+  - `POST /EmbyAuth/Migration/Run` — Queue migration task if not running
+- **Authorization:** `RequiresElevation` policy (administrators only)
+- **Registered by:** Jellyfin auto-discovers and routes via `[ApiController]` and `[Route]` attributes
+- **Client:** Called by settings page JavaScript (`Configuration/configPage.html`)
 
-**EmbyAuthController.GetMigrationStatus (`GET /EmbyAuth/Migration`):**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs:37-39`
-- Triggers: The settings page, or an administrator's API call
-- Responsibilities: Return each user on the Emby login method with `ReadyToMove`
-
-**EmbyAuthController.RunMigration (`POST /EmbyAuth/Migration/Run`):**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/Api/EmbyAuthController.cs:53-55`
-- Triggers: **Run migration now** on the settings page, or an administrator's API call
-- Responsibilities: Queue the migration task unless it already runs; return 204
-
-**EmbyAuthPlugin.GetPages:**
-- Location: `src/Jellyfin.Plugin.EmbyAuth/EmbyAuthPlugin.cs:43`
-- Triggers: Jellyfin's dashboard
-- Responsibilities: Serve the embedded `Configuration/configPage.html`
+**Settings Page (IHasWebPages):**
+- **Location:** `src/Jellyfin.Plugin.EmbyAuth/Configuration/configPage.html`
+- **Triggers:** Administrator navigates to Plugins > Emby Auth in Dashboard
+- **Responsibilities:** Display current settings, validate inputs, call migration API, show user readiness
+- **Registered by:** `EmbyAuthPlugin.GetPages()` line 54
+- **Framework:** Server-side embedded HTML; uses Jellyfin's `Dashboard` and `ApiClient` globals
 
 ## Architectural Constraints
 
-- **Threading:** Jellyfin calls login methods inside a lock, and all logins for unknown names share the lock key `Guid.Empty` (`.claude/rules/plugin.md:14`). `EmbyUserDirectory` replaces an immutable `Snapshot` through a `volatile` field (`EmbyUserDirectory.cs:46, 58-64`), so a reader always sees a whole snapshot. Two logins that miss the cache at the same time can each request the user list; the last write wins. `EmbyVerifiedPasswords` guards the dictionary and the file with one `Lock` (`EmbyVerifiedPasswords.cs:22, 45, 81`).
-- **Global state:** `EmbyAuthPlugin.Instance` is a static, nullable property set in the plugin constructor (`EmbyAuthPlugin.cs:25, 31`). Callers use `?.` (`EmbyAuthenticationProvider.cs:146`, `MoveToDefaultLoginMethod.cs:34`).
-- **DI lifetimes:** `PluginServiceRegistrator.RegisterServices` (`PluginServiceRegistrator.cs:26-36`) adds `TimeProvider.System` with `TryAddSingleton`, adds `EmbyClient`, `EmbyUserDirectory`, `EmbyVerifiedPasswords`, and the `IAuthenticationProvider` as singletons, and adds `MoveToDefaultLoginMethod` as a scoped `IEventConsumer<AuthenticationResultEventArgs>`. `rg` finds no registration of `EmbyAuthController` or `MoveEmbyUsersToDefaultTask` in `src/`. Jellyfin still reaches both: the task is discovered by type (see Type visibility), and the e2e tests call both controller routes and get 403, 204, and the status list (`e2e/30-migration-modes.bats:95-120`). No file in this repo states how Jellyfin discovers a plugin controller.
-- **IUserManager resolution:** `IUserManager` depends on all login methods, so the provider resolves it from `IServiceProvider` at login time, never in a constructor (`EmbyAuthenticationProvider.cs:21, 106`, `.claude/rules/plugin.md:16`).
-- **Type visibility:** Jellyfin discovers scheduled tasks with `Assembly.GetExportedTypes()`, so `MoveEmbyUsersToDefaultTask` and every type in its constructor are public. Other plugin types stay internal (`.claude/rules/plugin.md:22`). `EmbyAuthController`, `MigrationStatus`, and `MigrationUser` are also public (`EmbyAuthController.cs:26, 66, 76`); `EmbyLoginMethodUsers` and `EmbyLoginMethodUser` are internal (`EmbyLoginMethodUsers.cs:18, 23`). Tests reach internal types through `InternalsVisibleTo` (`Jellyfin.Plugin.EmbyAuth.csproj:19`).
-- **API authorization:** Every plugin API controller uses `[Authorize(Policy = Policies.RequiresElevation)]`, so only administrators can call it (`.claude/rules/plugin.md:48`, `EmbyAuthController.cs:23`). `e2e/30-migration-modes.bats:95-110` checks that a regular user gets 403 on both routes.
-- **Mutual reference:** `EmbyAuthenticationProvider.ChangePassword` uses `DefaultLoginMethod.ProviderId`, and `DefaultLoginMethod.MoveAsync` and `EmbyLoginMethodUsers.ListAsync` use `EmbyAuthenticationProvider.ProviderId` (`EmbyAuthenticationProvider.cs:136`, `DefaultLoginMethod.cs:36`, `EmbyLoginMethodUsers.cs:40`).
-- **Database writes:** `DefaultLoginMethod.MoveAsync` changes one column in one statement, so it does not overwrite concurrent changes to the user (`DefaultLoginMethod.cs:23-25, 34-38`).
-- **Exceptions:** Jellyfin catches only `AuthenticationException` from a login method; any other exception becomes an HTTP 500 (`.claude/rules/plugin.md:15`). `EventManager` logs and ignores an exception from an event consumer, so a failed move does not fail the login (`.claude/rules/plugin.md:20`).
-- **Event ordering:** After a login, Jellyfin sets the user's login method to the method that accepted the login. The provider therefore cannot move the user to Default itself; `MoveToDefaultLoginMethod` does it after the login completes (`MoveToDefaultLoginMethod.cs:17-18`, `.claude/rules/plugin.md:18`).
+- **Threading:** Single-threaded event loop per request (async/await); `EmbyUserDirectory` uses volatile field for lock-free snapshot updates; `EmbyVerifiedPasswords` uses `Lock` for file I/O
+- **Global state:** 
+  - `EmbyAuthPlugin.Instance` static singleton (read-only after construction)
+  - `EmbyUserDirectory._snapshot` volatile field holds cached copy
+  - `EmbyVerifiedPasswords._fingerprints` holds in-memory cache (lazy-loaded)
+  - No other shared mutable state
+- **Login lock:** All login requests serialize inside Jellyfin's `UserManager` lock on `Guid.Empty` for unknown users; known users do not hold the lock. Plugin must not call `IUserManager.GetUserByName()` recursively or make blocking calls
+- **Circular imports:** None — structure is acyclic (Jellyfin → Plugin → Domain → External)
+- **Jellyfin dependency:** Plugin depends on Jellyfin 12.1 types; reverse dependency is implicit (Jellyfin discovers and invokes the plugin)
 
 ## Anti-Patterns
 
-These rules come from `.claude/rules/plugin.md` and `CLAUDE.md`.
+### Accessing IUserManager in Constructors
 
-### Full account save to move a user
+**What happens:** Plugin constructors or event handlers hold a reference to `IUserManager`
 
-**What happens:** A move to Default saves the whole user with `UpdateUserAsync`.
-**Why it's wrong:** It can overwrite a concurrent change, for example an administrator disabling the user (`.claude/rules/plugin.md:21`).
-**Do this instead:** Use `DefaultLoginMethod.MoveAsync` (`src/Jellyfin.Plugin.EmbyAuth/DefaultLoginMethod.cs:31`).
+**Why it's wrong:** `IUserManager` depends on every login method, including this plugin. A cycle in the DI graph breaks construction.
 
-### Move or accept a saved password without the fingerprint check
+**Do this instead:** Resolve `IUserManager` on each login attempt (inside `Authenticate()`), not in the constructor. `EmbyAuthenticationProvider.cs:107` does this correctly.
 
-**What happens:** A code path moves a user to Default, or accepts a saved hash without Emby, and skips `EmbyVerifiedPasswords.Matches`.
-**Why it's wrong:** A password that an administrator set on a pre-created account would then work (`.claude/rules/plugin.md:28`).
-**Do this instead:** Call `EmbyVerifiedPasswords.Matches` first, as `EmbyAuthenticationProvider.cs:82` and `MoveToDefaultLoginMethod.cs:48` do, or use `ReadyToMove` from `EmbyLoginMethodUsers.ListAsync` (`EmbyLoginMethodUsers.cs:51`), as `MoveEmbyUsersToDefaultTask.cs:69` does.
+### Storing Settings in Static State
 
-### Other exceptions from the login method
+**What happens:** Plugin reads configuration once at startup and caches it
 
-**What happens:** An expected failure escapes as an exception other than `AuthenticationException`.
-**Why it's wrong:** Jellyfin returns HTTP 500 for the login request.
-**Do this instead:** Catch the expected exception and throw `AuthenticationException`, as in `EmbyAuthenticationProvider.cs:175-179` and `192-196`.
+**Why it's wrong:** Administrator can change settings without restarting Jellyfin. Settings changes must be read on every login.
 
-### A Default account without a password
+**Do this instead:** Accept `Func<PluginConfiguration?>` in the constructor and call it on each login. `EmbyAuthenticationProvider.cs:41` does this correctly.
 
-**What happens:** A user is left on, or moved to, the Default login method with no password.
-**Why it's wrong:** The Default login method accepts a blank password for an account without a password (`.claude/rules/plugin.md:33`).
-**Do this instead:** Save the hash immediately after `CreateUserAsync` and delete the account if the save fails (`EmbyAuthenticationProvider.cs:181-203`). On a password reset, keep the user on the Emby login method (`EmbyAuthenticationProvider.cs:128-133`).
+### Moving Users Without Password Verification
 
-### A password or the API key in a log or exception message
+**What happens:** Plugin moves a user to Default after reading the password from the database, without checking that Emby verified it
 
-**What happens:** A log template or exception message includes a secret, or a settings message repeats a configured value.
-**Why it's wrong:** The server URL can contain credentials (`.claude/rules/plugin.md:56`), and `CLAUDE.md:46` forbids a password or the API key in a log or exception message.
-**Do this instead:** Use `[LoggerMessage]` templates with names and status codes only (`EmbyClient.cs:188-207`). Settings problems describe the field, not the value (`EmbyAuthSettings.cs:21, 36-76`).
+**Why it's wrong:** An administrator can set a password on a pre-created account without Emby seeing it. Moving such an account to Default makes it accessible with that password, even though Emby never accepted it. Default method allows blank-password access to accounts without passwords.
 
-### User names in page HTML
+**Do this instead:** Before moving, call `EmbyVerifiedPasswords.Matches()` and only move if it returns true. `MoveAfterLogin.cs:63` does this correctly.
 
-**What happens:** The settings page inserts a user name with `innerHTML`.
-**Why it's wrong:** `.claude/rules/plugin.md:50` requires `textContent` for page content built from user names.
-**Do this instead:** Create the element and set `textContent`, as `configPage.html:73-75` does.
+### Overwriting User Rows With UpdateUserAsync
+
+**What happens:** Plugin calls `IUserManager.UpdateUserAsync()` after changing the login method
+
+**Why it's wrong:** While the update is in flight, an administrator might disable the user or make other changes. `UpdateUserAsync()` overwrites the entire row, losing concurrent changes. The move is not atomic relative to other updates.
+
+**Do this instead:** Use `ExecuteUpdateAsync()` with condition checks on one column only. `LoginMethodMove.MoveAsync()` line 37-41 does this correctly.
 
 ## Error Handling
 
-**Strategy:** Fail closed. Every refused login throws `AuthenticationException("Invalid username or password")` (`EmbyAuthenticationProvider.cs:36`), except invalid settings, which throw `AuthenticationException` with the settings problem (line 152). Emby failures return `null` from `EmbyClient`, and the provider refuses the login.
+**Strategy:** Fail fast with clear, actionable messages. Never silently ignore errors.
 
 **Patterns:**
-- Invalid settings: Error log, login refused (`EmbyAuthenticationProvider.cs:144-153`).
-- Emby refuses the login: Information log (`EmbyClient.cs:68-72`).
-- Emby unreachable or timed out (`HttpRequestException`, or `TaskCanceledException` not caused by the caller's token): Warning log (`EmbyClient.cs:76-80, 148-149`).
-- Unreadable Emby response (`JsonException`, `InvalidOperationException`) or no user name: Warning log (`EmbyClient.cs:81-91, 152-153`).
-- User list refused or unreadable: Warning log; `EmbyUserDirectory` caches the failure for 30 seconds and returns `Unavailable` (`EmbyUserDirectory.cs:62-68`).
-- Sign-out failure: Warning log; the login still succeeds (`EmbyClient.cs:177-185`).
-- Saved hash cannot be parsed (`FormatException`, `NotSupportedException`): Warning log; the provider asks Emby (`EmbyAuthenticationProvider.cs:155-166`).
-- Jellyfin rejects the user name (`ArgumentException` from `CreateUserAsync`): Error log, login refused; no account exists (`EmbyAuthenticationProvider.cs:175-179`).
-- Account save fails (`DbUpdateException`, `ResourceNotFoundException`): Error log, login refused; a new account is deleted (`EmbyAuthenticationProvider.cs:192-203, 218-222`).
-- Fingerprint file read fails (`JsonException`, `IOException`, `UnauthorizedAccessException`): Error log; the in-memory map stays empty, and the next record replaces the file (`EmbyVerifiedPasswords.cs:103-110, 115`).
-- Fingerprint file write fails (`IOException`, `UnauthorizedAccessException`): Error log (`EmbyVerifiedPasswords.cs:54-63`).
-- Migration API: the controller has no exception handling of its own (`EmbyAuthController.cs:37-59`). The settings page shows "Jellyfin cannot read the migration status" or "Jellyfin did not start the migration" when a request fails (`configPage.html:77-79, 102-104`).
+- **Login method:** Convert expected failures (Emby rejects login, user disabled) to `AuthenticationException`; convert unexpected exceptions (HTTP error, JSON parse error) to `AuthenticationException` with inner exception for logging
+- **Account creation:** Log specific reason if creation or save fails; attempt cleanup delete before throwing
+- **Password file I/O:** Log read/write failures at Error level; reads fail non-sticky (retry next call); writes fail soft (keep in-memory, lose on restart only)
+- **Settings validation:** Refuse save with `ArgumentException` (synchronous, prevents state change); log validation errors at Error level
+- **Event consumer:** Log errors and swallow (Jellyfin's `EventManager` does this anyway; login succeeds even if move fails)
+- **Migration task:** Log per-user outcomes and summary; task completes with progress report even if some users fail to move
 
 ## Cross-Cutting Concerns
 
-**Logging:** Every class that logs declares `private static partial void Log...` methods with `[LoggerMessage]` near the end of the class. Levels: Information for normal events and ordinary refusals, Warning for Emby problems, an administrator on the Emby login method, and name conflicts, Error for settings, account creation or save failures, and fingerprint file failures. `EmbyAuthController` and `EmbyLoginMethodUsers` do not log.
+**Logging:**
+- Logger pattern: Inject `ILogger<T>` into constructor
+- Message format: Actions (created user, moved user), failures (login rejected, save failed), warnings (user list unavailable, settings invalid)
+- Security: Never log passwords, password hashes, or API keys
+- Structured logging: Use `LoggerMessage` partial methods for efficiency and structured fields
 
-**Validation:** `EmbyAuthSettings.FindProblem` (`EmbyAuthSettings.cs:36-76`) checks that the URL is set, is an absolute http or https URL, and has no user info; that the API key is set; and that both enums are defined. The user name must match an Emby user name exactly, ignoring case, before the password goes to Emby (`EmbyUserDirectory.cs:76`), and Emby's returned name must match the typed name, ignoring case (`LoginDecision.cs:42`).
+**Validation:**
+- Settings: `EmbyAuthSettings.TryCreate()` validates URL, API key, enums (pure function)
+- Targets: `MigrationTargetValidation.FindProblem()` validates against live provider list (takes provider list as parameter)
+- Settings save: `EmbyAuthPlugin.UpdateConfiguration()` calls validation and refuses save
 
-**Authentication and authorization:** Emby checks the password for a user on the Emby login method, except in `JellyfinPasswordFirst` mode when the saved hash is verified and matches. The plugin never authenticates an administrator through Emby (`EmbyAuthenticationProvider.cs:73-77`). A password set in Jellyfin moves the user to Default; a password reset keeps the user on the Emby login method. The migration API requires an administrator (`EmbyAuthController.cs:23`).
+**Authentication:**
+- Jellyfin provides login lock, user manager, and password hasher
+- Plugin accepts password, validates against Emby, saves hash in Jellyfin's format
+- Admin can reset password (clears hash, user stays on Emby method) or set new password (moves per configuration)
 
 ---
 
-*Architecture analysis: 2026-09-16*
+*Architecture analysis: 2026-09-20*
