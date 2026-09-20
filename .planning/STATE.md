@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
 status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-09-20T19:42:26.066Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-09-20T19:52:30.383Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 04 execution started
-state_head: d795794811a487c25945f5217cb3a68d2d65f53c
+state_head: 4ddc33123336a2ffb4234eb064e092cc8333f357
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 22
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 04 execution started
 
@@ -75,6 +75,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 03 P06 | 25min | 2 tasks | 6 files |
 | Phase 03 P07 | 23min | 3 tasks | 10 files |
 | Phase 04 P01 | 18min | 2 tasks | 8 files |
+| Phase 04 P02 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,8 @@ Recent decisions affecting current work:
 - [Phase 03]: [Phase 03-migration-status-and-target]: [Phase 03] fetch-jellyfinsecurity.sh's clean action uses trash (macOS-only) safely, because no mise task or CI job ever calls it — only fetch, which needs no destructive delete, runs in any automated path
 - [Phase 04]: [Phase 04] Checkpoint resolved proceed: fingerprint store moves to SQLite, one-way for data written after the upgrade; plugin project gains a pinned Microsoft.Data.Sqlite.Core reference — Removes the lock-around-I/O contention and the three documented failure modes of the JSON store (lost record on read failure, every user reported unverified during a read failure, in-memory record lost on restart)
 - [Phase 04]: [Phase 04] Task 1's RED phase proved nothing against the pre-rewrite JSON store (storage-engine swap behind an unchanged API); red was proven instead by break-then-restore against the finished SQLite implementation, per human direction — Unskipping all 14 rewritten tests against the unmodified JSON store passed all 14 — no behavior in the <behavior> block is false before the rewrite and true after it
+- [Phase 04]: SignOutAsync gained a username parameter rather than computing the fallback name at the AuthenticateAsync call site, keeping the string.IsNullOrEmpty(embyUserName) ? username : embyUserName fallback next to the two log calls that consume it — Matches the plan's instruction to widen SignOutAsync's own embyUserName parameter to string?
+- [Phase 04]: Task 2's break-then-restore proof for the SignOutAsync fallback produced a compile-time CS8604 red rather than a runtime test failure, the same precedent Phase 03's MIGR-02 established — A nullable-reference-type check catches a missing fallback before any test can run; still a witnessed red, and the second break (removing the empty-token guard) did fail at runtime as expected
 
 ### Pending Todos
 
@@ -144,6 +147,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T19:42:19.912Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-09-20T19:52:02.683Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
