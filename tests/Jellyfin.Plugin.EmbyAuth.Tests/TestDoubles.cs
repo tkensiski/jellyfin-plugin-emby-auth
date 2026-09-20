@@ -28,9 +28,17 @@ public sealed record RecordedRequest(HttpMethod Method, Uri? Uri, string? Author
 
 public sealed class StubHttpMessageHandler : HttpMessageHandler
 {
+    private readonly Lock _lock = new();
     private readonly Queue<Func<HttpResponseMessage>> _responses = new();
+    private readonly TaskCompletionSource _firstRequestStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private volatile TaskCompletionSource? _hold;
 
     public List<RecordedRequest> Requests { get; } = [];
+
+    /// <summary>
+    /// Gets a task that completes as soon as <see cref="SendAsync"/> has recorded its first request.
+    /// </summary>
+    public Task FirstRequestStarted => _firstRequestStarted.Task;
 
     public StubHttpMessageHandler Then(Func<HttpResponseMessage> response)
     {
@@ -38,24 +46,52 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
         return this;
     }
 
+    /// <summary>
+    /// Makes every response returned after this call wait until <see cref="ReleaseResponses"/> runs. The request is
+    /// still recorded into <see cref="Requests"/> before the wait begins.
+    /// </summary>
+    public void HoldResponses() => _hold = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Releases any response that <see cref="HoldResponses"/> is holding open. Safe to call when nothing is held.
+    /// </summary>
+    public void ReleaseResponses() => _hold?.TrySetResult();
+
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var contentLength = request.Content?.Headers.ContentLength;
         var body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
-        Requests.Add(new RecordedRequest(
-            request.Method,
-            request.RequestUri,
-            HeaderValue(request, "Authorization"),
-            HeaderValue(request, "X-Emby-Token"),
-            body,
-            contentLength));
 
-        if (_responses.Count == 0)
+        Func<HttpResponseMessage> factory;
+        lock (_lock)
         {
-            throw new InvalidOperationException($"No stub response for {request.Method} {request.RequestUri}");
+            Requests.Add(new RecordedRequest(
+                request.Method,
+                request.RequestUri,
+                HeaderValue(request, "Authorization"),
+                HeaderValue(request, "X-Emby-Token"),
+                body,
+                contentLength));
+
+            if (Requests.Count == 1)
+            {
+                _firstRequestStarted.TrySetResult();
+            }
+
+            if (_responses.Count == 0)
+            {
+                throw new InvalidOperationException($"No stub response for {request.Method} {request.RequestUri}");
+            }
+
+            factory = _responses.Dequeue();
         }
 
-        return _responses.Dequeue()();
+        if (_hold is { } hold)
+        {
+            await hold.Task.ConfigureAwait(false);
+        }
+
+        return factory();
     }
 
     private static string? HeaderValue(HttpRequestMessage request, string name) =>

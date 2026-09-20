@@ -1,4 +1,6 @@
 using System;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
@@ -11,6 +13,59 @@ namespace Jellyfin.Plugin.EmbyAuth.Tests;
 
 public sealed class TestDoublesTests
 {
+    [Fact]
+    public async Task SendAsync_TenConcurrentRequests_RecordsAllTenWithNoLostEntry()
+    {
+        var handler = new StubHttpMessageHandler();
+        for (var i = 0; i < 10; i++)
+        {
+            handler.Then(() => new HttpResponseMessage(HttpStatusCode.OK));
+        }
+
+        using var client = new HttpClient(handler);
+        var sends = new Task[10];
+        for (var i = 0; i < sends.Length; i++)
+        {
+            sends[i] = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://stub-handler.test/"), TestContext.Current.CancellationToken);
+        }
+
+        await Task.WhenAll(sends);
+
+        Assert.Equal(10, handler.Requests.Count);
+    }
+
+    [Fact]
+    public async Task FirstRequestStarted_CompletesWhileAHeldResponseIsStillBlocked()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => new HttpResponseMessage(HttpStatusCode.OK));
+        handler.HoldResponses();
+        using var client = new HttpClient(handler);
+
+        var send = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://stub-handler.test/"), TestContext.Current.CancellationToken);
+        await handler.FirstRequestStarted;
+
+        Assert.False(send.IsCompleted);
+
+        handler.ReleaseResponses();
+        await send;
+    }
+
+    [Fact]
+    public async Task ReleaseResponses_LetsTheHeldCallReturnItsQueuedResponse()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => new HttpResponseMessage(HttpStatusCode.Accepted));
+        handler.HoldResponses();
+        using var client = new HttpClient(handler);
+
+        var send = client.SendAsync(new HttpRequestMessage(HttpMethod.Get, "http://stub-handler.test/"), TestContext.Current.CancellationToken);
+        await handler.FirstRequestStarted;
+
+        handler.ReleaseResponses();
+        var response = await send;
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
     [Fact]
     public async Task SqliteJellyfinDbContextFactory_SharesRows_AcrossContexts()
     {
