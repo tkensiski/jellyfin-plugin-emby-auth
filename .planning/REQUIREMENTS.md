@@ -14,7 +14,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 - [x] **AUTH-03**: When the plugin creates an account, it saves the Emby-verified hash and the Emby login method in the call right after `CreateUserAsync`, the same pattern as Jellyfin's own user creation, and `docs/how-it-works.md` describes the brief moment before that save.
 - [x] **AUTH-04**: No failure while creating or saving an account (failed save, failed cleanup delete, or an unexpected exception type) returns HTTP 500 or leaves an enabled account on the Default login method without a password.
 - [ ] **AUTH-05**: The plugin ends the Emby session whenever Emby returns an access token, including a login response that has no user name.
-- [ ] **AUTH-06**: An account on the Emby login method may have no saved password, and the plugin does not invent one. The saved hash plays no part in an Emby login method login (AUTH-01), so a missing password costs the user nothing while Emby checks the login. The settings page names every account on the Emby login method that has no saved password, warns that Jellyfin's Default login method opens such an account with a blank password, and recommends setting a password before the account moves. The plugin does not refuse the move and does not write a password the user cannot type.
+- [x] **AUTH-06**: An account on the Emby login method may have no saved password, and the plugin does not invent one. The saved hash plays no part in an Emby login method login (AUTH-01), so a missing password costs the user nothing while Emby checks the login. The settings page names every account on the Emby login method that has no saved password, warns that Jellyfin's Default login method opens such an account with a blank password, and recommends setting a password before the account moves. The plugin does not refuse the move and does not write a password the user cannot type.
 
 ### Verified Password Records
 
@@ -30,7 +30,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Migration Target
 
-- [ ] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. Two settings carry it: **Migration target** governs the move after a login and the migration task, and **Password-set target** governs the move after a password that an administrator sets in Jellyfin. Password-set target offers the same choices plus "Same as the migration target", which is its default. Both offer "Remain on Emby Login", which means no path moves anyone. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses the setting that governs it.
+- [x] **MIGR-01**: The login method that the plugin moves a user to is a setting, not a fixed value. Two settings carry it: **Migration target** governs the move after a login and the migration task, and **Password-set target** governs the move after a password that an administrator sets in Jellyfin. Password-set target offers the same choices plus "Same as the migration target", which is its default. Both offer "Remain on Emby Login", which means no path moves anyone. The settings page offers only the login methods that Jellyfin reports as enabled, and the plugin refuses a value that is not one of them. Every path that moves a user off the Emby login method uses the setting that governs it.
 - [x] **MIGR-02**: `EmbyAuthenticationProvider` stays `internal`. A public class enters the `GetExports<IAuthenticationProvider>()` scan that another plugin can run, which can send a password to Emby for a user that this plugin does not serve. A unit test fails if the class becomes public.
 
 ### Documentation
@@ -103,14 +103,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-03 | Phase 1 | Complete |
 | AUTH-04 | Phase 1 | Complete |
 | AUTH-05 | Phase 4 | Pending |
-| AUTH-06 | Phase 3 | Pending |
+| AUTH-06 | Phase 3 | Complete |
 | FPRT-01 | Phase 3 | Complete |
 | FPRT-02 | Phase 2 | Complete |
 | FPRT-03 | Phase 3 | Complete |
 | UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 3 | Complete |
-| MIGR-01 | Phase 3 | Pending |
+| MIGR-01 | Phase 3 | Complete |
 | MIGR-02 | Phase 3 | Complete |
 | DOCS-01 | Phase 3 | Complete |
 | DOCS-02 | Phase 6 | Pending |
