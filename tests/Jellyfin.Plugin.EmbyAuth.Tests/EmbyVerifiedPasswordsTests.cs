@@ -177,7 +177,7 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
         Assert.All(userIds, id => Assert.True(reloaded.Matches(id, HashA)));
     }
 
-    [Fact(Skip = "RED: awaiting the corrected write-failure log text (Task 1 GREEN commit)")]
+    [Fact]
     public void WriteFailure_KeepsTheRecordInMemory_AndLogsExactlyOneErrorSayingSo()
     {
         var userId = Guid.NewGuid();

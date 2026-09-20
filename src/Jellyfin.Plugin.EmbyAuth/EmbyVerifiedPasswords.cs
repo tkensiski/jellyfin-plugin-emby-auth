@@ -34,7 +34,7 @@ public sealed partial class EmbyVerifiedPasswords
     }
 
     /// <summary>
-    /// Records that Emby verified the password that has this hash. If the file cannot be read or cannot be written, the method logs an error and the record is lost.
+    /// Records that Emby verified the password that has this hash. If the file cannot be read, this call logs an error and loses the record. If the file can be read but not written, the record is kept in memory and this user still moves; only the on-disk copy is behind, and it is lost only if Jellyfin restarts before the next successful write.
     /// </summary>
     /// <param name="userId">The Jellyfin user ID.</param>
     /// <param name="passwordHash">The saved password hash.</param>
@@ -142,6 +142,6 @@ public sealed partial class EmbyVerifiedPasswords
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot read {FilePath}. The plugin records no verified password and moves no user to the Default login method while the read fails. It keeps the records that are in the file and reads the file again on the next login.")]
     private static partial void LogReadFailed(ILogger logger, Exception exception, string filePath);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot write {FilePath}. The plugin does not move this user to the Default login method until the user logs in again through Emby.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot write {FilePath}. The plugin keeps the record in memory and still moves this user; the record on disk is behind until the next successful write, and is lost only if Jellyfin restarts before one happens.")]
     private static partial void LogWriteFailed(ILogger logger, Exception exception, string filePath);
 }
