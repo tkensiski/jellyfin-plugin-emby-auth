@@ -198,3 +198,12 @@ Task 3's load-bearing proof (not a TDD gate, but the same break-then-restore dis
 ---
 *Phase: 04-emby-traffic-under-load-and-failure*
 *Completed: 2026-09-20*
+
+## Self-Check: PASSED
+
+- All key files present on disk (`src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs`, `tests/Jellyfin.Plugin.EmbyAuth.Tests/EmbyUserDirectoryTests.cs`, `TestDoubles.cs`, `TestDoublesTests.cs`, this SUMMARY).
+- All five commits (`fe533a2`, `78f382f`, `8d91a7a`, `46c899d`, `4c82bce`) found in `git log`.
+- `dotnet test --solution Jellyfin.Plugin.EmbyAuth.slnx`: 208/208 passed, zero warnings.
+- `mise run lint`: clean.
+- `bats e2e/40-emby-outage.bats`: 3/3 passed.
+- Plan-level acceptance greps re-confirmed: `SemaphoreSlim` present in `EmbyUserDirectory.cs`; no `Stopwatch`/`ElapsedMilliseconds` in `EmbyUserDirectoryTests.cs`; `test(04-03)` and `feat(04-03)` gate commits both present in git history.
