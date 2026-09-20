@@ -74,12 +74,20 @@ burst_logins() {
 @test "a second burst for a name whose account already exists still leaves exactly one account" {
 	local files status_file status accounts
 
+	# By this point bella has already moved to the Default login method (her first burst's
+	# successful login carried her there), so this burst also passes through JellyfinSecurity's
+	# TwoFactorAuthProvider, which every login tries ahead of Default. That provider's own
+	# IP-based app-password rate limiter can refuse one of five genuinely concurrent requests
+	# with a clean 401 (confirmed against the live Jellyfin log: "App-password attempt
+	# rate-limited", never a 500) before falling through. That is JellyfinSecurity's behavior,
+	# not this plugin's, so this test keeps the same 200-or-401-never-500 tolerance as the
+	# first burst rather than requiring every response to succeed.
 	mapfile -t files < <(burst_logins bella bella-emby-pass 5)
 
 	for status_file in "${files[@]}"; do
 		status="$(cat "$status_file")"
-		if [[ "$status" != "200" ]]; then
-			echo "Unexpected login status $status in $status_file (expected 200 for every response, the account already exists)" >&2
+		if [[ "$status" != "200" && "$status" != "401" ]]; then
+			echo "Unexpected login status $status in $status_file (expected 200 or 401, never 500)" >&2
 			return 1
 		fi
 	done
