@@ -136,6 +136,11 @@ public sealed class EmbyVerifiedPasswordsTests : IDisposable
     {
         CreateStore().Record(Guid.NewGuid(), HashA);
 
+        // WAL mode holds the row in the -wal sibling until the last connection closes, so the
+        // main file must be checkpointed before it is read as bytes. Without this the assertion
+        // passes whatever the store wrote.
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
         Assert.DoesNotContain("BBBB", Encoding.Latin1.GetString(File.ReadAllBytes(_databasePath)), StringComparison.Ordinal);
     }
 
