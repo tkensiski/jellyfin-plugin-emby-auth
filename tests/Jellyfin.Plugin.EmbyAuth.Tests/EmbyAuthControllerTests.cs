@@ -51,7 +51,7 @@ public sealed class EmbyAuthControllerTests : IDisposable
     private EmbyAuthController CreateController() =>
         new(_dbContextFactory, new EmbyVerifiedPasswords(_filePath, NullLogger<EmbyVerifiedPasswords>.Instance), _taskManager);
 
-    [Fact(Skip = "RED: unskipped in the 03-01 Task 2 GREEN commit that wires GetMigrationStatus to EmbyVerifiedPasswords.RecordsAvailable()")]
+    [Fact]
     public async Task GetMigrationStatus_ReportsRecordsUnavailable_WhenTheFingerprintFileCannotBeRead()
     {
         File.WriteAllText(_filePath, UnreadableContents);
@@ -72,7 +72,7 @@ public sealed class EmbyAuthControllerTests : IDisposable
         Assert.False(response.Value!.RecordsUnavailable);
     }
 
-    [Fact(Skip = "RED: unskipped in the 03-01 Task 2 GREEN commit that wires GetMigrationStatus to EmbyVerifiedPasswords.RecordsAvailable()")]
+    [Fact]
     public async Task GetMigrationStatus_ClearsRecordsUnavailable_OnceTheFileBecomesReadable()
     {
         File.WriteAllText(_filePath, UnreadableContents);

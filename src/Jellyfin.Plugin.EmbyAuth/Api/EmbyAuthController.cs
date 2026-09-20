@@ -42,7 +42,7 @@ public sealed class EmbyAuthController(
         await using (dbContext.ConfigureAwait(false))
         {
             var users = await EmbyLoginMethodUsers.ListAsync(dbContext, verifiedPasswords, cancellationToken).ConfigureAwait(false);
-            return new MigrationStatus(false, users.Select(user => new MigrationUser(user.Username, user.ReadyToMove)).ToList());
+            return new MigrationStatus(!verifiedPasswords.RecordsAvailable(), users.Select(user => new MigrationUser(user.Username, user.ReadyToMove)).ToList());
         }
     }
 

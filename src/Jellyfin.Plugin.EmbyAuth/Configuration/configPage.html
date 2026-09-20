@@ -88,10 +88,15 @@
                 var summary = document.querySelector('#EmbyAuthMigrationSummary');
                 var list = document.querySelector('#EmbyAuthMigrationUsers');
                 return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
-                    var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
-                    showEmbyAuthMessage(summary, status.Users.length === 0
-                        ? 'No users are on the Emby login method.'
-                        : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.', false);
+                    if (status.RecordsUnavailable) {
+                        showEmbyAuthMessage(summary, 'Jellyfin cannot read the record of passwords Emby verified. The readiness of each account is unknown until it can. See the Jellyfin log for detail.', true);
+                    } else {
+                        var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
+                        showEmbyAuthMessage(summary, status.Users.length === 0
+                            ? 'No users are on the Emby login method.'
+                            : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.', false);
+                    }
+
                     list.replaceChildren();
                     status.Users.forEach(function (user) {
                         var item = document.createElement('li');

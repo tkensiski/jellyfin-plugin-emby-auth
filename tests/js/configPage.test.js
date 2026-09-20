@@ -274,7 +274,7 @@ test('a failed migration status shows its message', async () => {
   assert.deepEqual(messageChildren(summary), EXPECTED_ICON);
 });
 
-test('a records-unavailable migration status shows a warning naming the Jellyfin log', { skip: 'RED: unskipped in the 03-01 Task 2 GREEN commit that wires loadEmbyAuthMigration to status.RecordsUnavailable' }, async () => {
+test('a records-unavailable migration status shows a warning naming the Jellyfin log', async () => {
   const { document, window } = buildDom({ recordsUnavailable: true });
 
   firePageshow(document, window);
