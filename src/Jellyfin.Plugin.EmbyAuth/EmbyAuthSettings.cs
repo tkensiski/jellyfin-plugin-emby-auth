@@ -11,7 +11,9 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// <param name="ApiKey">The Emby API key.</param>
 /// <param name="MigrationMode">How the plugin moves users from Emby to Jellyfin.</param>
 /// <param name="AccountAccess">The access that the plugin gives to Jellyfin accounts.</param>
-internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey, MigrationMode MigrationMode, AccountAccess AccountAccess)
+/// <param name="MigrationTarget">The login method that the move after a login and the migration task move a user to.</param>
+/// <param name="PasswordSetTarget">The login method that the move after an administrator sets a password in Jellyfin moves a user to. Empty means <paramref name="MigrationTarget"/> governs that move too.</param>
+internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey, MigrationMode MigrationMode, AccountAccess AccountAccess, string MigrationTarget, string PasswordSetTarget)
 {
     /// <summary>
     /// Validates the configured settings.
@@ -29,7 +31,13 @@ internal sealed record EmbyAuthSettings(Uri ServerUrl, string ApiKey, MigrationM
             return false;
         }
 
-        settings = new EmbyAuthSettings(url!, configuration!.EmbyApiKey.Trim(), configuration.MigrationMode, configuration.AccountAccess);
+        settings = new EmbyAuthSettings(
+            url!,
+            configuration!.EmbyApiKey.Trim(),
+            configuration.MigrationMode,
+            configuration.AccountAccess,
+            configuration.MigrationTarget.Trim(),
+            configuration.PasswordSetTarget.Trim());
         return true;
     }
 

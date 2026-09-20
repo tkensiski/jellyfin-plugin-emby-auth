@@ -13,7 +13,7 @@ namespace Jellyfin.Plugin.EmbyAuth.Tests;
 public class EmbyUserDirectoryTests
 {
     private static readonly EmbyAuthSettings Settings =
-        new(new Uri("http://emby:8096"), "key-1", MigrationMode.MoveAfterFirstLogin, AccountAccess.CopyEmbyRemoteAccess);
+        new(new Uri("http://emby:8096"), "key-1", MigrationMode.MoveAfterFirstLogin, AccountAccess.CopyEmbyRemoteAccess, DefaultLoginMethod.ProviderId, string.Empty);
 
     private readonly ManualTimeProvider _clock = new();
 
