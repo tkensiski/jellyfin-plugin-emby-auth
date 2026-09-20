@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 04
 current_phase_name: The Fingerprint Store, and Emby Traffic Under Failure
 status: executing
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-09-20T21:13:56.215Z"
+stopped_at: Completed 04-07-PLAN.md
+last_updated: "2026-09-20T22:00:25.832Z"
 last_activity: 2026-09-20
 last_activity_desc: Completed 04-04-PLAN.md (TEST-05 unit half)
-state_head: 7d4432680f964dca3e779cc8c211cf292b0a4635
+state_head: b736d087e30773a029a1a41644afdc7e5c89302f
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 22
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 04 (The Fingerprint Store, and Emby Traffic Under Failure) — EXECUTING
-Plan: 7 of 8
+Plan: 8 of 8
 Status: Ready to execute
 Last activity: 2026-09-20 — Completed 04-04-PLAN.md (TEST-05 unit half)
 
@@ -80,6 +80,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 04 P04 | ~7min | 2 tasks | 2 files |
 | Phase 04 P05 | 35min | 2 tasks | 8 files |
 | Phase 04 P06 | 50min | 3 tasks | 4 files |
+| Phase 04 P07 | 45min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,8 @@ Recent decisions affecting current work:
 - [Phase 04]: [Phase 04] Task 1's RED commit ships the widened three-arg constructor wired to ImportLegacyRecords, with the method body an inert stub, rather than a pre-implementation compile error — Widening the constructor's argument count is signature-incompatible, so no test file referencing the new shape can compile against the old two-arg constructor at all; confirmed red locally against the stub before committing, per repo convention
 - [Phase 04]: [Phase 04] Task 2 landed no separate commit; its two tests joined Task 1's RED/GREEN pair since they belong to the same test file and TDD cycle — Task 2's own acceptance criterion requires src/ unchanged for its contribution; its value is the three break-then-restore proofs recorded in 04-05-SUMMARY.md, not new production code
 - [Phase 04]: The second bella concurrent-login burst tolerates 200 or 401 (never 500) rather than strict all-200, after mise run e2e deterministically reproduced a 401 caused by JellyfinSecurity's TwoFactorAuthProvider's own IP-based app-password rate limiter tripping under genuine 5-way concurrency — Traced via the live Jellyfin log to a third-party plugin mounted for Phase 3's MIGR-01/02 verification, unrelated to this plugin; the exactly-one-account and never-500 invariants stayed strict
+- [Phase 04]: [Phase 04] docker compose exec cannot remove a file from a stopped container; fingerprint_store_remove and fingerprint_store_push's wal/shm cleanup instead run rm -f through a throwaway container sharing the stopped Jellyfin container's volumes via docker run --volumes-from, using nginx:1.30.5-alpine (already pinned for emby-proxy) — Confirmed empirically: docker compose exec refuses a stopped service (service is not running); --volumes-from attaches regardless of running state, and reusing the already-pinned image adds no new dependency
+- [Phase 04]: [Phase 04] 80-fingerprint-store.bats builds its legacy JSON fixture from a real record the plugin just wrote, never a hand-authored one — A fingerprint is a SHA-256 of a freshly salted Jellyfin password hash, so it cannot be constructed any other way and still mean anything as a genuine pre-upgrade file
 
 ### Pending Todos
 
@@ -159,6 +162,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-20T21:13:56.080Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-09-20T22:00:25.672Z
+Stopped at: Completed 04-07-PLAN.md
 Resume file: None
