@@ -3,3 +3,6 @@ obj/
 artifacts/
 TestResults/
 node_modules/
+
+# GSD runtime mirror, synced from the installed package on each run.
+.gsd/

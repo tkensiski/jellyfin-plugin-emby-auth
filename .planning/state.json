@@ -1,0 +1,43 @@
+{
+  "contract": "1.0.0",
+  "flavor": "core",
+  "milestone": "v0.9.0.0",
+  "phases": [
+    {
+      "number": "1",
+      "name": "Account Creation and Login Security",
+      "status": "complete"
+    },
+    {
+      "number": "2",
+      "name": "Safe Failures for the Fingerprint File and Settings",
+      "status": "complete"
+    },
+    {
+      "number": "3",
+      "name": "Migration Status and Target",
+      "status": "complete"
+    },
+    {
+      "number": "4",
+      "name": "Emby Traffic Under Load and Failure",
+      "status": "pending"
+    },
+    {
+      "number": "5",
+      "name": "Public Repository",
+      "status": "pending"
+    },
+    {
+      "number": "6",
+      "name": "Catalog Install and First Public Release",
+      "status": "pending"
+    }
+  ],
+  "next": {
+    "command": "/gsd:progress --next",
+    "label": "Advance to the next step (plan phase 4)",
+    "reason": "Phase 4 of 6 — needs a plan"
+  },
+  "updated_at": "2026-09-20T08:16:46.476Z"
+}
