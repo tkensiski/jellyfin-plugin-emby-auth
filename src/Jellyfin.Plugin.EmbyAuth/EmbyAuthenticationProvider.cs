@@ -117,7 +117,13 @@ internal sealed partial class EmbyAuthenticationProvider(
     /// Handles a password that an administrator or the user sets in Jellyfin.
     /// </summary>
     /// <remarks>
-    /// A new password is saved, and the user moves to the Default login method.
+    /// A new password is saved, then the user moves to the resolved password-set target: the configured
+    /// <see cref="PluginConfiguration.PasswordSetTarget"/>, or <see cref="PluginConfiguration.MigrationTarget"/>
+    /// when that setting is empty. Remain on Emby Login saves the password but leaves the login method unchanged;
+    /// the new password plays no part in a login while the user stays on the Emby method, since only Emby decides
+    /// a login there. An unusable target also leaves the login method unchanged and logs one Error entry, and
+    /// never refuses the password change: Jellyfin calls this method inside its own password-change flow, and a
+    /// settings problem that has nothing to do with the password must not block it.
     /// A password reset removes the saved password, and the user stays on the Emby login method, because a Default account without a password opens with a blank password.
     /// </remarks>
     /// <param name="user">The user. Jellyfin saves the changes after this method returns.</param>
@@ -134,8 +140,21 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         user.Password = cryptoProvider.CreatePasswordHash(newPassword).ToString();
-        user.AuthenticationProviderId = LoginMethodMove.DefaultProviderId;
-        LogPasswordSetInJellyfin(logger, user.Username);
+        var target = LoginMethodMove.ResolvePasswordSetTarget(configurationSource());
+        switch (target.Kind)
+        {
+            case MoveTargetKind.Move:
+                user.AuthenticationProviderId = target.ProviderId!;
+                LogPasswordSetInJellyfin(logger, user.Username);
+                break;
+            case MoveTargetKind.Remain:
+                LogPasswordSetTargetRemainsOnEmby(logger, user.Username);
+                break;
+            default:
+                LogPasswordSetTargetInvalid(logger, user.Username);
+                break;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -249,8 +268,14 @@ internal sealed partial class EmbyAuthenticationProvider(
     [LoggerMessage(Level = LogLevel.Error, Message = "The Emby Auth plugin refuses all logins on the Emby login method. {Problem} Set it in Dashboard > Plugins > Emby Auth.")]
     private static partial void LogSettingsInvalid(ILogger logger, string problem);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user now uses the Default login method.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user now moves to the configured login method.")]
     private static partial void LogPasswordSetInJellyfin(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user keeps the Emby login method because the configured target is set to remain, so Emby still checks this user's logins.")]
+    private static partial void LogPasswordSetTargetRemainsOnEmby(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "User {Username} got a new password in Jellyfin, but the configured target is not a login method Jellyfin reports as enabled. The user keeps the Emby login method; logins are unaffected.")]
+    private static partial void LogPasswordSetTargetInvalid(ILogger logger, string username);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The password of user {Username} was reset in Jellyfin. The user stays on the Emby login method, so Emby checks the next login.")]
     private static partial void LogPasswordReset(ILogger logger, string username);

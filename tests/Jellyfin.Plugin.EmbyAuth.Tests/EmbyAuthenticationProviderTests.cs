@@ -417,7 +417,7 @@ public class EmbyAuthenticationProviderTests
         return user;
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default, not the password-set target.")]
+    [Fact]
     public async Task ChangePassword_SavesTheHash_AndMovesTheUserToThePasswordSetTarget()
     {
         var provider = CreateProvider(new StubHttpMessageHandler(), new FakeUserManager(), out _, settingsSource: () => SettingsWithTargets(passwordSetTarget: "jf-security-id"));
@@ -429,7 +429,7 @@ public class EmbyAuthenticationProviderTests
         Assert.Equal(new FakeCryptoProvider().CreatePasswordHash("new-pass").ToString(), user.Password);
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default, not the migration target.")]
+    [Fact]
     public async Task ChangePassword_WithAnEmptyPasswordSetTarget_MovesTheUserToTheMigrationTarget()
     {
         var provider = CreateProvider(new StubHttpMessageHandler(), new FakeUserManager(), out _, settingsSource: () => SettingsWithTargets(migrationTarget: "jf-security-id"));
@@ -440,7 +440,7 @@ public class EmbyAuthenticationProviderTests
         Assert.Equal("jf-security-id", user.AuthenticationProviderId);
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default, ignoring Remain on Emby Login.")]
+    [Fact]
     public async Task ChangePassword_WithAPasswordSetTargetOfTheSentinel_SavesTheHash_AndLeavesTheLoginMethodUnchanged()
     {
         var logger = new CapturingLogger<EmbyAuthenticationProvider>();
@@ -459,7 +459,7 @@ public class EmbyAuthenticationProviderTests
         Assert.DoesNotContain(logger.Entries, entry => entry.StartsWith("Error:", StringComparison.Ordinal));
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default, ignoring Remain on Emby Login.")]
+    [Fact]
     public async Task ChangePassword_WithAMigrationTargetOfTheSentinel_AndEmptyPasswordSetTarget_LeavesTheLoginMethodUnchanged()
     {
         var provider = CreateProvider(
@@ -474,7 +474,7 @@ public class EmbyAuthenticationProviderTests
         Assert.Equal(EmbyAuthenticationProvider.ProviderId, user.AuthenticationProviderId);
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default and never logs an Error for an unusable target.")]
+    [Fact]
     public async Task ChangePassword_WithAnUnusableTarget_SavesTheHash_LeavesTheLoginMethodUnchanged_AndLogsOneError()
     {
         var logger = new CapturingLogger<EmbyAuthenticationProvider>();
@@ -494,7 +494,7 @@ public class EmbyAuthenticationProviderTests
         Assert.Single(errorEntries);
     }
 
-    [Fact(Skip = "Task 2 GREEN: ChangePassword still hardcodes Default and never logs an Error for a null configuration.")]
+    [Fact]
     public async Task ChangePassword_WithANullConfiguration_DoesTheSameAsAnUnusableTarget()
     {
         var logger = new CapturingLogger<EmbyAuthenticationProvider>();
