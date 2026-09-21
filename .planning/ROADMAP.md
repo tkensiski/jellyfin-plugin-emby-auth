@@ -193,7 +193,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-03-PLAN.md — REL-03: the gitleaks history scan and its value-only fixture allowlist land together in `mise run lint`
+- [x] 05-03-PLAN.md — REL-03: the gitleaks history scan and its value-only fixture allowlist land together in `mise run lint`
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
