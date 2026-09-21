@@ -7,7 +7,7 @@ A Jellyfin plugin that moves users from Emby to Jellyfin without a password rese
 
 Your users log in to Jellyfin with the user name and password that they use on Emby. The plugin checks each password against your Emby server and saves it in Jellyfin. Then each user moves to the login method you choose — Jellyfin's **Default** login method out of the box — and that login method checks the password without Emby. When every user has moved off the Emby login method, you shut down Emby and remove the plugin.
 
-**Status:** tested only in local containers, with Jellyfin 12.1.0 and Emby 4.10.0.40. Not tested on a production server. Not published to a plugin repository.
+**Status:** tested only in local containers, with the Jellyfin `12.1.20260915-010956` and Emby `4.10.0.40` images. Not tested on a production server. Not published to a plugin repository. See [Compatibility](#compatibility).
 
 ## Requirements
 

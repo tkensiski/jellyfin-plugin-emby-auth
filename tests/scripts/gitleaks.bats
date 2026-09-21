@@ -65,15 +65,17 @@ scan_dir() {
 	[[ "$output" == *"no leaks found"* ]]
 }
 
-# The three tests below pin the allowlist's scope rather than the scanner's
-# ability to detect. The fixture-value allowlist is deliberately narrow in two
-# directions at once, and each direction needs its own test because a config
-# that got either one wrong would still pass the other:
+# The four tests below pin the allowlist's scope rather than the scanner's
+# ability to detect. The fixture-value allowlist is narrow in three directions
+# at once, and each needs its own test because a config that got one wrong
+# would still pass the other two:
 #
 #   - by path, so a fixture-shaped value committed to production source is
 #     still reported rather than silently ignored repository-wide;
 #   - by value, so any other secret inside tests/ or .planning/ is still
-#     reported rather than those trees becoming blanket-exempt.
+#     reported rather than those trees becoming blanket-exempt;
+#   - by rule, so the fixture substring earns no exemption from a rule other
+#     than the generic-api-key one it was allowlisted for.
 #
 # The second direction depends on `condition = "AND"` in .gitleaks.toml.
 # gitleaks defaults an allowlist to "OR", where any one criterion suffices —
@@ -85,22 +87,40 @@ scan_dir() {
 # runs, and the one that reports repository-relative paths. `gitleaks dir`
 # reports absolute paths, so it cannot exercise repository-relative `paths`
 # patterns and `scan_dir` above is no use for these three tests.
+#
+# Every step is checked and returns 2 — distinct from gitleaks' own 0 (clean)
+# and 1 (leaks found) — because bats runs this under `run`, which disables
+# errexit. A repository with no commit makes `gitleaks git` print "no leaks
+# found" and exit 0, indistinguishable from a working allowlist, so an
+# unchecked setup failure would let the "is ignored" test below pass while
+# proving nothing.
 scan_git_repo() {
 	local repo="$1"
 	shift
 
-	git init -q "$repo"
+	# Override the invoking developer's global config: commit.gpgsign can fail
+	# the fixture commit outright, and core.hooksPath can rewrite or reject it.
+	local -a git_fixture=(
+		git
+		-c commit.gpgsign=false
+		-c core.hooksPath=/dev/null
+		-c user.email=test@example.invalid
+		-c user.name=test
+	)
+
+	git init -q "$repo" || return 2
 
 	local pair path content
 	for pair in "$@"; do
 		path="${pair%%=*}"
 		content="${pair#*=}"
-		mkdir -p "$repo/$(dirname "$path")"
-		printf '%s\n' "$content" >"$repo/$path"
+		mkdir -p "$repo/$(dirname "$path")" || return 2
+		printf '%s\n' "$content" >"$repo/$path" || return 2
 	done
 
-	git -C "$repo" add -A
-	git -C "$repo" -c user.email=test@example.invalid -c user.name=test commit -qm fixture
+	"${git_fixture[@]}" -C "$repo" add -A || return 2
+	"${git_fixture[@]}" -C "$repo" commit -qm fixture || return 2
+	[ "$("${git_fixture[@]}" -C "$repo" rev-list --count HEAD)" -eq 1 ] || return 2
 
 	gitleaks git --no-banner --no-color --redact -c "$REPO_ROOT/.gitleaks.toml" "$repo"
 }
@@ -130,9 +150,27 @@ fixture_shaped_value() {
 	[[ "$output" =~ leaks\ found:\ [0-9]+ ]]
 }
 
+@test "a fixture value that trips another rule is still reported" {
+	# The allowlist names generic-api-key in |targetRules|, so the fixture
+	# substring must not buy an exemption from any other rule. This token
+	# matches the allowlist regex and sits in tests/, yet trips github-pat, so
+	# it must still be reported. Assembled at run time like the values above —
+	# and unlike them, it would not be exempt if it appeared whole here.
+	local pat_prefix="ghp_"
+
+	run scan_git_repo "$BATS_TEST_TMPDIR/other-rule" \
+		"tests/Pat.cs=var v = \"${pat_prefix}$(fixture_shaped_value)abcd\";"
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ leaks\ found:\ [0-9]+ ]]
+}
+
 @test "a fixture value inside the fixture trees is ignored" {
 	run scan_git_repo "$BATS_TEST_TMPDIR/inside-fixture" \
 		"tests/Fixture.cs=var apiKey = \"$(fixture_shaped_value)\";"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"no leaks found"* ]]
+	# Pins that a commit was actually scanned. Without this the assertions
+	# above also describe an empty repository, which is what a silent setup
+	# failure would produce.
+	[[ "$output" == *"1 commits scanned"* ]]
 }
