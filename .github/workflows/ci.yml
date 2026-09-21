@@ -7,6 +7,10 @@ on:
   push:
     branches:
       - main
+  # Lets an operator produce a ci-success run on a commit that never got one
+  # from pull_request or push — for example an intermediate commit on a
+  # multi-commit push to main, which GitHub does not schedule a run for.
+  workflow_dispatch:
 
 permissions:
   contents: read
