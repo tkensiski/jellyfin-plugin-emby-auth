@@ -22,11 +22,18 @@ setup() {
 	ISSUES_FILE="$BATS_TEST_TMPDIR/issues"
 	PULLS_FILE="$BATS_TEST_TMPDIR/pulls"
 	RELEASES_FILE="$BATS_TEST_TMPDIR/releases"
+	GIT_TOPLEVEL_FILE="$BATS_TEST_TMPDIR/git-toplevel"
+	GIT_ORIGIN_FILE="$BATS_TEST_TMPDIR/git-origin"
 	export GH_ARGV_FILE MISE_EXIT_FILE VISIBILITY_FILE RUNS_FILE ARTIFACTS_FILE ISSUES_FILE PULLS_FILE RELEASES_FILE
+	export GIT_TOPLEVEL_FILE GIT_ORIGIN_FILE
 
 	: >"$GH_ARGV_FILE"
 	printf '0' >"$MISE_EXIT_FILE"
 	printf '{"visibility":"PRIVATE"}' >"$VISIBILITY_FILE"
+	# Matches the default GH_REPO below, so every existing test keeps passing
+	# without knowing WR-14's repo-identity check exists.
+	printf '%s' "$BATS_TEST_TMPDIR" >"$GIT_TOPLEVEL_FILE"
+	printf 'git@github.com:owner/repo.git' >"$GIT_ORIGIN_FILE"
 	# Slurped shape: gh api --paginate --slurp wraps each page in an outer
 	# array. actions/runs is a single-page fixture here; the two-page test
 	# below overwrites RUNS_FILE with a second page to prove the script's jq
@@ -90,6 +97,23 @@ if [ "$1" = "api" ]; then
 fi
 FAKE_GH
 	chmod +x "$FAKE_BIN_DIR/gh"
+
+	# WR-14: answers the two git calls the audit uses to verify the local
+	# checkout is the repository GH_REPO names, before scanning or querying it.
+	cat >"$FAKE_BIN_DIR/git" <<'FAKE_GIT'
+#!/usr/bin/env bash
+if [ "$1" = "rev-parse" ] && [ "$2" = "--show-toplevel" ]; then
+	cat "$GIT_TOPLEVEL_FILE"
+	exit 0
+fi
+if [ "$1" = "remote" ] && [ "$2" = "get-url" ] && [ "$3" = "origin" ]; then
+	cat "$GIT_ORIGIN_FILE"
+	exit 0
+fi
+echo "fake git: unhandled args: $*" >&2
+exit 1
+FAKE_GIT
+	chmod +x "$FAKE_BIN_DIR/git"
 
 	PATH="$FAKE_BIN_DIR:$PATH"
 	export PATH
@@ -237,4 +261,23 @@ releases"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"REVIEW releases: 1 releases"* ]]
 	[[ "$output" == *"v1.0.0 First release"* ]]
+}
+
+# WR-14: the lint item scans whatever git repository the current directory
+# belongs to while every other item reports on GH_REPO; without this check
+# a mismatched GH_REPO silently produces a report describing two
+# repositories under one PASS/FAIL summary.
+@test "a GH_REPO that does not match the origin refuses before any gh call" {
+	printf 'git@github.com:someone-else/other-repo.git' >"$GIT_ORIGIN_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"GH_REPO is owner/repo"* ]]
+	[[ "$output" == *"someone-else/other-repo"* ]]
+	[ ! -s "$GH_ARGV_FILE" ]
+}
+
+@test "a GH_REPO that matches the origin passes the repo-identity check" {
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 0 ]
+	[ -s "$GH_ARGV_FILE" ]
 }
