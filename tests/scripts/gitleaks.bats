@@ -28,6 +28,8 @@
 # below was measured the other way: one finding, rule id `aws-access-token`,
 # exit 1, under both configurations.
 
+bats_require_minimum_version 1.5.0
+
 setup_file() {
 	REPO_ROOT="$(cd "$BATS_TEST_DIRNAME/../.." && pwd)"
 	export REPO_ROOT
