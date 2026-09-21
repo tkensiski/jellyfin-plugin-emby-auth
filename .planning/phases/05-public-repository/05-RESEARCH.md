@@ -96,7 +96,7 @@ This phase adds no new library dependency to the plugin itself — every deliver
 
 01-CONTEXT.md's decisions (D-01 through D-19) already resolve the architecture, the sequencing, and the security posture of this phase in detail — this research does not re-litigate any of them. Its job is to close the "Claude's Discretion" items with verified technical grounding: the exact `.gitleaks.toml` allowlist shape, the GitHub REST endpoint and permission scope `scripts/release-gate.sh` needs to check `ci-success`, and the precise wording zizmor's `undocumented-permissions` and `concurrency-limits` pedantic audits expect. The standout finding is the `check_name` query parameter on the check-runs endpoint: filtering server-side (`?check_name=ci-success`) turns D-03's "exactly one check run named `ci-success`" rule into a single filtered API call instead of a client-side scan of every check run on the commit, and its default `filter=latest` already collapses re-runs to the most recent result — no extra logic needed for that case.
 
-**Primary recommendation:** Build `scripts/release-gate.sh` around `gh api "repos/$GH_REPO/commits/$SHA/check-runs" -f check_name=ci-success --jq '.check_runs'`, add `checks: read` to the release job's `permissions:` block (the current `contents: write` does not cover it), and build `.gitleaks.toml` as a single global `[[allowlists]]` table with `regexes` left on the default `regexTarget = "secret"` — no `regexTarget` override is needed because D-07's two value regexes already match the extracted secret itself, which is what "secret" targets by default.
+**Primary recommendation:** Build `scripts/release-gate.sh` around `gh api "repos/$GH_REPO/commits/$SHA/check-runs?check_name=ci-success"`, reading the response with the repository's pinned `jq`, add `checks: read` to the release job's `permissions:` block (the current `contents: write` does not cover it), and build `.gitleaks.toml` as a single global `[[allowlists]]` table with `regexes` left on the default `regexTarget = "secret"` — no `regexTarget` override is needed because D-07's two value regexes already match the extracted secret itself, which is what "secret" targets by default.
 
 ## Architectural Responsibility Map
 
@@ -170,8 +170,8 @@ Push a "v*" tag
        v
 [3] scripts/release-gate.sh check "$GITHUB_SHA"    (NEW — REL-01)
        |
-       |  gh api repos/$GH_REPO/commits/$GITHUB_SHA/check-runs \
-       |     -f check_name=ci-success --jq '.check_runs'
+       |  gh api "repos/$GH_REPO/commits/$GITHUB_SHA/check-runs?check_name=ci-success"
+       |  response read with the pinned jq
        |
        |  exactly one run, status=="completed", conclusion=="success"?
        |        NO  -----> exit 1, workflow stops, no release created
@@ -231,23 +231,32 @@ tests/scripts/
 # Source: https://docs.github.com/rest/checks/runs (List check runs for a Git reference)
 # check_name filters server-side; filter defaults to "latest", which already
 # collapses a re-run to the most recent result for that name.
-runs_json="$(gh api "repos/${GH_REPO}/commits/${SHA}/check-runs" \
-  -f check_name=ci-success --jq '.check_runs')"
+runs_json="$(gh api "repos/${GH_REPO}/commits/${SHA}/check-runs?check_name=ci-success")"
 
-count="$(jq 'length' <<<"$runs_json")"
+count="$(jq '.check_runs | length' <<<"$runs_json")"
 if [[ "$count" -ne 1 ]]; then
   echo "Expected exactly one ci-success check run on ${SHA}, found ${count}." >&2
   exit 1
 fi
 
-status="$(jq -r '.[0].status' <<<"$runs_json")"
-conclusion="$(jq -r '.[0].conclusion' <<<"$runs_json")"
+status="$(jq -r '.check_runs[0].status' <<<"$runs_json")"
+conclusion="$(jq -r '.check_runs[0].conclusion' <<<"$runs_json")"
 if [[ "$status" != "completed" || "$conclusion" != "success" ]]; then
   echo "ci-success on ${SHA} is ${status}/${conclusion}, not completed/success." >&2
   exit 1
 fi
 ```
 This directly implements D-02/D-03: fails closed on `cancelled`, `failure`, `skipped`, `timed_out`, any other conclusion, an in-progress run, or no matching run at all (`count == 0`).
+
+**The filter goes in the query string, not in a field flag — measured, not assumed.** `gh api` switches the HTTP method to POST as soon as a field flag is passed, unless `-X GET` is also passed. Three forms were run against the live repository:
+
+| Invocation | Measured result |
+|---|---|
+| `gh api "repos/{owner}/{repo}/commits/$SHA/check-runs"` with the filter passed as a field flag | **HTTP 404 Not Found** — sent as POST, so it never reaches the endpoint |
+| the same call with `-X GET` added | HTTP 422 "No commit found for SHA" |
+| `gh api "repos/{owner}/{repo}/commits/$SHA/check-runs?check_name=ci-success"` | HTTP 422 "No commit found for SHA" |
+
+The 422s are the correct response for a SHA GitHub does not know, and they prove the endpoint path, the `{owner}`/`{repo}` expansion, and the auth all resolve. The 404 proves the field-flag form does not reach the endpoint at all. A 404 lands in the gate's "API call failed" branch, so the gate fails closed and refuses **every** release. Do not "tidy" the query string back into a field flag.
 
 ### Pattern 2: A single global `[[allowlists]]` table, default `regexTarget`
 **What:** One `[[allowlists]]` block at the top level of `.gitleaks.toml`, `regexes` left on the implicit default `regexTarget = "secret"`.
@@ -316,9 +325,9 @@ regexes = [
 ### Querying a commit's `ci-success` check run
 ```bash
 # Source: https://docs.github.com/rest/checks/runs
-gh api "repos/${GH_REPO}/commits/${SHA}/check-runs" \
-  -f check_name=ci-success \
-  --jq '.check_runs'
+# The filter is a query-string parameter. Passing it as a field flag makes
+# gh send the request as a POST, which 404s — see the measurement in Pattern 1.
+gh api "repos/${GH_REPO}/commits/${SHA}/check-runs?check_name=ci-success"
 ```
 `filter` defaults to `latest`, which "returns the most recent check runs and all pending check runs for a given check name" — a re-run of `ci-success` on the same SHA does not produce a duplicate the gate has to reason about.
 
@@ -356,7 +365,7 @@ regexes = [
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | GitHub-hosted `ubuntu-latest` runners ship a `gh` CLI version new enough to support `-f check_name=` and `--jq` on the check-runs endpoint | Standard Stack | Low — `gh api -f`/`--jq` have been stable `gh` features for years; only a very old pinned runner image would lack them, and this repo does not pin a runner image version |
+| A1 | GitHub-hosted `ubuntu-latest` runners ship a `gh` CLI version that accepts a query string on a `gh api` path argument | Standard Stack | Low — `gh api <path>` with an inline query string is the oldest and plainest form of the command, and this repo does not pin a runner image version. The gate passes no field flag, so `gh`'s method-selection behavior (the 404 measured in Pattern 1) is out of the picture entirely |
 | A2 | `gitleaks git` invoked from the repository root without `--source` treats `.` as the target path, so `.gitleaks.toml` at the repo root is auto-discovered under rule 4 of the config precedence order | Architecture Patterns, Pitfall 2 | Low — directly read from gitleaks' own `cmd/root.go` source this session, but the exact invocation form the planner chooses for `mise run lint`'s new line should still be spot-checked (e.g. `gitleaks git -v` run once locally) before relying on it in CI |
 
 ## Open Questions
