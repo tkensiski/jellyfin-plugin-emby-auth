@@ -66,21 +66,18 @@ FAKE_GH
 }
 
 @test "pre-public-audit.sh with no action prints usage and fails" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh"
 	[ "$status" -eq 2 ]
 	[[ "$output" == *"Usage:"* ]]
 }
 
 @test "pre-public-audit.sh with an unknown action prints usage and fails" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" publish
 	[ "$status" -eq 2 ]
 	[[ "$output" == *"Usage:"* ]]
 }
 
 @test "a clean mise run lint passes the secret-scan item and the whole run" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	printf '0' >"$MISE_EXIT_FILE"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	[ "$status" -eq 0 ]
@@ -88,7 +85,6 @@ FAKE_GH
 }
 
 @test "a failing mise run lint fails the secret-scan item and the whole run" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	printf '1' >"$MISE_EXIT_FILE"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	[ "$status" -eq 1 ]
@@ -96,7 +92,6 @@ FAKE_GH
 }
 
 @test "empty artifacts, issues, pull requests, and releases each print an explicit zero line" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"REVIEW artifacts: 0"* ]]
@@ -106,7 +101,6 @@ FAKE_GH
 }
 
 @test "two runs against the same fixtures print item labels in the same, documented order" {
-	skip "GREEN pending: scripts/pre-public-audit.sh not yet implemented"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	first_labels="$(grep -oE '^(PASS|FAIL|REVIEW) [a-z-]+' <<<"$output" | sed -E 's/^(PASS|FAIL|REVIEW) //')"
 
