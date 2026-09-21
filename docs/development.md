@@ -32,4 +32,6 @@ The demo uses the same containers, on `127.0.0.1:18196` (Emby) and `127.0.0.1:28
 
 1. Set `<Version>`, `<AssemblyVersion>`, and `<FileVersion>` in `Directory.Build.props`, and merge the change.
 2. Tag the merge commit `v<version>`, for example `v1.0.0.0`, and push the tag.
-3. `.github/workflows/release.yml` checks that the tag matches the version, runs `mise run test` and `mise run package`, and creates a GitHub release with the zip and `manifest.json`.
+3. `.github/workflows/release.yml` checks that the tag matches the version, then requires the tagged commit to carry a `ci-success` check run that completed with conclusion `success`, then runs `mise run test` and `mise run package`, and creates a GitHub release with the zip and `manifest.json`.
+
+The workflow stops before creating any release when the tagged commit has no `ci-success` check run, when that run is still in progress, or when it finished with any conclusion other than `success` — including `cancelled`, which happens when a later push to `main` cancelled the earlier run. To fix it, wait for CI on that commit to finish green, then delete and push the tag again. There is no waiting period and no override inside the workflow.
