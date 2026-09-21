@@ -45,7 +45,6 @@ FAKE_GH
 }
 
 @test "no matching check run refuses with a message naming the absence" {
-	skip "GREEN pending: scripts/release-gate.sh not yet implemented"
 	set_fixture_body '{"check_runs":[]}'
 	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
 	[ "$status" -eq 1 ]
@@ -53,7 +52,6 @@ FAKE_GH
 }
 
 @test "one completed success check run passes with no stderr" {
-	skip "GREEN pending: scripts/release-gate.sh not yet implemented"
 	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"success"}]}'
 	run --separate-stderr "$REPO_ROOT/scripts/release-gate.sh" check deadbee
 	[ "$status" -eq 0 ]
@@ -61,7 +59,6 @@ FAKE_GH
 }
 
 @test "the request carries the filter in the query string and no field flag" {
-	skip "GREEN pending: scripts/release-gate.sh not yet implemented"
 	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"success"}]}'
 	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
 	[ "$status" -eq 0 ]
@@ -69,20 +66,20 @@ FAKE_GH
 	grep -qx "api" "$GH_ARGV_FILE"
 	grep -qx "repos/owner/repo/commits/deadbee/check-runs?check_name=ci-success" "$GH_ARGV_FILE"
 	run ! grep -Eq -- '(^|/)(-f|--field|--raw-field)$' "$GH_ARGV_FILE"
-	[ "$status" -eq 0 ]
 }
 
 @test "the real gh sends a GET for the query-string filter form, not a 404-triggering POST" {
 	if [ -z "$REAL_GH" ]; then
 		skip "gh is not installed"
 	fi
-	if ! "$REAL_GH" auth status >/dev/null 2>&1; then
-		skip "gh is not authenticated"
-	fi
 
 	cd "$REPO_ROOT" || return 1
 	unset GH_REPO
 	unset GH_TOKEN
+
+	if ! "$REAL_GH" auth status >/dev/null 2>&1; then
+		skip "gh is not authenticated"
+	fi
 
 	sha="0123456789abcdef0123456789abcdef01234567"
 	run "$REAL_GH" api "repos/{owner}/{repo}/commits/$sha/check-runs?check_name=ci-success"
