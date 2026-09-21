@@ -180,7 +180,30 @@ Plans:
   4. Before the visibility change, gitleaks scans the full git history, and the Actions logs and artifacts, the issue and PR text, and the release notes are reviewed. Every finding is removed or rotated.
   5. The repository is public. The maintainer gave explicit approval at the time of the change, after criteria 1 and 4 were complete.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Tracer: the release gate end to end — `scripts/release-gate.sh`, its bats coverage, and the `release.yml` step that refuses a tag whose commit has no passing `ci-success`
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — REL-02: every pedantic zizmor finding fixed, and the pedantic persona becomes the standing lint gate
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05-03-PLAN.md — REL-03: the gitleaks history scan and its value-only fixture allowlist land together in `mise run lint`
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-04-PLAN.md — DOCS-03: the README Compatibility section, and the two sentences the visibility change falsifies
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 05-05-PLAN.md — PUB-01 and PUB-03: the pre-publication audit script, the audit run, and the maintainer's own visibility decision
+
+> **Sequencing note (planning, 2026-09-20).** The five waves are strictly sequential by decision, not only by file overlap. D-16 fixes the order — the gate and the tooling land and are proven first, then the audit runs, then the switch — and nothing in this phase is slow enough for parallelism to buy anything. PUB-03 cannot be closed from inside the execution run: the phase ends at a `blocking-human` decision checkpoint that hands the maintainer the command, and `gh repo view --json visibility` verifies it afterwards (D-15).
 
 ### Phase 6: Catalog Install and First Public Release
 
@@ -208,5 +231,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
 | 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | Complete    | 2026-09-20 |
-| 5. Public Repository | 0/TBD | Not started | - |
+| 5. Public Repository | 0/5 | Not started | - |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
