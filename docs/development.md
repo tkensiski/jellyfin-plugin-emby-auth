@@ -13,8 +13,13 @@ The tools are pinned in `.mise.toml`. Run `mise install` first.
 | Run the CI end-to-end job in a local container | `act pull_request -j e2e --bind --container-options "--network host"` |
 | Start a demo in Docker to log in and look around | `scripts/dev-env.sh up` |
 | Show or remove the demo | `scripts/dev-env.sh status` or `scripts/dev-env.sh down` |
+| Audit the repository before making it public | `GH_REPO=owner/repo scripts/pre-public-audit.sh run` |
 
 CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so a local run of these three tasks matches CI.
+
+## Pre-publication audit
+
+`scripts/pre-public-audit.sh run` reports the evidence a human needs before making the repository public. It needs `GH_REPO` (`owner/repo`) and a `GH_TOKEN` that `gh` can use. Only the secret-scan line (`mise run lint`, which includes the gitleaks history scan) is machine-checked pass/fail; the visibility, workflow-run, artifact, issue, pull-request, and release lines are for a human to read before deciding — the script cannot judge whether their contents are safe to publish.
 
 ## Settings-page tests
 

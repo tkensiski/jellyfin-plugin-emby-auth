@@ -40,53 +40,53 @@ visibility() {
 
 workflow_runs() {
 	local json count
-	json="$(gh api "repos/$GH_REPO/actions/runs")"
-	count="$(jq '.workflow_runs | length' <<<"$json")"
+	json="$(gh api --paginate --slurp "repos/$GH_REPO/actions/runs")"
+	count="$(jq '[.[].workflow_runs[]] | length' <<<"$json")"
 	echo "REVIEW workflow-runs: $count runs"
 	if [[ "$count" -gt 0 ]]; then
-		jq -r '.workflow_runs[] | "  id=\(.id) workflow=\(.name) conclusion=\(.conclusion)"' <<<"$json"
+		jq -r '.[].workflow_runs[] | "  id=\(.id) workflow=\(.name) conclusion=\(.conclusion)"' <<<"$json"
 	fi
 }
 
 artifacts() {
 	local json count
-	json="$(gh api "repos/$GH_REPO/actions/artifacts")"
-	count="$(jq '.artifacts | length' <<<"$json")"
+	json="$(gh api --paginate --slurp "repos/$GH_REPO/actions/artifacts")"
+	count="$(jq '[.[].artifacts[]] | length' <<<"$json")"
 	echo "REVIEW artifacts: $count artifacts"
 	if [[ "$count" -gt 0 ]]; then
-		jq -r '.artifacts[] | "  \(.name)"' <<<"$json"
+		jq -r '.[].artifacts[] | "  \(.name)"' <<<"$json"
 	fi
 }
 
 issues() {
 	local json count
-	json="$(gh api "repos/$GH_REPO/issues?state=all")"
+	json="$(gh api --paginate --slurp "repos/$GH_REPO/issues?state=all")"
 	# This endpoint also returns pull requests; drop anything carrying a
 	# pull_request key before counting or listing.
-	count="$(jq '[.[] | select(has("pull_request") | not)] | length' <<<"$json")"
+	count="$(jq '[.[][] | select(has("pull_request") | not)] | length' <<<"$json")"
 	echo "REVIEW issues: $count issues"
 	if [[ "$count" -gt 0 ]]; then
-		jq -r '.[] | select(has("pull_request") | not) | "  #\(.number) \(.title)"' <<<"$json"
+		jq -r '.[][] | select(has("pull_request") | not) | "  #\(.number) \(.title)"' <<<"$json"
 	fi
 }
 
 pull_requests() {
 	local json count
-	json="$(gh api "repos/$GH_REPO/pulls?state=all")"
-	count="$(jq '. | length' <<<"$json")"
+	json="$(gh api --paginate --slurp "repos/$GH_REPO/pulls?state=all")"
+	count="$(jq '[.[][]] | length' <<<"$json")"
 	echo "REVIEW pull-requests: $count pull requests"
 	if [[ "$count" -gt 0 ]]; then
-		jq -r '.[] | "  #\(.number) \(.title)"' <<<"$json"
+		jq -r '.[][] | "  #\(.number) \(.title)"' <<<"$json"
 	fi
 }
 
 releases() {
 	local json count
-	json="$(gh api "repos/$GH_REPO/releases")"
-	count="$(jq '. | length' <<<"$json")"
+	json="$(gh api --paginate --slurp "repos/$GH_REPO/releases")"
+	count="$(jq '[.[][]] | length' <<<"$json")"
 	echo "REVIEW releases: $count releases"
 	if [[ "$count" -gt 0 ]]; then
-		jq -r '.[] | "  \(.tag_name) \(.name)"' <<<"$json"
+		jq -r '.[][] | "  \(.tag_name) \(.name)"' <<<"$json"
 	fi
 }
 
