@@ -24,9 +24,13 @@ run = [
   "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh tests/scripts/*.bats",
   "shfmt -d e2e scripts tests/scripts",
   "actionlint",
-  "gitleaks git",
+  "mise run secrets",
   "zizmor --offline --persona=pedantic .github/workflows",
 ]
+
+[tasks.secrets]
+description = "Scan the full git history for secrets"
+run = "gitleaks git"
 
 [tasks.test]
 description = "Build with warnings as errors, then run the unit tests, the script tests, and the settings-page tests"

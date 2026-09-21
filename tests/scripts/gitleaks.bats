@@ -204,3 +204,34 @@ job_block() {
 	[[ "$test_block" != *"fetch-depth"* ]]
 	[[ "$e2e_block" != *"fetch-depth"* ]]
 }
+
+# CR-02 pins that the secret scan runs on every commit, not only on commits
+# that touch a file extension the `lint` hook's `files:` regex matches. A
+# commit touching only .md or .planning/ files must still trigger it.
+# Parses .pre-commit-config.yaml with node rather than grepping the whole
+# file, so the assertion binds to one hook's own fields, not to any
+# always_run/entry pair present anywhere in the file.
+@test "a pre-commit hook runs the secret scan unconditionally, not gated by files:" {
+	# shellcheck disable=SC2016 # single quotes are deliberate: the node
+	# script's own template literals must reach node unexpanded by bash.
+	run node -e '
+		const fs = require("fs");
+		const text = fs.readFileSync(process.argv[1], "utf8");
+		const blocks = text.split(/\n(?=\s*-\s+id:)/);
+		const secretHooks = blocks.filter((b) => /entry:\s*mise run secrets\b/.test(b));
+		if (secretHooks.length !== 1) {
+			console.error(`expected exactly one hook running mise run secrets, found ${secretHooks.length}`);
+			process.exit(1);
+		}
+		const hook = secretHooks[0];
+		if (!/^\s*always_run:\s*true\s*$/m.test(hook)) {
+			console.error("the secrets hook is missing always_run: true");
+			process.exit(1);
+		}
+		if (/^\s*files:/m.test(hook)) {
+			console.error("the secrets hook must not carry a files: pattern");
+			process.exit(1);
+		}
+	' "$REPO_ROOT/.pre-commit-config.yaml"
+	[ "$status" -eq 0 ]
+}

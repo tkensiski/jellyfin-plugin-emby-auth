@@ -7,6 +7,12 @@ repos:
         language: system
         pass_filenames: false
         files: \.(cs|csproj|slnx|props|sh|bash|bats|ya?ml)$|^\.mise\.toml$|^\.gitleaks\.toml$
+    -   id: secrets
+        name: mise run secrets (gitleaks git, scans the full history on every commit)
+        entry: mise run secrets
+        language: system
+        pass_filenames: false
+        always_run: true
     -   id: test
         name: mise run test (build with warnings as errors, unit tests, script tests)
         entry: mise run test
