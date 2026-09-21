@@ -1,20 +1,14 @@
 ---
-status: testing
+status: partial
 phase: 05-public-repository
 source: [05-VERIFICATION.md]
 started: 2026-09-21T06:55:00Z
-updated: 2026-09-21T06:55:00Z
+updated: 2026-09-21T06:50:21Z
 ---
 
 ## Current Test
 
-number: 1
-name: Make the repository public, personally
-expected: |
-  `gh repo view --json visibility` reports `public`. PUB-03 closes and roadmap success
-  criterion 5 is met. Branch protection requiring the `ci-success` check becomes
-  available for the first time — it returns 403 on a private repository today.
-awaiting: user response
+[testing paused — 1 item outstanding]
 
 ## Tests
 
@@ -32,16 +26,24 @@ Decision D-15 reserves this command for the maintainer. No agent has run it or w
 
 The evidence this decision rests on is already gathered. `scripts/pre-public-audit.sh run` reported exit 0 across all seven items: gitleaks clean over the full history, 9 workflow runs, 0 artifacts, 0 issues, 10 pull requests (all titles and bodies read, all benign), 0 releases. Nothing was found that needs removing or rotating.
 
-result: [pending]
+result: blocked
+blocked_by: other
+reason: "im holding off for the moment on making it public"
+
+The hold is a maintainer decision, not a defect and not a missing prerequisite in
+the built work. Verified independently at pause time: `gh repo view --json
+visibility` reports `PRIVATE`, and `scripts/pre-public-audit.sh run` exits 0 with
+nothing to remove or rotate. No further evidence is outstanding — the only input
+this test waits on is the decision itself.
 
 ## Summary
 
 total: 1
 passed: 0
 issues: 0
-pending: 1
+pending: 0
 skipped: 0
-blocked: 0
+blocked: 1
 
 ## Gaps
 
