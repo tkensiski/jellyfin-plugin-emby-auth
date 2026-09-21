@@ -23,7 +23,7 @@ run = [
   "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh tests/scripts/*.bats",
   "shfmt -d e2e scripts tests/scripts",
   "actionlint",
-  "zizmor --offline .github/workflows",
+  "zizmor --offline --persona=pedantic .github/workflows",
 ]
 
 [tasks.test]
