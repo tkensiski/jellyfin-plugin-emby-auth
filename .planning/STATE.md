@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 05
 current_phase_name: Public Repository
 status: executing
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-09-21T03:02:05.500Z"
+stopped_at: Completed 05-02-PLAN.md
+last_updated: "2026-09-21T03:10:31.847Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 05 execution started
-state_head: c7110eed28b028aee667fa203f1c5fa7a00fb6a9
+state_head: f89386c888e5f0fd5a75d7f5454f6f42440d4aba
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 27
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 05 (Public Repository) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 05 execution started
 
@@ -84,6 +84,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 04 P07 | 45min | 2 tasks | 3 files |
 | Phase 04-emby-traffic-under-load-and-failure P08 | 35 min | 2 tasks | 2 files |
 | Phase 05 P01 | 20min | 3 tasks | 4 files |
+| Phase 05 P02 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,7 @@ Recent decisions affecting current work:
 - [Phase 04-emby-traffic-under-load-and-failure]: The read-failure Limits entry says the migration list reports readiness unknown, not needing an Emby login, correcting the plan's own must_haves wording against EmbyLoginMethodUsers.DetermineState — RecordsAvailable()==false maps to MigrationUserState.Unknown, not NeedsEmbyLogin (EmbyLoginMethodUsers.cs:98-103); docs/migration.md already documents this as readiness unknown, so the plan's literal phrase would have misstated a verified-but-unreported user as needing to log in again
 - [Phase 05]: [Phase 05] The release gate's gh api request carries check_name in the query string, never a field flag — a field flag makes gh send POST instead of GET, measured to return HTTP 404 on this repository, which would make the gate refuse every release — D-03/RESEARCH.md Pattern 1: verified live against the repository before implementation
 - [Phase 05]: [Phase 05] release-gate.bats plumbs fixture data to the fake gh through per-test files rather than env vars exported inside @test bodies — Clears shellcheck's SC2030/SC2031 bats-subshell false positive while keeping D-04's fake-on-PATH seam with no test-only env var in the script itself
+- [Phase 05]: [Phase 05] Plan 05-02's measured pedantic zizmor inventory (7 findings) had shrunk to 6 before this plan's first edit -- 05-01's inline permission comments already satisfied undocumented-permissions; confirmed live before any edit, no task or acceptance criterion needed a change
 
 ### Pending Todos
 
@@ -169,6 +171,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-21T03:02:05.385Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-09-21T03:10:31.728Z
+Stopped at: Completed 05-02-PLAN.md
 Resume file: None
