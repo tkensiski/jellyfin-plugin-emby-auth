@@ -16,7 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: write # gh release create
+      checks: read # scripts/release-gate.sh: read the ci-success check run
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,6 +34,13 @@ jobs:
         env:
           TAG: ${{ github.ref_name }}
         run: scripts/package.sh check-tag "$TAG"
+
+      - name: Require a passing ci-success check run on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: scripts/release-gate.sh check "$SHA"
 
       - name: Build and run unit tests
         run: mise run test
