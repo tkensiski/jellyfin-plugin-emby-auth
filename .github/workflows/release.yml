@@ -11,8 +11,16 @@ on:
 permissions:
   contents: read
 
+# Unlike ci.yml, this never cancels an in-flight run: gh release create can
+# succeed before every asset finishes uploading, and cancelling mid-upload
+# would leave a partial release. A second tagged release queues instead.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
+    name: Build and publish the release
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
