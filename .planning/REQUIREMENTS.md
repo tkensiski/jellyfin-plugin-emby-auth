@@ -65,7 +65,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Public Install
 
-- [ ] **PUB-01**: Before the repository goes public, gitleaks scans the full git history, and the Actions logs and artifacts, issue and PR text, and release notes are reviewed; every finding is removed or rotated.
+- [x] **PUB-01**: Before the repository goes public, gitleaks scans the full git history, and the Actions logs and artifacts, issue and PR text, and release notes are reviewed; every finding is removed or rotated.
 - [ ] **PUB-02**: One `manifest.json` on GitHub Pages lists every released version with a plain hex MD5 checksum, and a separate workflow publishes it when it changes.
 - [ ] **PUB-03**: The repository is public, after PUB-01 and REL-01 are complete and the maintainer approves the change at that time.
 - [ ] **PUB-04**: A Jellyfin 12.1 administrator adds the manifest URL, installs the plugin from the catalog, and receives an update to a newer version.
@@ -131,7 +131,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REL-02 | Phase 5 | Complete |
 | REL-03 | Phase 5 | Complete |
 | REL-04 | Phase 6 | Pending |
-| PUB-01 | Phase 5 | Pending |
+| PUB-01 | Phase 5 | Complete |
 | PUB-02 | Phase 6 | Pending |
 | PUB-03 | Phase 5 | Pending |
 | PUB-04 | Phase 6 | Pending |
