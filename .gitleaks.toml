@@ -3,8 +3,21 @@ title = "jellyfin-plugin-emby-auth gitleaks config"
 [extend]
 useDefault = true
 
+# Scoped three ways, so it exempts the repository's deliberate fixture values
+# and nothing else. `condition = "AND"` is load-bearing: gitleaks defaults an
+# allowlist to "OR", where any single criterion suffices, so without it `paths`
+# would exempt every finding under tests/ and .planning/ instead of narrowing
+# anything. `targetRules` keeps the exemption on the one rule these values
+# trip, so the same strings are still reported if they ever match a more
+# specific rule. tests/scripts/gitleaks.bats pins all three directions.
 [[allowlists]]
 description = "Deliberate test fixtures, not real credentials (see 05-CONTEXT.md D-07)"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = [
+  '''^tests/''',
+  '''^\.planning/''',
+]
 regexes = [
   '''0123456789abcdef''',
   '''sentinel-api-key-''',

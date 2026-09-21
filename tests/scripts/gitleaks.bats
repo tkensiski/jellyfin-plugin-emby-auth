@@ -64,3 +64,75 @@ scan_dir() {
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"no leaks found"* ]]
 }
+
+# The three tests below pin the allowlist's scope rather than the scanner's
+# ability to detect. The fixture-value allowlist is deliberately narrow in two
+# directions at once, and each direction needs its own test because a config
+# that got either one wrong would still pass the other:
+#
+#   - by path, so a fixture-shaped value committed to production source is
+#     still reported rather than silently ignored repository-wide;
+#   - by value, so any other secret inside tests/ or .planning/ is still
+#     reported rather than those trees becoming blanket-exempt.
+#
+# The second direction depends on `condition = "AND"` in .gitleaks.toml.
+# gitleaks defaults an allowlist to "OR", where any one criterion suffices —
+# under that default, adding `paths` would exempt every finding in those trees
+# instead of narrowing anything.
+
+# Builds a throwaway git repository at $1 from the remaining `path=content`
+# arguments, then scans it with `gitleaks git` — the subcommand `mise run lint`
+# runs, and the one that reports repository-relative paths. `gitleaks dir`
+# reports absolute paths, so it cannot exercise repository-relative `paths`
+# patterns and `scan_dir` above is no use for these three tests.
+scan_git_repo() {
+	local repo="$1"
+	shift
+
+	git init -q "$repo"
+
+	local pair path content
+	for pair in "$@"; do
+		path="${pair%%=*}"
+		content="${pair#*=}"
+		mkdir -p "$repo/$(dirname "$path")"
+		printf '%s\n' "$content" >"$repo/$path"
+	done
+
+	git -C "$repo" add -A
+	git -C "$repo" -c user.email=test@example.invalid -c user.name=test commit -qm fixture
+
+	gitleaks git --no-banner --no-color --redact -c "$REPO_ROOT/.gitleaks.toml" "$repo"
+}
+
+# Held as two halves joined at run time, for the same reason the AKIA value
+# above is: the whole string never appears contiguously in this tracked file,
+# so it never becomes a finding in this repository's own history scan. Neither
+# half's variable name contains "key", "token", "secret", or "api".
+fixture_shaped_value() {
+	local head="0123456789" tail="abcdef"
+	printf '%s%s%s%s' "$head" "$tail" "$head" "$tail"
+}
+
+@test "a fixture value in production source is reported, not allowlisted repository-wide" {
+	run scan_git_repo "$BATS_TEST_TMPDIR/outside" \
+		"src/Leaky.cs=var apiKey = \"$(fixture_shaped_value)\";"
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ leaks\ found:\ [0-9]+ ]]
+}
+
+@test "a non-fixture secret inside the fixture trees is reported" {
+	local other_head="Zq7Z3mK9pLxW2nRvT8sY" other_tail="bHgJ4dFcQ1aE"
+
+	run scan_git_repo "$BATS_TEST_TMPDIR/inside-other" \
+		"tests/Other.cs=var apiKey = \"${other_head}${other_tail}\";"
+	[ "$status" -eq 1 ]
+	[[ "$output" =~ leaks\ found:\ [0-9]+ ]]
+}
+
+@test "a fixture value inside the fixture trees is ignored" {
+	run scan_git_repo "$BATS_TEST_TMPDIR/inside-fixture" \
+		"tests/Fixture.cs=var apiKey = \"$(fixture_shaped_value)\";"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"no leaks found"* ]]
+}
