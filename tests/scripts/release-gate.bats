@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # Tests for scripts/release-gate.sh. A fake `gh` on PATH supplies fixture JSON for
-# every state; one test calls the real `gh` to prove the request shape is not a 404.
+# every state; one test calls the real `gh` against a well-formed, unknown SHA
+# and asserts the specific 422 GitHub returns for that case, so a 401 (bad or
+# absent credentials) does not read as a pass.
 
 bats_require_minimum_version 1.5.0
 
@@ -276,7 +278,7 @@ FAKE_GH
 	[[ "$output" == *"Usage:"* ]]
 }
 
-@test "the real gh sends a GET for the query-string filter form, not a 404-triggering POST" {
+@test "the real gh sends a GET for the query-string filter form and gets a 422 for the unknown SHA" {
 	if [ -z "$REAL_GH" ]; then
 		skip "gh is not installed"
 	fi
@@ -292,5 +294,5 @@ FAKE_GH
 	sha="0123456789abcdef0123456789abcdef01234567"
 	run "$REAL_GH" api "repos/{owner}/{repo}/commits/$sha/check-runs?check_name=ci-success"
 	[ "$status" -ne 0 ]
-	[[ "$output" != *"404"* ]]
+	[[ "$output" == *"422"* ]]
 }
