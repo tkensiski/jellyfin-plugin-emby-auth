@@ -58,7 +58,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 ### Release and Tooling
 
-- [ ] **REL-01**: The release workflow publishes a release only when the tagged commit has a passing `ci-success` check run.
+- [x] **REL-01**: The release workflow publishes a release only when the tagged commit has a passing `ci-success` check run.
 - [ ] **REL-02**: Each `zizmor --persona=pedantic` finding is fixed or suppressed with a written reason.
 - [ ] **REL-03**: gitleaks runs in `mise run lint`, so the pre-commit hook and CI check for secrets.
 - [ ] **REL-04**: Each release has an entry in `CHANGELOG.md`, and the manifest entry for that version carries the same changelog.
@@ -127,7 +127,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | TEST-06 | Phase 4 | Complete |
 | PERF-01 | Phase 4 | Complete |
 | PERF-02 | Phase 4 | Complete |
-| REL-01 | Phase 5 | Pending |
+| REL-01 | Phase 5 | Complete |
 | REL-02 | Phase 5 | Pending |
 | REL-03 | Phase 5 | Pending |
 | REL-04 | Phase 6 | Pending |

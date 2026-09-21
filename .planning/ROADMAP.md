@@ -180,12 +180,12 @@ Plans:
   4. Before the visibility change, gitleaks scans the full git history, and the Actions logs and artifacts, the issue and PR text, and the release notes are reviewed. Every finding is removed or rotated.
   5. The repository is public. The maintainer gave explicit approval at the time of the change, after criteria 1 and 4 were complete.
 
-**Plans**: 5 plans
+**Plans**: 1/5 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Tracer: the release gate end to end — `scripts/release-gate.sh`, its bats coverage, and the `release.yml` step that refuses a tag whose commit has no passing `ci-success`
+- [x] 05-01-PLAN.md — Tracer: the release gate end to end — `scripts/release-gate.sh`, its bats coverage, and the `release.yml` step that refuses a tag whose commit has no passing `ci-success`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -231,5 +231,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 2. Safe Failures for the Fingerprint File and Settings | 3/3 | Complete    | 2026-09-19 |
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
 | 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | Complete    | 2026-09-20 |
-| 5. Public Repository | 0/5 | Not started | - |
+| 5. Public Repository | 1/5 | In Progress|  |
 | 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
