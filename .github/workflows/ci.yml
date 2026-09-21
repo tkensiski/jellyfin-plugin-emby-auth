@@ -25,6 +25,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # mise run lint scans the full history for secrets (gitleaks git).
+          # A shallow clone would scan only the checked-out commit.
+          fetch-depth: 0
 
       - name: Install pinned tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0

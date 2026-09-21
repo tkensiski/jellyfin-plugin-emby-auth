@@ -174,3 +174,33 @@ fixture_shaped_value() {
 	# failure would produce.
 	[[ "$output" == *"1 commits scanned"* ]]
 }
+
+# CR-01 pins that the CI job running `gitleaks git` clones full history rather
+# than the `actions/checkout` default of depth 1, under which `gitleaks git`
+# scans only the single commit in the clone and a secret committed and later
+# removed is invisible to it. Extracts the named job's block from ci.yml with
+# awk, rather than grepping the whole file for `fetch-depth: 0`, so the
+# assertion cannot pass because some other job happens to carry it. A job
+# boundary is a line at 2-space indent ending in a bare `key:`.
+job_block() {
+	local job="$1"
+	awk -v job="  $job:" '
+		$0 == job { flag = 1 }
+		flag && /^  [a-z][a-zA-Z0-9-]*:$/ && $0 != job { exit }
+		flag
+	' "$REPO_ROOT/.github/workflows/ci.yml"
+}
+
+@test "CI's lint job checks out full history for the gitleaks history scan" {
+	local block
+	block="$(job_block lint)"
+	[[ "$block" == *"fetch-depth: 0"* ]]
+}
+
+@test "CI's test and e2e jobs stay shallow" {
+	local test_block e2e_block
+	test_block="$(job_block test)"
+	e2e_block="$(job_block e2e)"
+	[[ "$test_block" != *"fetch-depth"* ]]
+	[[ "$e2e_block" != *"fetch-depth"* ]]
+}
