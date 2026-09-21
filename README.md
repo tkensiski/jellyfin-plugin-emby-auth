@@ -15,6 +15,14 @@ Your users log in to Jellyfin with the user name and password that they use on E
 - An Emby server that Jellyfin can reach over HTTP or HTTPS.
 - An API key for the plugin on that Emby server.
 
+## Compatibility
+
+This plugin was tested only against Jellyfin 12.1.0 and Emby 4.10.0.40, in local containers. No production server has run it.
+
+The release zip's `meta.json`, and the plugin repository `manifest.json`, both carry a `targetAbi` value. For this build it is `12.1.0.0`. This value declares the minimum Jellyfin version the plugin asks for: Jellyfin decides which catalog entries to offer a server by parsing each entry's `targetAbi` and keeping the ones less than or equal to the server's own version. A server older than `12.1.0.0` is never offered the plugin. A server newer than it is offered the plugin, and Jellyfin will install it.
+
+There is no upper bound in that value. A Jellyfin release newer than 12.1 will install this plugin even though nobody has tested it there. Installing is not the same as supported — treat any version past the tested `12.1.0` as untested.
+
 ## Install
 
 1. Get the zip `jellyfin-plugin-emby-auth_<version>.zip`:
