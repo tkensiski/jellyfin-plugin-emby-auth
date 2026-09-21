@@ -26,7 +26,7 @@ There is no upper bound in that value. A Jellyfin release newer than 12.1 will i
 ## Install
 
 1. Get the zip `jellyfin-plugin-emby-auth_<version>.zip`:
-   - From a GitHub release of this repository. The repository is private, so you need access to it.
+   - From a GitHub release of this repository.
    - Or build it. The tools are pinned in `.mise.toml`:
 
      ```sh
@@ -38,7 +38,7 @@ There is no upper bound in that value. A Jellyfin release newer than 12.1 will i
 2. Unzip it into `<jellyfin config>/plugins/EmbyAuth_<version>/`. The zip holds the plugin DLL and `meta.json`.
 3. Restart Jellyfin.
 
-Each release also has `manifest.json`, a Jellyfin plugin repository manifest with the download URL and MD5 checksum of the zip. Jellyfin downloads a repository manifest and the zip without GitHub credentials, so the manifest works as a repository URL only when the release files are public.
+Each release also has `manifest.json`, a Jellyfin plugin repository manifest with the download URL and MD5 checksum of the zip. Jellyfin downloads a repository manifest and the zip without GitHub credentials, so a manifest URL only works for release files that anyone can download without signing in to GitHub.
 
 ## Configure
 
