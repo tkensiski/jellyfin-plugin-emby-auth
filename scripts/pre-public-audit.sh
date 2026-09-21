@@ -2,11 +2,12 @@
 set -euo pipefail
 
 # Reports the evidence a human needs before the repository can be made
-# public: the mise run lint secret-scan verdict, the repository's current
-# visibility, and the workflow run, artifact, issue, pull request, and
-# release surface, each printed for review. Every `gh` call here is a
-# read — `gh api` for the enumerations, `gh repo view` for the visibility
-# line — and nothing in this script can change the repository's visibility.
+# public: the mise run lint verdict (which includes the gitleaks history
+# scan), the repository's current visibility, and the workflow run,
+# artifact, issue, pull request, and release surface, each printed for
+# review. Every `gh` call here is a read — `gh api` for the enumerations,
+# `gh repo view` for the visibility line — and nothing in this script can
+# change the repository's visibility.
 #
 # Usage:
 #   scripts/pre-public-audit.sh run   Print the audit report.
@@ -19,15 +20,18 @@ usage() {
 	echo "Usage: $0 run" >&2
 }
 
-secret_scan() {
-	# Reuses mise run lint's own history scan; this script defines no
-	# separate scanner, so the pre-commit hook, CI, and this audit can
-	# never disagree.
-	if mise run lint >/dev/null 2>&1; then
-		echo "PASS secret-scan: mise run lint reported no findings"
+lint_gate() {
+	# Reuses mise run lint itself, including its gitleaks history scan, so
+	# the pre-commit hook, CI, and this audit can never disagree. Forwards
+	# mise's own output on failure instead of discarding it, because a
+	# bare verdict cannot tell a real secret finding from a shfmt diff.
+	local out
+	if out="$(mise run lint 2>&1)"; then
+		echo "PASS lint: no findings (includes the gitleaks history scan)"
 		return 0
 	fi
-	echo "FAIL secret-scan: mise run lint reported a finding; run 'mise run lint' yourself to see it" >&2
+	echo "FAIL lint: a check reported a finding (includes the gitleaks history scan)" >&2
+	printf '%s\n' "$out" >&2
 	return 1
 }
 
@@ -91,15 +95,15 @@ releases() {
 }
 
 run() {
-	local secret_status=0
+	local lint_status=0
 
 	if [[ -z "${GH_REPO:-}" ]]; then
 		echo "GH_REPO is not set; cannot query the GitHub API." >&2
 		return 1
 	fi
 
-	if ! secret_scan; then
-		secret_status=1
+	if ! lint_gate; then
+		lint_status=1
 	fi
 
 	visibility
@@ -109,13 +113,13 @@ run() {
 	pull_requests
 	releases
 
-	if [[ "$secret_status" -eq 0 ]]; then
-		echo "Summary: PASS overall — only the secret-scan item is machine-checked; read every REVIEW line above before deciding."
+	if [[ "$lint_status" -eq 0 ]]; then
+		echo "Summary: PASS overall — only the lint item is machine-checked; read every REVIEW line above before deciding."
 	else
-		echo "Summary: FAIL overall — the secret-scan item failed; fix it before reading the REVIEW lines above."
+		echo "Summary: FAIL overall — the lint item failed; fix it before reading the REVIEW lines above."
 	fi
 
-	return "$secret_status"
+	return "$lint_status"
 }
 
 main() {

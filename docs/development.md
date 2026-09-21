@@ -19,7 +19,7 @@ CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull reque
 
 ## Pre-publication audit
 
-`scripts/pre-public-audit.sh run` reports the evidence a human needs before making the repository public. It needs `GH_REPO` (`owner/repo`) and a `GH_TOKEN` that `gh` can use. Only the secret-scan line (`mise run lint`, which includes the gitleaks history scan) is machine-checked pass/fail; the visibility, workflow-run, artifact, issue, pull-request, and release lines are for a human to read before deciding — the script cannot judge whether their contents are safe to publish.
+`scripts/pre-public-audit.sh run` reports the evidence a human needs before making the repository public. It needs `GH_REPO` (`owner/repo`) and a `GH_TOKEN` that `gh` can use. Only the lint line (`mise run lint`, which includes the gitleaks history scan) is machine-checked pass/fail, and it prints `mise run lint`'s own output when it fails; the visibility, workflow-run, artifact, issue, pull-request, and release lines are for a human to read before deciding — the script cannot judge whether their contents are safe to publish.
 
 ## Settings-page tests
 

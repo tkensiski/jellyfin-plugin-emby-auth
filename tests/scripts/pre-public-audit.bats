@@ -37,8 +37,12 @@ setup() {
 	printf '[[]]' >"$PULLS_FILE"
 	printf '[[]]' >"$RELEASES_FILE"
 
+	# Always prints a marker so a test can tell whether the audit forwards
+	# mise run lint's own output or discards it (WR-05); the marker never
+	# starts with PASS/FAIL/REVIEW, so it cannot be mistaken for an item line.
 	cat >"$FAKE_BIN_DIR/mise" <<'FAKE_MISE'
 #!/usr/bin/env bash
+echo "mise-lint-fixture-output: shfmt would reformat scripts/example.sh"
 exit "$(cat "$MISE_EXIT_FILE")"
 FAKE_MISE
 	chmod +x "$FAKE_BIN_DIR/mise"
@@ -105,18 +109,28 @@ FAKE_GH
 	[[ "$output" == *"Usage:"* ]]
 }
 
-@test "a clean mise run lint passes the secret-scan item and the whole run" {
+@test "a clean mise run lint passes the lint item and the whole run" {
 	printf '0' >"$MISE_EXIT_FILE"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	[ "$status" -eq 0 ]
-	[[ -n "$(grep '^PASS secret-scan' <<<"$output" || true)" ]]
+	[[ -n "$(grep '^PASS lint' <<<"$output" || true)" ]]
 }
 
-@test "a failing mise run lint fails the secret-scan item and the whole run" {
+@test "a failing mise run lint fails the lint item and the whole run" {
 	printf '1' >"$MISE_EXIT_FILE"
 	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
 	[ "$status" -eq 1 ]
-	[[ -n "$(grep '^FAIL secret-scan' <<<"$output" || true)" ]]
+	[[ -n "$(grep '^FAIL lint' <<<"$output" || true)" ]]
+}
+
+# WR-05: the item used to hide mise run lint's own output behind
+# ">/dev/null 2>&1", so a shfmt or dotnet-format finding printed only a
+# misleading "FAIL secret-scan" with no way to see what actually failed.
+@test "a failing mise run lint forwards mise's own output, not just a verdict" {
+	printf '1' >"$MISE_EXIT_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"mise-lint-fixture-output: shfmt would reformat scripts/example.sh"* ]]
 }
 
 @test "empty artifacts, issues, pull requests, and releases each print an explicit zero line" {
@@ -137,7 +151,7 @@ FAKE_GH
 
 	[ "$first_labels" = "$second_labels" ]
 
-	expected="secret-scan
+	expected="lint
 visibility
 workflow-runs
 artifacts

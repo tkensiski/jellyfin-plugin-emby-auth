@@ -30,7 +30,7 @@ run = [
 
 [tasks.secrets]
 description = "Scan the full git history for secrets"
-run = "gitleaks git"
+run = "gitleaks git -v --redact"
 
 [tasks.lint-workflows-online]
 description = "Run zizmor's online audits against the GitHub API (CI only; needs GH_TOKEN and actions: read)"
