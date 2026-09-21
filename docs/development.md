@@ -4,7 +4,7 @@ The tools are pinned in `.mise.toml`. Run `mise install` first.
 
 | Task | Command |
 |---|---|
-| Check formatting, and lint scripts and workflows | `mise run lint` |
+| Check formatting, lint scripts and workflows, and scan for secrets | `mise run lint` |
 | Build with warnings as errors, then run the unit tests, the script tests, and the settings-page tests | `mise run test` |
 | Run end-to-end tests in Docker | `mise run e2e` |
 | Build the release zip and manifest | `mise run package` |

@@ -5,6 +5,7 @@ jq = "1.8.2"
 shellcheck = "0.11.0"
 shfmt = "3.14.1"
 actionlint = "1.7.12"
+gitleaks = "8.30.1"
 zizmor = "1.30.1"
 prek = "0.5.3"
 act = "0.2.89"
@@ -17,12 +18,13 @@ DOTNET_NOLOGO = "1"
 # CI runs exactly these tasks (.github/workflows/ci.yml), so a local run matches CI.
 
 [tasks.lint]
-description = "Check C# formatting, and lint the shell scripts and GitHub workflows"
+description = "Check C# formatting, lint the shell scripts and GitHub workflows, and scan the git history for secrets"
 run = [
   "dotnet format Jellyfin.Plugin.EmbyAuth.slnx --verify-no-changes",
   "shellcheck -x e2e/*.bash e2e/*.bats scripts/*.sh tests/scripts/*.bats",
   "shfmt -d e2e scripts tests/scripts",
   "actionlint",
+  "gitleaks git",
   "zizmor --offline --persona=pedantic .github/workflows",
 ]
 

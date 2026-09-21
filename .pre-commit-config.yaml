@@ -2,11 +2,11 @@ repos:
 -   repo: local
     hooks:
     -   id: lint
-        name: mise run lint (dotnet format, shellcheck, shfmt, actionlint, zizmor)
+        name: mise run lint (dotnet format, shellcheck, shfmt, actionlint, gitleaks, zizmor)
         entry: mise run lint
         language: system
         pass_filenames: false
-        files: \.(cs|csproj|slnx|props|sh|bash|bats|ya?ml)$|^\.mise\.toml$
+        files: \.(cs|csproj|slnx|props|sh|bash|bats|ya?ml)$|^\.mise\.toml$|^\.gitleaks\.toml$
     -   id: test
         name: mise run test (build with warnings as errors, unit tests, script tests)
         entry: mise run test

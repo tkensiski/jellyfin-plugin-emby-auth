@@ -1,0 +1,11 @@
+title = "jellyfin-plugin-emby-auth gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Deliberate test fixtures, not real credentials (see 05-CONTEXT.md D-07)"
+regexes = [
+  '''0123456789abcdef''',
+  '''sentinel-api-key-''',
+]
