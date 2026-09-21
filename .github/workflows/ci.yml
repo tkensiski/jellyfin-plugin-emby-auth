@@ -87,9 +87,21 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Job results: $RESULTS"
+          count=0
           for result in $RESULTS; do
+            count=$((count + 1))
             if [ "$result" != "success" ]; then
               echo "A required job did not succeed."
               exit 1
             fi
           done
+          # Catches an empty RESULTS (the loop above passes vacuously on zero
+          # iterations) and a needs: entry removed without updating this
+          # count. It does NOT catch the opposite: a job added to `jobs:` and
+          # left out of `needs:` still passes, because it never contributes a
+          # result here. Keep this count equal to the number of entries in
+          # `needs:` above whenever either changes.
+          if [ "$count" -ne 3 ]; then
+            echo "Expected 3 required job results, got $count; update needs and this count together."
+            exit 1
+          fi
