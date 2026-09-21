@@ -193,3 +193,48 @@ releases"
 	[[ "$output" == *"id=1 workflow=CI conclusion=success"* ]]
 	[[ "$output" == *"id=2 workflow=CI conclusion=failure"* ]]
 }
+
+# WR-08: every fixture before this point was empty, so the issues item's
+# pull_request filter, the artifacts/pull-requests/releases listing
+# branches, and the unset-GH_REPO refusal never ran.
+@test "the issues item counts issues and excludes pull requests" {
+	printf '[[{"number":1,"title":"a real issue"},{"number":2,"title":"a pr","pull_request":{}}]]' >"$ISSUES_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"REVIEW issues: 1 issues"* ]]
+	[[ "$output" == *"#1 a real issue"* ]]
+	[[ "$output" != *"#2 a pr"* ]]
+}
+
+@test "an unset GH_REPO refuses before any gh call" {
+	unset GH_REPO
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"GH_REPO is not set"* ]]
+	[ ! -s "$GH_ARGV_FILE" ]
+}
+
+@test "a non-empty artifacts fixture lists each artifact" {
+	printf '[{"artifacts":[{"name":"build-output"},{"name":"coverage-report"}]}]' >"$ARTIFACTS_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"REVIEW artifacts: 2 artifacts"* ]]
+	[[ "$output" == *"build-output"* ]]
+	[[ "$output" == *"coverage-report"* ]]
+}
+
+@test "a non-empty pull-requests fixture lists each pull request" {
+	printf '[[{"number":7,"title":"add a feature"}]]' >"$PULLS_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"REVIEW pull-requests: 1 pull requests"* ]]
+	[[ "$output" == *"#7 add a feature"* ]]
+}
+
+@test "a non-empty releases fixture lists each release" {
+	printf '[[{"tag_name":"v1.0.0","name":"First release"}]]' >"$RELEASES_FILE"
+	run "$REPO_ROOT/scripts/pre-public-audit.sh" run
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"REVIEW releases: 1 releases"* ]]
+	[[ "$output" == *"v1.0.0 First release"* ]]
+}
