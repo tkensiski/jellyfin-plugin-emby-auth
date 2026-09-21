@@ -4,11 +4,11 @@ milestone: v0.9.0.0
 current_phase: 05
 current_phase_name: Public Repository
 status: executing
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-09-21T04:58:41.741Z"
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-09-21T05:04:41.764Z"
 last_activity: 2026-09-20
 last_activity_desc: Phase 05 execution started
-state_head: c96b1894a2407d74f3b1738f2a9f5697dcd24291
+state_head: 157614ebe04034798db18c5701e2756b040650bf
 progress:
   total_phases: 6
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 05 (Public Repository) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-09-20 — Phase 05 execution started
 
@@ -86,6 +86,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 05 P01 | 20min | 3 tasks | 4 files |
 | Phase 05 P02 | 10min | 2 tasks | 3 files |
 | Phase 05-public-repository P03 | 9min | 3 tasks | 5 files |
+| Phase 05 P04 | 8min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,7 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05] Plan 05-02's measured pedantic zizmor inventory (7 findings) had shrunk to 6 before this plan's first edit -- 05-01's inline permission comments already satisfied undocumented-permissions; confirmed live before any edit, no task or acceptance criterion needed a change
 - [Phase 05-public-repository]: [Phase 05] Confirmed gitleaks git with no --source argument scans the current directory and auto-discovers the root .gitleaks.toml -- measured live, not carried forward from RESEARCH.md's Assumption A2 unchecked: 5 leaks found before the config existed, 0 after — The plan's own read_first step required settling A2 from the tool's own help output before writing the allowlist; confirming live (rather than trusting the research note) avoided building the invocation form on an unexercised assumption
 - [Phase 05-public-repository]: [Phase 05] Task 3's detection fixture uses an AWS-access-key-ID shape (AKIA + 16 chars) with variable names detect_head/detect_tail rather than key/token/secret/api-named variables, and never assembles the whole value in the tracked file -- AWS's own published EXAMPLE key ID measured zero findings under the pinned gitleaks 8.30.1 and would have made the test assert nothing while staying green — Confirmed live before writing the test: the vendor EXAMPLE value and the chosen candidate value were both scanned against the repository's own .gitleaks.toml, producing 0 and 1 findings respectively (rule id aws-access-token)
+- [Phase 05]: [Phase 05] Compatibility section states only the measured Jellyfin 12.1.0 / Emby 4.10.0.40 combination and frames targetAbi as a floor with no ceiling, never an endorsement of untested newer versions — Jellyfin's InstallationManager filters the catalog with Version.Parse(targetAbi) <= appVer, so a newer server will install the plugin untested; the README must stop that from being read as support
 
 ### Pending Todos
 
@@ -174,6 +176,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-21T04:58:27.463Z
-Stopped at: Completed 05-03-PLAN.md
+Last session: 2026-09-21T05:04:41.636Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None

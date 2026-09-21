@@ -38,7 +38,7 @@ Requirements for the public v1.0.0 release. Each maps to one roadmap phase. Sour
 
 - [x] **DOCS-01**: `docs/how-it-works.md` points to the shutdown step in `docs/migration.md` that finds users who went back to the Emby login method.
 - [ ] **DOCS-02**: `README.md` gives the manifest URL and the steps to install and update the plugin from the Jellyfin catalog.
-- [ ] **DOCS-03**: `README.md` states the tested Jellyfin and Emby versions, and that `targetAbi` sets only the minimum Jellyfin version.
+- [x] **DOCS-03**: `README.md` states the tested Jellyfin and Emby versions, and that `targetAbi` sets only the minimum Jellyfin version.
 - [ ] **DOCS-04**: The Jellyfin version bump rule in `CLAUDE.md` names every pin, including the test project's `Jellyfin.Controller` reference and the `targetAbi` values in `tests/scripts/package.bats`.
 - [x] **DOCS-05**: `docs/how-it-works.md` states that Jellyfin's Default login method accepts a blank password for an account that has no saved password, and names the three places this shapes the plugin: the account that a failed password save leaves behind is deleted (AUTH-04), the settings page warns before a move (AUTH-06), and the plugin is an interim tool whose end state is users on a login method that checks a password the user chose.
 
@@ -116,7 +116,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MIGR-02 | Phase 3 | Complete |
 | DOCS-01 | Phase 3 | Complete |
 | DOCS-02 | Phase 6 | Pending |
-| DOCS-03 | Phase 5 | Pending |
+| DOCS-03 | Phase 5 | Complete |
 | DOCS-04 | Phase 6 | Pending |
 | DOCS-05 | Phase 3 | Complete |
 | TEST-01 | Phase 1 | Complete |
