@@ -62,3 +62,29 @@ extract_ci_success_script() {
 	RESULTS="success success" run bash "$BATS_TEST_TMPDIR/ci-success.sh"
 	[ "$status" -eq 1 ]
 }
+
+# WR-13: --offline (used by [tasks.lint] so a contributor with no GH_TOKEN
+# can still lint locally) disables every zizmor audit that needs the GitHub
+# API, so the standing gate never runs them. CI has a token, so the lint job
+# should also run the online audits there. Pins the job-level permission and
+# the wiring rather than the audit's own findings, which depend on live
+# workflow content and are not this suite's concern.
+@test "the lint job grants actions: read for the online zizmor audits" {
+	run awk '/^  lint:$/{flag=1; next} flag && /^  [a-zA-Z]/{exit} flag' "$CI_YML"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"actions: read"* ]]
+}
+
+@test "the lint job runs the online zizmor audit task" {
+	run grep -c "mise run lint-workflows-online" "$CI_YML"
+	[ "$status" -eq 0 ]
+	[ "$output" -eq 1 ]
+}
+
+@test "the online zizmor task does not pass --offline" {
+	MISE_TOML="$REPO_ROOT/.mise.toml"
+	run awk '/^\[tasks\.lint-workflows-online\]$/{flag=1; next} flag && /^\[/{exit} flag' "$MISE_TOML"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"zizmor"* ]]
+	[[ "$output" != *"--offline"* ]]
+}

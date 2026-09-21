@@ -15,7 +15,7 @@ The tools are pinned in `.mise.toml`. Run `mise install` first.
 | Show or remove the demo | `scripts/dev-env.sh status` or `scripts/dev-env.sh down` |
 | Audit the repository before making it public | `GH_REPO=owner/repo scripts/pre-public-audit.sh run` |
 
-CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so a local run of these three tasks matches CI.
+CI runs `mise run lint`, `mise run test`, and `mise run e2e` on every pull request, so a local run of these three tasks matches CI, with one exception: `mise run lint`'s zizmor check runs `--offline`, so it skips every audit that needs the GitHub API — there is no `GH_TOKEN` on a laptop by default. The `lint` job also runs `mise run lint-workflows-online`, which repeats the same zizmor scan without `--offline`, using the job's own `GH_TOKEN`. A green `mise run lint` locally does not cover those online audits; only CI does.
 
 ## Pre-publication audit
 

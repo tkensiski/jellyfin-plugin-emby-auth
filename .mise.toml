@@ -32,6 +32,10 @@ run = [
 description = "Scan the full git history for secrets"
 run = "gitleaks git"
 
+[tasks.lint-workflows-online]
+description = "Run zizmor's online audits against the GitHub API (CI only; needs GH_TOKEN and actions: read)"
+run = "zizmor --persona=pedantic .github/workflows"
+
 [tasks.test]
 description = "Build with warnings as errors, then run the unit tests, the script tests, and the settings-page tests"
 run = [
