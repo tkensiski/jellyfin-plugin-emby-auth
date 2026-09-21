@@ -17,11 +17,11 @@ Your users log in to Jellyfin with the user name and password that they use on E
 
 ## Compatibility
 
-This plugin was tested only against Jellyfin 12.1.0 and Emby 4.10.0.40, in local containers. No production server has run it.
+This plugin was tested only in local containers, against the two server images pinned in `e2e/compose.yaml`: Jellyfin `12.1.20260915-010956` and Emby `4.10.0.40`. No production server has run it. The Jellyfin image tag is a dated 12.1 build, not a release numbered `12.1.0` — `12.1.0` is the version of the Jellyfin packages the plugin compiles against, which is a separate thing from the server it was run against.
 
-The release zip's `meta.json`, and the plugin repository `manifest.json`, both carry a `targetAbi` value. For this build it is `12.1.0.0`. This value declares the minimum Jellyfin version the plugin asks for: Jellyfin decides which catalog entries to offer a server by parsing each entry's `targetAbi` and keeping the ones less than or equal to the server's own version. A server older than `12.1.0.0` is never offered the plugin. A server newer than it is offered the plugin, and Jellyfin will install it.
+The release zip's `meta.json`, and the plugin repository `manifest.json`, both carry a `targetAbi` value. For this build it is `12.1.0.0`, those same compiled-against packages with a fourth part added. This value declares the minimum Jellyfin version the plugin asks for: Jellyfin decides which catalog entries to offer a server by parsing each entry's `targetAbi` and keeping the ones less than or equal to the server's own version. A server older than `12.1.0.0` is never offered the plugin. A server newer than it is offered the plugin, and Jellyfin will install it.
 
-There is no upper bound in that value. A Jellyfin release newer than 12.1 will install this plugin even though nobody has tested it there. Installing is not the same as supported — treat any version past the tested `12.1.0` as untested.
+There is no upper bound in that value. A Jellyfin release newer than the tested image will install this plugin even though nobody has tested it there. Installing is not the same as supported — treat any Jellyfin build other than the one named above as untested.
 
 ## Install
 
