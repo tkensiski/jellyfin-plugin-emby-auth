@@ -68,6 +68,87 @@ FAKE_GH
 	run ! grep -Eq -- '(^|/)(-f|--field|--raw-field)$' "$GH_ARGV_FILE"
 }
 
+@test "an in-progress check run refuses and names in_progress" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"in_progress","conclusion":null}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"in_progress"* ]]
+}
+
+@test "a cancelled check run refuses and names cancelled" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"cancelled"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"cancelled"* ]]
+}
+
+@test "a failure check run refuses" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"failure"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+}
+
+@test "a skipped check run refuses" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"skipped"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+}
+
+@test "a timed_out check run refuses" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"timed_out"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+}
+
+@test "an unenumerated conclusion refuses because the script matches success exactly" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"neutral"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+}
+
+@test "two ci-success check runs refuses and states the count found" {
+	set_fixture_body '{"check_runs":[{"name":"ci-success","status":"completed","conclusion":"success"},{"name":"ci-success","status":"completed","conclusion":"success"}]}'
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"2"* ]]
+}
+
+@test "a failed gh api call (403) refuses distinctly from a missing check run" {
+	set_fixture_stderr "HTTP 403: Resource not accessible by integration"
+	set_fixture_exit 1
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"API call to list check runs"* ]]
+	[[ "$output" != *"No ci-success check run found"* ]]
+}
+
+@test "a failed gh api call (422, unknown SHA) refuses distinctly from a missing check run" {
+	set_fixture_stderr "HTTP 422: No commit found for SHA"
+	set_fixture_exit 1
+	run "$REPO_ROOT/scripts/release-gate.sh" check deadbee
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"API call to list check runs"* ]]
+	[[ "$output" != *"No ci-success check run found"* ]]
+}
+
+@test "release-gate.sh with no action prints usage and fails" {
+	run "$REPO_ROOT/scripts/release-gate.sh"
+	[ "$status" -eq 2 ]
+	[[ "$output" == *"Usage:"* ]]
+}
+
+@test "release-gate.sh with an unknown action prints usage and fails" {
+	run "$REPO_ROOT/scripts/release-gate.sh" publish deadbee
+	[ "$status" -eq 2 ]
+	[[ "$output" == *"Usage:"* ]]
+}
+
+@test "release-gate.sh check with no SHA prints usage and fails" {
+	run "$REPO_ROOT/scripts/release-gate.sh" check
+	[ "$status" -eq 2 ]
+	[[ "$output" == *"Usage:"* ]]
+}
+
 @test "the real gh sends a GET for the query-string filter form, not a 404-triggering POST" {
 	if [ -z "$REAL_GH" ]; then
 		skip "gh is not installed"
