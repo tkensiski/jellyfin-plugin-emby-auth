@@ -12,6 +12,7 @@ paths:
 - A file that stops a service starts it again in `teardown_file` (see `40-emby-outage.bats`).
 - `scripts/dev-env.sh` also uses `compose.yaml` and `helpers.bash`. After a change to either file, run `scripts/dev-env.sh up` and `down`.
 - `90-jellyfin-log.bats` runs last and checks the whole Jellyfin log.
+- `85-catalog-install.bats` starts the two `catalog` profile services itself, in `setup_file`, and removes them in `teardown_file`; the shared stack's `docker compose up -d` never starts them.
 
 ## Conventions
 
@@ -21,7 +22,7 @@ paths:
 - Use `emby_login_requests NAME` to prove whether a login reached Emby. The helper reads the `emby-proxy` log. It first sends a marker request and waits for it, so the count includes all earlier requests.
 - Do not use the Emby activity log for a "did not reach Emby" check. Emby writes entries after a delay, so the check passes before the entry exists.
 - Jellyfin runs at Debug level (`JELLYFIN_Serilog__MinimumLevel__Default` in `compose.yaml`), so the log check also sees the exceptions that Jellyfin logs for refused logins.
-- `EMBY_PORT` and `JELLYFIN_PORT` (default 18096 and 28096) set the host ports in `compose.yaml` and `helpers.bash`. Set both to run the tests while another copy of the containers uses the default ports.
+- `EMBY_PORT`, `JELLYFIN_PORT`, `CATALOG_JELLYFIN_PORT`, and `CATALOG_MANIFEST_PORT` (default 18096, 28096, 38096, and 38080) set the host ports in `compose.yaml` and `helpers.bash`. Set them to run the tests while another copy of the containers uses the default ports.
 - Scripts must pass `shellcheck -x` and `shfmt -d`. Inside a test, use `if [[ ... ]]; then ...; return 1; fi` instead of a bare `[[ ... ]]` in a loop.
 - `sqlite3` must be on the host for `80-fingerprint-store.bats`. It is a system tool rather than a mise pin, because macOS and the GitHub runner both ship it. The helper that needs it fails, naming it, rather than skipping when it is absent.
 

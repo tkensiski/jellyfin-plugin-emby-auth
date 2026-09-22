@@ -8,6 +8,13 @@ export EMBY_PORT="${EMBY_PORT:-18096}"
 export JELLYFIN_PORT="${JELLYFIN_PORT:-28096}"
 export EMBY="http://127.0.0.1:$EMBY_PORT"
 export JELLYFIN="http://127.0.0.1:$JELLYFIN_PORT"
+# The `catalog` profile services (85-catalog-install.bats only) publish on these host ports.
+export CATALOG_JELLYFIN_PORT="${CATALOG_JELLYFIN_PORT:-38096}"
+export CATALOG_MANIFEST_PORT="${CATALOG_MANIFEST_PORT:-38080}"
+export CATALOG_JELLYFIN="http://127.0.0.1:$CATALOG_JELLYFIN_PORT"
+# The directory catalog-manifest's nginx serves as its document root, and where
+# 85-catalog-install.bats writes the two builds and the merged manifest.json.
+export CATALOG_ARTIFACT_DIR="$E2E_DIR/../artifacts/catalog"
 export EMBY_PROVIDER=Jellyfin.Plugin.EmbyAuth.EmbyAuthenticationProvider
 export DEFAULT_PROVIDER=Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider
 export PLUGIN_ID=e973e09a-e8b4-40c1-9be2-8e51342de1f9
