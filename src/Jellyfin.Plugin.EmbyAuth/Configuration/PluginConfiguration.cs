@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using Jellyfin.Plugin.EmbyAuth;
 using MediaBrowser.Model.Plugins;
 
 namespace Jellyfin.Plugin.EmbyAuth.Configuration;
@@ -17,12 +18,6 @@ public enum MigrationMode
     /// Emby checks every login. Users stay on the Emby login method until an administrator runs the migration task.
     /// </summary>
     KeepEmbyInCharge,
-
-    /// <summary>
-    /// Jellyfin checks the saved password first. Emby checks the login only if no saved password matches.
-    /// Users stay on the Emby login method until an administrator runs the migration task.
-    /// </summary>
-    JellyfinPasswordFirst,
 }
 
 /// <summary>
@@ -71,4 +66,25 @@ public class PluginConfiguration : BasePluginConfiguration
     /// Gets or sets the access that the plugin gives to Jellyfin accounts.
     /// </summary>
     public AccountAccess AccountAccess { get; set; } = AccountAccess.CopyEmbyRemoteAccess;
+
+    /// <summary>
+    /// Gets or sets the login method that the move after a login and the migration task move a user to. Defaults
+    /// to Jellyfin's Default login method, so an install that predates this setting keeps today's behaviour with
+    /// no administrator action.
+    /// </summary>
+    public string MigrationTarget { get; set; } = LoginMethodMove.DefaultProviderId;
+
+    /// <summary>
+    /// Gets or sets the login method that the move happening when an administrator sets a password in Jellyfin
+    /// moves a user to. An empty value, the default, means <see cref="MigrationTarget"/> governs that move too,
+    /// so an install that predates this setting keeps today's behaviour with no administrator action.
+    /// </summary>
+    public string PasswordSetTarget { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The value of <see cref="MigrationTarget"/> or <see cref="PasswordSetTarget"/> that means no path moves a
+    /// user off the Emby login method through it: not the move after a login, not the migration task, and not
+    /// the move happening when an administrator sets a password in Jellyfin. There is no fallback to Default.
+    /// </summary>
+    public const string RemainOnEmbyLoginMethod = "RemainOnEmbyLoginMethod";
 }

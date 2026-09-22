@@ -140,6 +140,32 @@ public class EmbyClientTests
         Assert.Equal("alice", login?.Name);
     }
 
+    [Fact]
+    public async Task Login_NamesTheTypedUserName_WhenTheSignOutFailsForAResponseWithoutAUserName()
+    {
+        var handler = new StubHttpMessageHandler()
+            .Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":""},"AccessToken":"logout-token-789"}"""))
+            .Then(() => throw new HttpRequestException("Connection refused"));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Null(login);
+        Assert.Contains(_logger.Entries, entry => entry.Contains("alice", StringComparison.Ordinal));
+        Assert.All(_logger.Entries, entry => Assert.DoesNotContain("logout-token-789", entry, StringComparison.Ordinal));
+        AssertNoSecretsLogged();
+    }
+
+    [Fact]
+    public async Task Login_DoesNotEndASession_WhenEmbyReturnsNoToken()
+    {
+        var handler = new StubHttpMessageHandler().Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":"alice"}}"""));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Equal(new EmbyLogin("alice", EnableRemoteAccess: false), login);
+        Assert.Single(handler.Requests);
+    }
+
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
     [InlineData(HttpStatusCode.Forbidden)]
@@ -176,9 +202,11 @@ public class EmbyClientTests
         Assert.Null(login);
     }
 
+    /// <summary>
+    /// Both remaining rows carry no <c>AccessToken</c>, so neither can send a sign-out.
+    /// </summary>
     [Theory]
     [InlineData("{}")]
-    [InlineData("""{"User":{"Name":""},"AccessToken":"t"}""")]
     [InlineData("not json")]
     public async Task Login_ReturnsNull_WhenEmbyResponseHasNoUserName(string json)
     {
@@ -192,6 +220,27 @@ public class EmbyClientTests
     }
 
     [Fact]
+    public async Task Login_EndsTheEmbySession_WhenTheResponseHasATokenAndNoUserName()
+    {
+        var handler = new StubHttpMessageHandler()
+            .Then(() => Json(HttpStatusCode.OK, """{"User":{"Name":""},"AccessToken":"t"}"""))
+            .Then(() => Status(HttpStatusCode.NoContent));
+
+        var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
+
+        Assert.Null(login);
+        Assert.Equal(2, handler.Requests.Count);
+        var logout = handler.Requests[1];
+        Assert.EndsWith("Sessions/Logout", logout.Uri!.AbsolutePath, StringComparison.Ordinal);
+        Assert.Contains("Token=\"t\"", logout.Authorization, StringComparison.Ordinal);
+        AssertNoSecretsLogged();
+    }
+
+    /// <summary>
+    /// A body Jellyfin cannot parse hides the token inside it, so the plugin cannot end that Emby session. This is
+    /// the documented limit (D-02), not a defect: no code buffers or hand-parses a body that deserialization rejected.
+    /// </summary>
+    [Fact]
     public async Task Login_ReturnsNull_WhenEmbyResponseHasAnInvalidCharset()
     {
         var handler = new StubHttpMessageHandler().Then(() =>
@@ -204,6 +253,7 @@ public class EmbyClientTests
         var login = await CreateClient(handler).AuthenticateAsync(EmbyUrl, "alice", Password, CancellationToken.None);
 
         Assert.Null(login);
+        Assert.Single(handler.Requests);
     }
 
     [Fact]

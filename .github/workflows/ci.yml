@@ -7,6 +7,10 @@ on:
   push:
     branches:
       - main
+  # Lets an operator produce a ci-success run on a commit that never got one
+  # from pull_request or push — for example an intermediate commit on a
+  # multi-commit push to main, which GitHub does not schedule a run for.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,13 +21,27 @@ concurrency:
 
 jobs:
   lint:
+    name: Lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read # actions/checkout
+      # zizmor's online audits (job below) need this to query the GitHub
+      # API. A pull_request run from a fork gets this downgraded to
+      # read-only regardless — GitHub docs, "How permissions are calculated
+      # for a workflow job": write permissions are downgraded to read-only
+      # for a pull_request (not pull_request_target) from a fork, unless an
+      # admin enabled write tokens for pull requests. This job requests only
+      # a read permission, so a fork PR cannot gain anything from it.
+      actions: read # zizmor --persona=pedantic (lint-workflows-online), online audits
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # mise run lint scans the full history for secrets (gitleaks git).
+          # A shallow clone would scan only the checked-out commit.
+          fetch-depth: 0
 
       - name: Install pinned tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -31,7 +49,13 @@ jobs:
       - name: Lint
         run: mise run lint
 
+      - name: Audit the workflows online
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: mise run lint-workflows-online
+
   test:
+    name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -47,6 +71,7 @@ jobs:
         run: mise run test
 
   e2e:
+    name: End-to-end tests
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -63,6 +88,10 @@ jobs:
 
   # One required check for branch protection. A skipped or failed job fails this job.
   ci-success:
+    # Repeats the job id on purpose: scripts/release-gate.sh queries the check run
+    # named "ci-success", and a job's name becomes its check-run name. A descriptive
+    # name here would rename that check run and break the release gate (D-09).
+    name: ci-success
     if: always()
     needs: [lint, test, e2e]
     runs-on: ubuntu-latest
@@ -73,9 +102,21 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "Job results: $RESULTS"
+          count=0
           for result in $RESULTS; do
+            count=$((count + 1))
             if [ "$result" != "success" ]; then
               echo "A required job did not succeed."
               exit 1
             fi
           done
+          # Catches an empty RESULTS (the loop above passes vacuously on zero
+          # iterations) and a needs: entry removed without updating this
+          # count. It does NOT catch the opposite: a job added to `jobs:` and
+          # left out of `needs:` still passes, because it never contributes a
+          # result here. Keep this count equal to the number of entries in
+          # `needs:` above whenever either changes.
+          if [ "$count" -ne 3 ]; then
+            echo "Expected 3 required job results, got $count; update needs and this count together."
+            exit 1
+          fi

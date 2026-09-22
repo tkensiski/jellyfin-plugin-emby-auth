@@ -10,12 +10,16 @@ public class EmbyAuthSettingsTests
         string? url = "http://emby:8096",
         string? apiKey = "0123456789abcdef",
         MigrationMode mode = MigrationMode.MoveAfterFirstLogin,
-        AccountAccess access = AccountAccess.CopyEmbyRemoteAccess) => new()
+        AccountAccess access = AccountAccess.CopyEmbyRemoteAccess,
+        string? migrationTarget = LoginMethodMove.DefaultProviderId,
+        string? passwordSetTarget = "") => new()
         {
             EmbyServerUrl = url!,
             EmbyApiKey = apiKey!,
             MigrationMode = mode,
             AccountAccess = access,
+            MigrationTarget = migrationTarget!,
+            PasswordSetTarget = passwordSetTarget!,
         };
 
     [Theory]
@@ -34,10 +38,10 @@ public class EmbyAuthSettingsTests
     [Fact]
     public void CarriesTheChosenMigrationModeAndAccountAccess()
     {
-        var ok = EmbyAuthSettings.TryCreate(Config(mode: MigrationMode.JellyfinPasswordFirst, access: AccountAccess.NoLibraries), out var settings, out _);
+        var ok = EmbyAuthSettings.TryCreate(Config(mode: MigrationMode.KeepEmbyInCharge, access: AccountAccess.NoLibraries), out var settings, out _);
 
         Assert.True(ok);
-        Assert.Equal(MigrationMode.JellyfinPasswordFirst, settings!.MigrationMode);
+        Assert.Equal(MigrationMode.KeepEmbyInCharge, settings!.MigrationMode);
         Assert.Equal(AccountAccess.NoLibraries, settings.AccountAccess);
     }
 
@@ -48,6 +52,48 @@ public class EmbyAuthSettingsTests
 
         Assert.Equal(MigrationMode.MoveAfterFirstLogin, configuration.MigrationMode);
         Assert.Equal(AccountAccess.CopyEmbyRemoteAccess, configuration.AccountAccess);
+    }
+
+    [Fact]
+    public void DefaultsMigrationTargetToJellyfinsDefaultProviderId_AndPasswordSetTargetToEmpty()
+    {
+        var configuration = new PluginConfiguration();
+
+        Assert.Equal(LoginMethodMove.DefaultProviderId, configuration.MigrationTarget);
+        Assert.Equal(string.Empty, configuration.PasswordSetTarget);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Rejects_BlankMigrationTarget(string? target)
+    {
+        var ok = EmbyAuthSettings.TryCreate(Config(migrationTarget: target), out var settings, out var problem);
+
+        Assert.False(ok);
+        Assert.Null(settings);
+        Assert.Equal("The migration target setting is not set.", problem);
+    }
+
+    [Fact]
+    public void Accepts_EmptyPasswordSetTarget()
+    {
+        var ok = EmbyAuthSettings.TryCreate(Config(passwordSetTarget: string.Empty), out var settings, out var problem);
+
+        Assert.True(ok);
+        Assert.Null(problem);
+        Assert.Equal(string.Empty, settings!.PasswordSetTarget);
+    }
+
+    [Fact]
+    public void Rejects_WhitespaceOnlyPasswordSetTarget()
+    {
+        var ok = EmbyAuthSettings.TryCreate(Config(passwordSetTarget: "   "), out var settings, out var problem);
+
+        Assert.False(ok);
+        Assert.Null(settings);
+        Assert.Equal("The password-set target setting is blank.", problem);
     }
 
     [Fact]

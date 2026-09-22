@@ -1,0 +1,8 @@
+{
+  "name": "jellyfin-plugin-emby-auth-page-tests",
+  "private": true,
+  "type": "commonjs",
+  "devDependencies": {
+    "jsdom": "28.1.0"
+  }
+}

@@ -1,0 +1,102 @@
+name: Pages
+
+# Rebuilds the plugin repository manifest from every GitHub release and publishes it to GitHub
+# Pages. A release created with this repository's own GITHUB_TOKEN starts no new workflow run
+# (GitHub's own docs: events triggered by GITHUB_TOKEN do not create a new workflow run), so this
+# workflow cannot trigger on the release event. It chains off the Release workflow's own
+# completion instead, guarded on that run's conclusion, with workflow_dispatch as the manual
+# fallback and recovery path if the chained trigger does not fire.
+#
+# A workflow_run trigger definition is read from the version of this file on the default branch,
+# not on whichever branch authored it, so this workflow has no effect until it is merged to main,
+# and the Release run it chains from must complete after that merge lands.
+#
+# GitHub Pages must already exist for this repository with its build type set to GitHub Actions.
+# That is a one-time, maintainer-performed setting: the endpoint that sets it sits under the
+# Administration repository permission, which is not among the permissions a workflow's
+# GITHUB_TOKEN can be granted, so no step in this file can perform it.
+
+on: # zizmor: ignore[dangerous-triggers] Release triggers only on a maintainer-pushed v* tag, never on pull_request or another fork-controllable event, so this chain never runs untrusted content with elevated permissions — the "pwn request" pattern this audit flags does not apply.
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A fixed group, not one derived from the ref, so two releases in quick succession queue into one
+# serialized deploy stream rather than each getting its own. cancel-in-progress stays false:
+# cancelling a deploy mid-flight is the one thing that could leave the published manifest partly
+# written.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Rebuild the manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    permissions:
+      contents: read # the checkout step, and scripts/manifest.sh rebuild's release reads via gh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          # A publish must not restore a cache another workflow could have written.
+          cache: false
+
+      - name: Rebuild the manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: mise run manifest
+
+      - name: Upload the manifest artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: artifacts/pages
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      contents: read # the checkout step
+      pages: write # the deploy step (actions/deploy-pages)
+      id-token: write # the deploy step's OIDC token (actions/deploy-pages)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pinned tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          # The verify step below runs a repository script that needs the pinned jq.
+          cache: false
+
+      - name: Setup Pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      - name: Verify the published manifest
+        env:
+          # page_url already ends with a slash.
+          MANIFEST_URL: ${{ steps.deployment.outputs.page_url }}manifest.json
+        run: scripts/manifest.sh verify "$MANIFEST_URL"

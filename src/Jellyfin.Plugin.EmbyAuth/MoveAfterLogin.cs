@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 namespace Jellyfin.Plugin.EmbyAuth;
 
 /// <summary>
-/// In <see cref="MigrationMode.MoveAfterFirstLogin"/>, moves a user to the Default login method after a login, if Emby verified the saved password.
+/// In <see cref="MigrationMode.MoveAfterFirstLogin"/>, moves a user to the configured migration target after a login, if Emby verified the saved password.
 /// </summary>
 /// <remarks>
 /// This runs after the login completes, because Jellyfin sets the login method of the user to the method that accepted the login.
@@ -20,19 +20,34 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// </remarks>
 /// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
 /// <param name="dbContextFactory">The Jellyfin database context factory.</param>
+/// <param name="configurationSource">The plugin settings source. Reads the current configuration on each event, so tests can supply settings with no static plugin state.</param>
 /// <param name="logger">The logger.</param>
-internal sealed partial class MoveToDefaultLoginMethod(
+internal sealed partial class MoveAfterLogin(
     EmbyVerifiedPasswords verifiedPasswords,
     IDbContextFactory<JellyfinDbContext> dbContextFactory,
-    ILogger<MoveToDefaultLoginMethod> logger)
+    Func<PluginConfiguration?> configurationSource,
+    ILogger<MoveAfterLogin> logger)
     : IEventConsumer<AuthenticationResultEventArgs>
 {
     /// <inheritdoc />
     public async Task OnEvent(AuthenticationResultEventArgs eventArgs)
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
-        if (EmbyAuthPlugin.Instance?.Configuration.MigrationMode != MigrationMode.MoveAfterFirstLogin)
+        var configuration = configurationSource();
+        if (configuration?.MigrationMode != MigrationMode.MoveAfterFirstLogin)
         {
+            return;
+        }
+
+        var target = LoginMethodMove.ResolveMigrationTarget(configuration);
+        if (target.Kind == MoveTargetKind.Remain)
+        {
+            return;
+        }
+
+        if (target.Kind == MoveTargetKind.Invalid)
+        {
+            LogTargetInvalid(logger);
             return;
         }
 
@@ -50,13 +65,16 @@ internal sealed partial class MoveToDefaultLoginMethod(
                 return;
             }
 
-            if (await DefaultLoginMethod.MoveAsync(dbContext, userId, user.Password, CancellationToken.None).ConfigureAwait(false))
+            if (await LoginMethodMove.MoveAsync(dbContext, userId, user.Password, target.ProviderId!, CancellationToken.None).ConfigureAwait(false))
             {
-                LogMovedToDefault(logger, user.Username);
+                LogMoved(logger, user.Username);
             }
         }
     }
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "The plugin moved user {Username} to the Default login method. Jellyfin now checks the password of this user without Emby.")]
-    private static partial void LogMovedToDefault(ILogger logger, string username);
+    [LoggerMessage(Level = LogLevel.Information, Message = "The plugin moved user {Username} to the configured login method. Jellyfin now checks the password of this user without Emby.")]
+    private static partial void LogMoved(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "The configured migration target is not a login method Jellyfin reports as enabled. The plugin moved nobody. Logins are unaffected, because Emby still checks every password.")]
+    private static partial void LogTargetInvalid(ILogger logger);
 }

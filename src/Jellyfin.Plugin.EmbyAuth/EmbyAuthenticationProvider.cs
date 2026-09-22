@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Data;
@@ -18,11 +19,18 @@ namespace Jellyfin.Plugin.EmbyAuth;
 /// <summary>
 /// A Jellyfin login method that checks passwords against Emby and saves a Jellyfin copy of each password that Emby accepts.
 /// </summary>
+/// <remarks>
+/// This class stays internal. A public class would enter the <c>GetExports&lt;IAuthenticationProvider&gt;()</c> scan
+/// another plugin can run, which would let that plugin send a password to Emby for a user this plugin does not
+/// serve. <c>TypeVisibilityTests</c> fails if this class, or any other type in this assembly, becomes public
+/// without a recorded reason.
+/// </remarks>
 /// <param name="serviceProvider">The service provider. The user manager is resolved on each login because it depends on all login methods.</param>
 /// <param name="cryptoProvider">The Jellyfin password hasher.</param>
 /// <param name="embyClient">The Emby client.</param>
 /// <param name="userDirectory">The cached list of Emby users.</param>
 /// <param name="verifiedPasswords">The record of password hashes that Emby verified.</param>
+/// <param name="configurationSource">The plugin settings source. Reads the current configuration on each login, so tests can supply settings with no static plugin state.</param>
 /// <param name="logger">The logger.</param>
 internal sealed partial class EmbyAuthenticationProvider(
     IServiceProvider serviceProvider,
@@ -30,6 +38,7 @@ internal sealed partial class EmbyAuthenticationProvider(
     EmbyClient embyClient,
     EmbyUserDirectory userDirectory,
     EmbyVerifiedPasswords verifiedPasswords,
+    Func<PluginConfiguration?> configurationSource,
     ILogger<EmbyAuthenticationProvider> logger)
     : IAuthenticationProvider, IRequiresResolvedUser
 {
@@ -77,14 +86,6 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         var settings = GetSettings();
-        if (settings.MigrationMode == MigrationMode.JellyfinPasswordFirst
-            && resolvedUser?.Password is { } savedHash
-            && verifiedPasswords.Matches(resolvedUser.Id, savedHash)
-            && SavedPasswordMatches(resolvedUser.Username, savedHash, password))
-        {
-            return new ProviderAuthenticationResult { Username = resolvedUser.Username };
-        }
-
         var status = await userDirectory.GetStatusAsync(settings, username, CancellationToken.None).ConfigureAwait(false);
         if (status != EmbyUserStatus.Active)
         {
@@ -116,7 +117,13 @@ internal sealed partial class EmbyAuthenticationProvider(
     /// Handles a password that an administrator or the user sets in Jellyfin.
     /// </summary>
     /// <remarks>
-    /// A new password is saved, and the user moves to the Default login method.
+    /// A new password is saved, then the user moves to the resolved password-set target: the configured
+    /// <see cref="PluginConfiguration.PasswordSetTarget"/>, or <see cref="PluginConfiguration.MigrationTarget"/>
+    /// when that setting is empty. Remain on Emby Login saves the password but leaves the login method unchanged;
+    /// the new password plays no part in a login while the user stays on the Emby method, since only Emby decides
+    /// a login there. An unusable target also leaves the login method unchanged and logs one Error entry, and
+    /// never refuses the password change: Jellyfin calls this method inside its own password-change flow, and a
+    /// settings problem that has nothing to do with the password must not block it.
     /// A password reset removes the saved password, and the user stays on the Emby login method, because a Default account without a password opens with a blank password.
     /// </remarks>
     /// <param name="user">The user. Jellyfin saves the changes after this method returns.</param>
@@ -133,8 +140,21 @@ internal sealed partial class EmbyAuthenticationProvider(
         }
 
         user.Password = cryptoProvider.CreatePasswordHash(newPassword).ToString();
-        user.AuthenticationProviderId = DefaultLoginMethod.ProviderId;
-        LogPasswordSetInJellyfin(logger, user.Username);
+        var target = LoginMethodMove.ResolvePasswordSetTarget(configurationSource());
+        switch (target.Kind)
+        {
+            case MoveTargetKind.Move:
+                user.AuthenticationProviderId = target.ProviderId!;
+                LogPasswordSetInJellyfin(logger, user.Username);
+                break;
+            case MoveTargetKind.Remain:
+                LogPasswordSetTargetRemainsOnEmby(logger, user.Username);
+                break;
+            default:
+                LogPasswordSetTargetInvalid(logger, user.Username);
+                break;
+        }
+
         return Task.CompletedTask;
     }
 
@@ -143,7 +163,7 @@ internal sealed partial class EmbyAuthenticationProvider(
 
     private EmbyAuthSettings GetSettings()
     {
-        if (EmbyAuthSettings.TryCreate(EmbyAuthPlugin.Instance?.Configuration, out var settings, out var problem))
+        if (EmbyAuthSettings.TryCreate(configurationSource(), out var settings, out var problem))
         {
             return settings;
         }
@@ -152,19 +172,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         throw new AuthenticationException(problem);
     }
 
-    private bool SavedPasswordMatches(string username, string savedHash, string password)
-    {
-        try
-        {
-            return cryptoProvider.Verify(PasswordHash.Parse(savedHash), password);
-        }
-        catch (Exception ex) when (ex is FormatException or NotSupportedException)
-        {
-            LogSavedPasswordUnreadable(logger, ex, username);
-            return false;
-        }
-    }
-
+    [SuppressMessage("Design", "CA1031:Do not catch general exception types", Justification = "The cleanup delete must never let a second exception replace the login refusal already in flight (D-03); every exception type is logged and swallowed.")]
     private async Task<User> CreateAccountAsync(IUserManager userManager, EmbyAuthSettings settings, EmbyLogin embyLogin, string passwordHash)
     {
         User user;
@@ -172,7 +180,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         {
             user = await userManager.CreateUserAsync(embyLogin.Name).ConfigureAwait(false);
         }
-        catch (ArgumentException ex)
+        catch (Exception ex)
         {
             LogCreateAccountFailed(logger, ex, embyLogin.Name);
             throw new AuthenticationException(InvalidLogin, ex);
@@ -183,23 +191,32 @@ internal sealed partial class EmbyAuthenticationProvider(
         AccountAccessPolicy.ApplyToNewAccount(user, settings.AccountAccess, embyLogin.EnableRemoteAccess);
 
         // Jellyfin commits the new account without a password. If this save fails, delete the account so that no blank password opens it.
-        var saved = false;
+        Exception? saveFailure = null;
         try
         {
             await userManager.UpdateUserAsync(user).ConfigureAwait(false);
-            saved = true;
         }
-        catch (Exception ex) when (ex is DbUpdateException or ResourceNotFoundException)
+        catch (Exception ex)
         {
-            LogSaveFailed(logger, ex, embyLogin.Name);
-            throw new AuthenticationException(InvalidLogin, ex);
+            saveFailure = ex;
         }
-        finally
+
+        if (saveFailure is not null)
         {
-            if (!saved)
+            // The delete is attempted exactly once and never retried (D-03). Whichever of the two failures is
+            // the last word gets the one Error log: the save failure if the cleanup delete succeeds, or the
+            // delete failure if it does not, because that is the more actionable message for an administrator.
+            try
             {
                 await userManager.DeleteUserAsync(user.Id).ConfigureAwait(false);
+                LogSaveFailed(logger, saveFailure, embyLogin.Name);
             }
+            catch (Exception deleteEx)
+            {
+                LogDeleteFailed(logger, deleteEx, embyLogin.Name);
+            }
+
+            throw new AuthenticationException(InvalidLogin, saveFailure);
         }
 
         LogAccountCreated(logger, user.Username, settings.AccountAccess);
@@ -215,7 +232,7 @@ internal sealed partial class EmbyAuthenticationProvider(
         {
             await userManager.UpdateUserAsync(user).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is DbUpdateException or ResourceNotFoundException)
+        catch (Exception ex)
         {
             LogSaveFailed(logger, ex, user.Username);
             throw new AuthenticationException(InvalidLogin, ex);
@@ -236,23 +253,29 @@ internal sealed partial class EmbyAuthenticationProvider(
     [LoggerMessage(Level = LogLevel.Warning, Message = "The plugin refused the login for {Username}. Emby accepted the password for Emby user {EmbyUserName}. But the names are different, or the Jellyfin account does not use the Emby login method.")]
     private static partial void LogAccountConflict(ILogger logger, string username, string embyUserName);
 
-    [LoggerMessage(Level = LogLevel.Warning, Message = "Jellyfin cannot read the saved password of user {Username}. The plugin asks Emby instead.")]
-    private static partial void LogSavedPasswordUnreadable(ILogger logger, Exception exception, string username);
-
     [LoggerMessage(Level = LogLevel.Information, Message = "The plugin created a Jellyfin account for Emby user {EmbyUserName}. Account access: {AccountAccess}.")]
     private static partial void LogAccountCreated(ILogger logger, string embyUserName, AccountAccess accountAccess);
 
-    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot create an account for Emby user {EmbyUserName}. If Jellyfin does not allow this user name, rename the user on Emby.")]
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot create an account for Emby user {EmbyUserName}. Two logins for this user may have arrived at the same time. If so, one of them succeeded, and the user can log in again. If Jellyfin does not allow this user name, rename the user on Emby.")]
     private static partial void LogCreateAccountFailed(ILogger logger, Exception exception, string embyUserName);
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot save the password for user {Username}. The plugin refused the login.")]
     private static partial void LogSaveFailed(ILogger logger, Exception exception, string username);
 
+    [LoggerMessage(Level = LogLevel.Error, Message = "Jellyfin cannot delete the half-made account for Emby user {EmbyUserName} after a failed save. The account may still exist on the Default login method with no password. Remove it or give it a password.")]
+    private static partial void LogDeleteFailed(ILogger logger, Exception exception, string embyUserName);
+
     [LoggerMessage(Level = LogLevel.Error, Message = "The Emby Auth plugin refuses all logins on the Emby login method. {Problem} Set it in Dashboard > Plugins > Emby Auth.")]
     private static partial void LogSettingsInvalid(ILogger logger, string problem);
 
-    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user now uses the Default login method.")]
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user now moves to the configured login method.")]
     private static partial void LogPasswordSetInJellyfin(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Information, Message = "User {Username} got a new password in Jellyfin. The user keeps the Emby login method because the configured target is set to remain, so Emby still checks this user's logins.")]
+    private static partial void LogPasswordSetTargetRemainsOnEmby(ILogger logger, string username);
+
+    [LoggerMessage(Level = LogLevel.Error, Message = "User {Username} got a new password in Jellyfin, but the configured target is not a login method Jellyfin reports as enabled. The user keeps the Emby login method; logins are unaffected.")]
+    private static partial void LogPasswordSetTargetInvalid(ILogger logger, string username);
 
     [LoggerMessage(Level = LogLevel.Information, Message = "The password of user {Username} was reset in Jellyfin. The user stays on the Emby login method, so Emby checks the next login.")]
     private static partial void LogPasswordReset(ILogger logger, string username);

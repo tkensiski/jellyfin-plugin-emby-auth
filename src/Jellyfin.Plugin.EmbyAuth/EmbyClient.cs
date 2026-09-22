@@ -85,13 +85,16 @@ internal sealed partial class EmbyClient(IHttpClientFactory httpClientFactory, I
         }
 
         var embyUserName = login?.User?.Name;
+        var accessToken = login?.AccessToken;
+
+        await SignOutAsync(client, baseUrl, embyUserName, accessToken, username, cancellationToken).ConfigureAwait(false);
+
         if (string.IsNullOrEmpty(embyUserName))
         {
             LogResponseWithoutUserName(logger, baseUrl);
             return null;
         }
 
-        await SignOutAsync(client, baseUrl, embyUserName, login?.AccessToken, cancellationToken).ConfigureAwait(false);
         return new EmbyLogin(embyUserName, login?.User?.Policy?.EnableRemoteAccess ?? false);
     }
 
@@ -162,12 +165,16 @@ internal sealed partial class EmbyClient(IHttpClientFactory httpClientFactory, I
         return client;
     }
 
-    private async Task SignOutAsync(HttpClient client, Uri baseUrl, string embyUserName, string? accessToken, CancellationToken cancellationToken)
+    private async Task SignOutAsync(HttpClient client, Uri baseUrl, string? embyUserName, string? accessToken, string username, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(accessToken))
         {
             return;
         }
+
+        // Emby's response can carry a token with no user name (AUTH-05). The typed user name is not a secret and is
+        // already logged by LogLoginRejected, so it names the sign-out when Emby's own response does not.
+        var signOutUserName = string.IsNullOrEmpty(embyUserName) ? username : embyUserName;
 
         try
         {
@@ -176,12 +183,12 @@ internal sealed partial class EmbyClient(IHttpClientFactory httpClientFactory, I
             using var response = await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                LogSignOutRejected(logger, embyUserName, (int)response.StatusCode);
+                LogSignOutRejected(logger, signOutUserName, (int)response.StatusCode);
             }
         }
         catch (Exception ex) when (IsUnreachable(ex, cancellationToken))
         {
-            LogSignOutFailed(logger, ex, embyUserName);
+            LogSignOutFailed(logger, ex, signOutUserName);
         }
     }
 

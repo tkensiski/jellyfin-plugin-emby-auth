@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <PackageReference Include="Jellyfin.Controller" Version="12.1.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.11" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />
   </ItemGroup>
 

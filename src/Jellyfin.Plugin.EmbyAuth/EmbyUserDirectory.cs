@@ -31,7 +31,7 @@ internal enum EmbyUserStatus
 /// <param name="embyClient">The Emby client.</param>
 /// <param name="timeProvider">The clock.</param>
 /// <param name="logger">The logger.</param>
-internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvider timeProvider, ILogger<EmbyUserDirectory> logger)
+internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvider timeProvider, ILogger<EmbyUserDirectory> logger) : IDisposable
 {
     /// <summary>
     /// How long the plugin uses a user list before it reads the list again.
@@ -45,8 +45,11 @@ internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvi
 
     private volatile Snapshot? _snapshot;
 
+    private readonly SemaphoreSlim _refreshGuard = new(1, 1);
+
     /// <summary>
-    /// Gets the state of the Emby user that has the given name.
+    /// Gets the state of the Emby user that has the given name. Concurrent callers that find the cached list stale
+    /// send one Emby request between them; a caller that finds it fresh takes nothing and sends nothing.
     /// </summary>
     /// <param name="settings">The plugin settings.</param>
     /// <param name="username">The user name that the person typed. The match ignores case and nothing else.</param>
@@ -59,12 +62,24 @@ internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvi
         var now = timeProvider.GetUtcNow();
         if (snapshot is null || snapshot.ServerUrl != settings.ServerUrl || snapshot.ApiKey != settings.ApiKey || now >= snapshot.ValidUntil)
         {
-            var users = await embyClient.GetUsersAsync(settings.ServerUrl, settings.ApiKey, cancellationToken).ConfigureAwait(false);
-            snapshot = new Snapshot(settings.ServerUrl, settings.ApiKey, users, now + (users is null ? RetryDelay : CacheDuration));
-            _snapshot = snapshot;
-            if (users is null)
+            await _refreshGuard.WaitAsync(cancellationToken).ConfigureAwait(false);
+            try
             {
-                LogUserListUnavailable(logger, RetryDelay.TotalSeconds);
+                snapshot = _snapshot;
+                if (snapshot is null || snapshot.ServerUrl != settings.ServerUrl || snapshot.ApiKey != settings.ApiKey || now >= snapshot.ValidUntil)
+                {
+                    var users = await embyClient.GetUsersAsync(settings.ServerUrl, settings.ApiKey, cancellationToken).ConfigureAwait(false);
+                    snapshot = new Snapshot(settings.ServerUrl, settings.ApiKey, users, now + (users is null ? RetryDelay : CacheDuration));
+                    _snapshot = snapshot;
+                    if (users is null)
+                    {
+                        LogUserListUnavailable(logger, RetryDelay.TotalSeconds);
+                    }
+                }
+            }
+            finally
+            {
+                _refreshGuard.Release();
             }
         }
 
@@ -81,6 +96,9 @@ internal sealed partial class EmbyUserDirectory(EmbyClient embyClient, TimeProvi
 
         return user.IsDisabled ? EmbyUserStatus.Disabled : EmbyUserStatus.Active;
     }
+
+    /// <inheritdoc />
+    public void Dispose() => _refreshGuard.Dispose();
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Jellyfin cannot read the list of Emby users. The plugin refuses logins on the Emby login method for {RetrySeconds} seconds. Then it tries again.")]
     private static partial void LogUserListUnavailable(ILogger logger, double retrySeconds);

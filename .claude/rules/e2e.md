@@ -12,6 +12,7 @@ paths:
 - A file that stops a service starts it again in `teardown_file` (see `40-emby-outage.bats`).
 - `scripts/dev-env.sh` also uses `compose.yaml` and `helpers.bash`. After a change to either file, run `scripts/dev-env.sh up` and `down`.
 - `90-jellyfin-log.bats` runs last and checks the whole Jellyfin log.
+- `85-catalog-install.bats` starts the two `catalog` profile services itself, in `setup_file`, and removes them in `teardown_file`; the shared stack's `docker compose up -d` never starts them.
 
 ## Conventions
 
@@ -21,12 +22,14 @@ paths:
 - Use `emby_login_requests NAME` to prove whether a login reached Emby. The helper reads the `emby-proxy` log. It first sends a marker request and waits for it, so the count includes all earlier requests.
 - Do not use the Emby activity log for a "did not reach Emby" check. Emby writes entries after a delay, so the check passes before the entry exists.
 - Jellyfin runs at Debug level (`JELLYFIN_Serilog__MinimumLevel__Default` in `compose.yaml`), so the log check also sees the exceptions that Jellyfin logs for refused logins.
-- `EMBY_PORT` and `JELLYFIN_PORT` (default 18096 and 28096) set the host ports in `compose.yaml` and `helpers.bash`. Set both to run the tests while another copy of the containers uses the default ports.
+- `EMBY_PORT`, `JELLYFIN_PORT`, `CATALOG_JELLYFIN_PORT`, and `CATALOG_MANIFEST_PORT` (default 18096, 28096, 38096, and 38080) set the host ports in `compose.yaml` and `helpers.bash`. Set them to run the tests while another copy of the containers uses the default ports.
+- A command must not leave a process running after it returns. Such a child inherits the descriptors bats opened for the command, keeps the suite's output stream open, and blocks `bats e2e` until it exits (bats-core#419). `dotnet publish` and `scripts/package.sh build` start a Roslyn `VBCSCompiler` with a ten-minute keep-alive, which cost about nine minutes per run; both now pass `UseSharedCompilation=false`. Closing fd 3 does **not** fix this: a child of `setup_suite` inherits the same stream on fd 3 *and* fd 4. Close fd 3 only for a command you background yourself (`60-concurrent-logins.bats`). `tests/scripts/e2e-harness.bats` guards both call sites and pins both measurements.
 - Scripts must pass `shellcheck -x` and `shfmt -d`. Inside a test, use `if [[ ... ]]; then ...; return 1; fi` instead of a bare `[[ ... ]]` in a loop.
+- `sqlite3` must be on the host for `80-fingerprint-store.bats`. It is a system tool rather than a mise pin, because macOS and the GitHub runner both ship it. The helper that needs it fails, naming it, rather than skipping when it is absent.
 
 ## Server facts
 
 - Jellyfin 12.1 starts a setup server first. Wait for `/health` to return `Healthy`, not for `/System/Info/Public`. Emby has no `/health`.
 - Emby and Jellyfin use the same API style. The helpers send `Authorization: MediaBrowser Client=..., Token=...` to both servers.
 - Quick Connect: `POST /QuickConnect/Initiate` (anonymous), `POST /QuickConnect/Authorize?code=&userId=` (admin token), then `POST /Users/AuthenticateWithQuickConnect` with the secret.
-- The migration task has the key `EmbyAuthMoveUsersToDefault`. Start it with `POST /ScheduledTasks/Running/{id}` (`run_migration_task`).
+- The migration task has the key `EmbyAuthMigration`. Start it with `POST /ScheduledTasks/Running/{id}` (`run_migration_task`).

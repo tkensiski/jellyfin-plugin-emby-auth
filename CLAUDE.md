@@ -6,7 +6,7 @@ Jellyfin 12.1 authentication plugin in C# (.NET 10). It checks Jellyfin logins a
 
 - `mise install` — install the pinned tools (`.mise.toml`).
 - `mise run lint` — check C# formatting, and run shellcheck, shfmt, actionlint, and zizmor.
-- `mise run test` — build with warnings as errors, then run the unit tests and the `scripts/package.sh` tests (`tests/scripts/`).
+- `mise run test` — build with warnings as errors, then run the unit tests, the `scripts/package.sh` tests (`tests/scripts/`), and the settings-page tests (`tests/js/`).
 - `mise run e2e` — run the end-to-end tests against Emby and Jellyfin containers. Needs Docker. `bats e2e/NN-topic.bats` runs one file.
 - `mise run package` — build `artifacts/release/jellyfin-plugin-emby-auth_<version>.zip` and `manifest.json` with `scripts/package.sh build`.
 - `prek run` — run the pre-commit hooks, which call `mise run lint` and `mise run test`.
@@ -28,15 +28,16 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
   - `EmbyClient.cs` — the only code that sends requests to Emby.
   - `EmbyUserDirectory.cs` — the cached Emby user list.
   - `EmbyVerifiedPasswords.cs` — the file of fingerprints of password hashes that Emby verified.
-  - `DefaultLoginMethod.cs` — the single-column move to Default.
-  - `MoveToDefaultLoginMethod.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
-  - `MoveEmbyUsersToDefaultTask.cs` — the migration task.
+  - `LoginMethodMove.cs` — the single-column move, and resolving the configured migration target.
+  - `MoveAfterLogin.cs` — the move after a login, in `MoveAfterFirstLogin` mode.
+  - `EmbyMigrationTask.cs` — the migration task.
   - `EmbyLoginMethodUsers.cs` — the list of users on the Emby login method, with their readiness. The task and the API share it.
   - `Api/EmbyAuthController.cs` — the admin-only migration API (`GET /EmbyAuth/Migration`, `POST /EmbyAuth/Migration/Run`) that the settings page calls.
 - `tests/Jellyfin.Plugin.EmbyAuth.Tests/` — xUnit v3 unit tests. `TestDoubles.cs` has the HTTP stub, the manual clock, and the capturing logger.
+- `tests/js/` — `node:test` tests for `configPage.html`, run with jsdom against the shipping file. `configPage.test.js` has the tests; `testHelpers.js` has the `ApiClient`/`Dashboard` stubs and DOM helpers, the one shared file of doubles, the same role `TestDoubles.cs` plays for the C# suite.
 - `e2e/` — bats tests in independent `NN-topic.bats` files, `setup_suite.bash` (shared servers and Emby users), Docker Compose file, and the logging proxy for Emby.
 - `scripts/dev-env.sh` — the demo. It uses `e2e/compose.yaml` and `e2e/helpers.bash`.
-- `docs/` — user and developer documentation. `docs/images/settings-page.png` is the README screenshot, taken from the demo.
+- `docs/` — user and developer documentation.
 
 ## Rules
 
@@ -46,7 +47,7 @@ A pushed `v<version>` tag runs `.github/workflows/release.yml`: `scripts/package
 - Never put a password or the API key in a log or exception message.
 - Warnings are errors, and the plugin project uses `AnalysisMode` `AllEnabledByDefault`. Fix a warning. Suppress it only with a `Justification`.
 - Pin exact versions. Look up the current stable version before a bump.
-- A Jellyfin version bump changes three pins together: `Jellyfin.Controller` and `Jellyfin.Model`, the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`, and the target framework.
-- Keep `README.md` and `docs/` accurate when behavior changes. Keep the README short, and put details in `docs/`. When the settings page changes, take a new screenshot.
+- A Jellyfin version bump changes six pins together: `Jellyfin.Controller` and `Jellyfin.Model` in `src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj`; `Microsoft.Data.Sqlite.Core` in the same project, whose version must equal the one in `/jellyfin/jellyfin.deps.json` inside the pinned image — a version above the host's stops the plugin loading; the `jellyfin/jellyfin` image tag in `e2e/compose.yaml`; the target framework in `Directory.Build.props`; `Jellyfin.Controller` again in `tests/Jellyfin.Plugin.EmbyAuth.Tests/Jellyfin.Plugin.EmbyAuth.Tests.csproj`, a second reference to the same package in a second file that can drift from the first; and the two hardcoded `targetAbi` assertions in `tests/scripts/package.bats`, which hold the value `scripts/package.sh` derives from the plugin project's `Jellyfin.Controller` version with a fourth part appended, so they go red on a bump that misses one of the other five pins.
+- Keep `README.md` and `docs/` accurate when behavior changes. Keep the README short, and put details in `docs/`.
 
 Path-scoped rules add details: `.claude/rules/plugin.md` for `src/` and `tests/`, and `.claude/rules/e2e.md` for `e2e/`.

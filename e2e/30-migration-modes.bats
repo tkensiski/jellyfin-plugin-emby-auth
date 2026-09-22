@@ -13,8 +13,8 @@ wes_is_on_default() {
 	[[ "$(policy_field wes AuthenticationProviderId)" == "$DEFAULT_PROVIDER" ]]
 }
 
-migration_ready_state() {
-	api GET "$JELLYFIN/EmbyAuth/Migration" "$JF_TOKEN" | jq -r --arg n "$1" '.Users[] | select(.Name == $n) | .ReadyToMove'
+migration_user_state() {
+	api GET "$JELLYFIN/EmbyAuth/Migration" "$JF_TOKEN" | jq -r --arg n "$1" '.Users[] | select(.Name == $n) | .State'
 }
 
 teardown_file() {
@@ -57,8 +57,8 @@ setup() {
 	[ "$output" = "200" ]
 }
 
-@test "Jellyfin password first: the saved password works until Emby accepts a new one" {
-	set_plugin_config "$JF_TOKEN" '.MigrationMode = "JellyfinPasswordFirst"'
+@test "Keep Emby in charge: an Emby password change is effective at once and the saved hash follows it" {
+	set_plugin_config "$JF_TOKEN" '.MigrationMode = "KeepEmbyInCharge"'
 
 	run login_status "$JELLYFIN" oscar oscar-emby-pass
 	[ "$output" = "200" ]
@@ -66,11 +66,11 @@ setup() {
 
 	set_password "$EMBY" "$EMBY_TOKEN" "$(emby_user_id oscar)" oscar-emby-pass-2
 	run login_status "$JELLYFIN" oscar oscar-emby-pass
-	[ "$output" = "200" ]
+	[ "$output" = "401" ]
 	run login_status "$JELLYFIN" oscar oscar-emby-pass-2
 	[ "$output" = "200" ]
-	run login_status "$JELLYFIN" oscar oscar-emby-pass
-	[ "$output" = "401" ]
+
+	[ "$(migration_user_state oscar)" = "Ready" ]
 	[ "$(policy_field oscar AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
 }
 
@@ -97,9 +97,9 @@ setup() {
 	run login_status "$JELLYFIN" wes wes-emby-pass
 	[ "$output" = "200" ]
 
-	[ "$(migration_ready_state wes)" = "true" ]
-	[ "$(migration_ready_state nora)" = "false" ]
-	[ "$(migration_ready_state rex)" = "false" ]
+	[ "$(migration_user_state wes)" = "Ready" ]
+	[ "$(migration_user_state nora)" = "NeedsEmbyLogin" ]
+	[ "$(migration_user_state rex)" = "NeedsEmbyLogin" ]
 
 	xena_token="$(login_token "$JELLYFIN" xena xena-jf-pass)"
 	run status GET "$JELLYFIN/EmbyAuth/Migration" "$xena_token"
@@ -115,6 +115,6 @@ setup() {
 
 	wait_until "The move of wes to Default" wes_is_on_default
 	[ "$(policy_field nora AuthenticationProviderId)" = "$EMBY_PROVIDER" ]
-	[ -z "$(migration_ready_state wes)" ]
-	[ "$(migration_ready_state nora)" = "false" ]
+	[ -z "$(migration_user_state wes)" ]
+	[ "$(migration_user_state nora)" = "NeedsEmbyLogin" ]
 }

@@ -6,6 +6,18 @@
 </head>
 <body>
     <div id="EmbyAuthConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select">
+        <style>
+            #EmbyAuthConfigPage .button-submit[disabled] {
+                opacity: 0.38;
+                cursor: default;
+            }
+
+            #EmbyAuthConfigPage .material-icons {
+                font-size: 1.2em;
+                vertical-align: middle;
+                margin-right: 0.25em;
+            }
+        </style>
         <div data-role="content">
             <div class="content-primary">
                 <form id="EmbyAuthConfigForm">
@@ -24,9 +36,13 @@
                         <select is="emby-select" id="MigrationMode" name="MigrationMode" class="emby-select-withcolor emby-select">
                             <option value="MoveAfterFirstLogin">Move each user to Jellyfin after the first login</option>
                             <option value="KeepEmbyInCharge">Keep Emby in charge until the migration task runs</option>
-                            <option value="JellyfinPasswordFirst">Check the saved Jellyfin password first, then Emby</option>
                         </select>
-                        <div class="fieldDescription">With the second and third choice, users stay on the Emby login method until you run the migration. Use "Run migration now" below.</div>
+                        <div class="fieldDescription">This setting answers when a move happens; the migration target in the Migration section below answers where. With the second choice, users stay on the Emby login method until you run the migration. While the migration target is Remain on Emby Login, this setting has no effect, because no path moves anyone.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="PasswordSetTarget">Password-set target</label>
+                        <select is="emby-select" id="PasswordSetTarget" name="PasswordSetTarget" class="emby-select-withcolor emby-select"></select>
+                        <div class="fieldDescription">Governs the move that happens when an administrator sets a password for a user in Jellyfin. Leaving it at the first entry makes the migration target above govern that move too.</div>
                     </div>
                     <div class="selectContainer">
                         <label class="selectLabel" for="AccountAccess">Account access</label>
@@ -41,17 +57,24 @@
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
                         </button>
+                        <p id="EmbyAuthSettingsStatus" role="status"></p>
                     </div>
                 </form>
 
                 <div class="verticalSection readOnlyContent">
                     <h2 class="sectionTitle">Migration</h2>
                     <p id="EmbyAuthMigrationSummary"></p>
+                    <p id="EmbyAuthMigrationWarning"></p>
                     <ul id="EmbyAuthMigrationUsers"></ul>
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="EmbyAuthMigrationTarget">Migration target</label>
+                        <select is="emby-select" id="EmbyAuthMigrationTarget" class="emby-select-withcolor emby-select"></select>
+                        <div class="fieldDescription">Where each ready user moves, and the destination Run migration now below queues the task for. A one-off run to a different destination also changes where automatic after-login moves go from then on, because there is only one migration target.</div>
+                    </div>
                     <button is="emby-button" type="button" id="EmbyAuthRunMigration" class="raised block emby-button">
                         <span>Run migration now</span>
                     </button>
-                    <div class="fieldDescription">Moves each user marked "ready" to the Default login method. A user who is not ready must log in to Jellyfin once while Emby runs, or needs a new password that you set in Jellyfin. The migration also runs as the task "Move Emby users to the Default login method" in Dashboard &gt; Advanced &gt; Scheduled Tasks.</div>
+                    <div class="fieldDescription">Moves each user marked "ready" to the migration target above. A user who is not ready must log in to Jellyfin once while Emby runs, or needs a new password that you set in Jellyfin. The migration also runs as the task "Finish the Emby migration" in Dashboard &gt; Advanced &gt; Scheduled Tasks.</div>
                 </div>
             </div>
         </div>
@@ -60,61 +83,363 @@
                 pluginUniqueId: 'e973e09a-e8b4-40c1-9be2-8e51342de1f9'
             };
 
+            function showEmbyAuthMessage(element, text, isFailure) {
+                element.replaceChildren();
+                if (isFailure) {
+                    var icon = document.createElement('span');
+                    icon.className = 'material-icons warning';
+                    icon.setAttribute('aria-hidden', 'true');
+                    element.appendChild(icon);
+                }
+
+                element.appendChild(document.createTextNode(text));
+            }
+
+            function migrationStateText(state) {
+                switch (state) {
+                    case 'Ready':
+                        return 'will move on the next run';
+                    case 'NeedsEmbyLogin':
+                        return 'needs one login while Emby runs';
+                    case 'NoPassword':
+                        return 'has no saved password';
+                    case 'Unknown':
+                    default:
+                        return 'readiness unknown';
+                }
+            }
+
+            var EMBY_AUTH_DEFAULT_PROVIDER_ID = 'Jellyfin.Server.Implementations.Users.DefaultAuthenticationProvider';
+            var EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD = 'RemainOnEmbyLoginMethod';
+
+            var currentPluginConfig = null;
+
+            function appendEmbyAuthTargetOption(select, value, label) {
+                var option = document.createElement('option');
+                option.value = value;
+                option.textContent = label;
+                select.appendChild(option);
+            }
+
+            // Built only from AvailableTargets, which the server already filtered to this plugin's own Emby
+            // method removed. Default is rendered first when present, then the fixed Remain entry, then the
+            // rest labelled "Move to {name}" -- never built from markup, since a login method's name comes
+            // from another plugin and is not this plugin's to trust.
+            function appendEmbyAuthTargetChoices(select, availableTargets) {
+                var targets = availableTargets || [];
+                var defaultTarget = null;
+                targets.forEach(function (target) {
+                    if (target.Id === EMBY_AUTH_DEFAULT_PROVIDER_ID) {
+                        defaultTarget = target;
+                    }
+                });
+
+                if (defaultTarget) {
+                    appendEmbyAuthTargetOption(select, defaultTarget.Id, 'Move to Default');
+                }
+
+                appendEmbyAuthTargetOption(select, EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD, 'Remain on Emby Login');
+
+                targets.forEach(function (target) {
+                    if (target.Id !== EMBY_AUTH_DEFAULT_PROVIDER_ID) {
+                        appendEmbyAuthTargetOption(select, target.Id, 'Move to ' + target.Name);
+                    }
+                });
+            }
+
+            function buildEmbyAuthTargetOptions(select, availableTargets) {
+                select.replaceChildren();
+                appendEmbyAuthTargetChoices(select, availableTargets);
+            }
+
+            // The password-set target offers the same choices as the migration target, plus a first entry
+            // meaning "no override" -- the empty value PluginConfiguration.PasswordSetTarget already treats
+            // that way -- so an install that predates this setting keeps today's behaviour untouched.
+            function buildEmbyAuthPasswordSetTargetOptions(select, availableTargets) {
+                select.replaceChildren();
+                appendEmbyAuthTargetOption(select, '', 'Same as the migration target');
+                appendEmbyAuthTargetChoices(select, availableTargets);
+            }
+
+            // Selects the saved value if it is one of the select's own options. Otherwise -- the saved login
+            // method is not one Jellyfin currently reports as enabled, per D-14 -- prepends a disabled,
+            // selected placeholder and selects nothing else: substituting a destination the administrator did
+            // not choose is the failure this prevents.
+            function selectEmbyAuthTargetValue(select, value) {
+                var knownValues = Array.prototype.map.call(select.options, function (option) {
+                    return option.value;
+                });
+                if (knownValues.indexOf(value) !== -1) {
+                    select.value = value;
+                    return true;
+                }
+
+                var placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Not one of the login methods Jellyfin reports as enabled';
+                placeholder.disabled = true;
+                select.insertBefore(placeholder, select.firstChild);
+                select.value = '';
+                placeholder.selected = true;
+                return false;
+            }
+
+            function renderEmbyAuthMigrationTargetSelection(availableTargets) {
+                var select = document.querySelector('#EmbyAuthMigrationTarget');
+                buildEmbyAuthTargetOptions(select, availableTargets);
+                var savedValue = currentPluginConfig ? currentPluginConfig.MigrationTarget : '';
+                return selectEmbyAuthTargetValue(select, savedValue);
+            }
+
+            function renderEmbyAuthPasswordSetTargetSelection(availableTargets) {
+                var select = document.querySelector('#PasswordSetTarget');
+                buildEmbyAuthPasswordSetTargetOptions(select, availableTargets);
+                var savedValue = currentPluginConfig ? currentPluginConfig.PasswordSetTarget : '';
+                selectEmbyAuthTargetValue(select, savedValue);
+            }
+
+            // The plugin never claims a behaviour it has not verified (AUTH-06, D-18). Jellyfin's own Default
+            // login method opens an account with no saved password with a blank password, verified at
+            // DefaultAuthenticationProvider.cs:61-68. Any other login method that hands its password check to
+            // Default inherits that behaviour -- measured this way for JellyfinSecurity -- so the fallback
+            // wording states that mechanism instead of claiming the behaviour is unknown. Remain on Emby Login
+            // gets no warning at all, because no account reaches another method. The plugin neither refuses the
+            // move nor invents a password -- this states the risk and a recommendation.
+            function embyAuthNoPasswordWarningText(users, migrationTarget) {
+                if (migrationTarget === EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD) {
+                    return '';
+                }
+
+                var names = users
+                    .filter(function (user) { return user.State === 'NoPassword'; })
+                    .map(function (user) { return user.Name; });
+                if (names.length === 0) {
+                    return '';
+                }
+
+                var who = names.join(', ');
+                if (migrationTarget === EMBY_AUTH_DEFAULT_PROVIDER_ID) {
+                    return 'Jellyfin\'s Default login method opens an account with no saved password when a blank password is sent. Set a password for these accounts before they move: ' + who + '.';
+                }
+
+                return 'A login method that hands the password check to Jellyfin\'s Default login method opens an account with no saved password when a blank password is sent, the way Default itself does. Set a password for these accounts before they move: ' + who + '.';
+            }
+
+            function renderEmbyAuthMigrationWarning(users, migrationTarget) {
+                var warningElement = document.querySelector('#EmbyAuthMigrationWarning');
+                var text = embyAuthNoPasswordWarningText(users, migrationTarget);
+                showEmbyAuthMessage(warningElement, text, Boolean(text));
+            }
+
+            var lastObservedTaskEndTime = null;
+
+            var embyAuthMigrationPoll = {
+                timer: null,
+                inFlight: false,
+                pollsSinceStart: 0,
+                seenRunning: false,
+                baselineEndTime: null
+            };
+
+            function stopMigrationPolling() {
+                if (embyAuthMigrationPoll.timer !== null) {
+                    clearInterval(embyAuthMigrationPoll.timer);
+                    embyAuthMigrationPoll.timer = null;
+                }
+            }
+
+            function startMigrationPolling(options) {
+                stopMigrationPolling();
+                embyAuthMigrationPoll.pollsSinceStart = 0;
+                embyAuthMigrationPoll.seenRunning = Boolean(options && options.seenRunning);
+                embyAuthMigrationPoll.baselineEndTime = options && options.baselineEndTime !== undefined ? options.baselineEndTime : null;
+                embyAuthMigrationPoll.timer = setInterval(pollMigrationStatus, 2000);
+            }
+
+            // D-03's stop condition compares values instead of clocks: a page that stopped at the first Idle
+            // response after Run migration now would render the old list, because QueueIfNotRunning returns 204
+            // while the task is still Idle. Comparing the last end time observed before the run to the one the
+            // poll now sees closes that window without ever comparing a browser clock to a server timestamp.
+            function pollMigrationStatus() {
+                if (embyAuthMigrationPoll.inFlight) {
+                    return;
+                }
+
+                embyAuthMigrationPoll.inFlight = true;
+                loadEmbyAuthMigration().then(function (status) {
+                    embyAuthMigrationPoll.inFlight = false;
+                    if (!status || !status.Task) {
+                        stopMigrationPolling();
+                        return;
+                    }
+
+                    if (status.Task.State !== 'Idle') {
+                        embyAuthMigrationPoll.seenRunning = true;
+                        return;
+                    }
+
+                    var endTime = status.Task.LastEndTimeUtc || null;
+                    if (endTime !== null && endTime !== embyAuthMigrationPoll.baselineEndTime) {
+                        stopMigrationPolling();
+                        return;
+                    }
+
+                    if (embyAuthMigrationPoll.seenRunning) {
+                        return;
+                    }
+
+                    embyAuthMigrationPoll.pollsSinceStart += 1;
+                    if (embyAuthMigrationPoll.pollsSinceStart >= 10) {
+                        stopMigrationPolling();
+                        showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationSummary'), 'The migration did not start. See the Jellyfin log.', true);
+                    }
+                });
+            }
+
             function loadEmbyAuthMigration() {
                 var summary = document.querySelector('#EmbyAuthMigrationSummary');
                 var list = document.querySelector('#EmbyAuthMigrationUsers');
                 return ApiClient.getJSON(ApiClient.getUrl('EmbyAuth/Migration')).then(function (status) {
-                    var ready = status.Users.filter(function (user) { return user.ReadyToMove; }).length;
-                    summary.textContent = status.Users.length === 0
-                        ? 'No users are on the Emby login method.'
-                        : 'Users on the Emby login method: ' + status.Users.length + '. Ready to move: ' + ready + '.';
+                    if (status.Task) {
+                        lastObservedTaskEndTime = status.Task.LastEndTimeUtc || null;
+                    }
+
+                    if (status.RecordsUnavailable) {
+                        showEmbyAuthMessage(summary, 'Jellyfin cannot read the record of passwords Emby verified. The readiness of each account is unknown until it can. See the Jellyfin log for detail.', true);
+                    } else if (!status.Task) {
+                        showEmbyAuthMessage(summary, 'Jellyfin has no scheduled task registered for the migration. See the Jellyfin log.', true);
+                    } else if (status.Users.length === 0) {
+                        showEmbyAuthMessage(summary, 'No users are on the Emby login method.', false);
+                    } else {
+                        var counts = { Ready: 0, NeedsEmbyLogin: 0, NoPassword: 0, Unknown: 0 };
+                        status.Users.forEach(function (user) {
+                            counts[user.State] = (counts[user.State] || 0) + 1;
+                        });
+                        showEmbyAuthMessage(summary, 'Users on the Emby login method: ' + status.Users.length
+                            + '. Ready: ' + counts.Ready
+                            + '. Needs an Emby login: ' + counts.NeedsEmbyLogin
+                            + '. No saved password: ' + counts.NoPassword
+                            + '. Unknown: ' + counts.Unknown + '.', false);
+                    }
+
                     list.replaceChildren();
                     status.Users.forEach(function (user) {
                         var item = document.createElement('li');
-                        item.textContent = user.Name + ': ' + (user.ReadyToMove ? 'ready' : 'needs one login while Emby runs');
+                        item.textContent = user.Name + ': ' + migrationStateText(user.State);
                         list.appendChild(item);
                     });
+
+                    var targetKnown = renderEmbyAuthMigrationTargetSelection(status.AvailableTargets);
+                    renderEmbyAuthPasswordSetTargetSelection(status.AvailableTargets);
+                    renderEmbyAuthMigrationWarning(status.Users, currentPluginConfig ? currentPluginConfig.MigrationTarget : '');
+                    if (!targetKnown && !status.RecordsUnavailable) {
+                        showEmbyAuthMessage(summary, 'The saved migration target is not a login method Jellyfin reports as enabled. See the Jellyfin log.', true);
+                    }
+
+                    return status;
                 }).catch(function () {
-                    summary.textContent = 'Jellyfin cannot read the migration status. See the Jellyfin log.';
+                    showEmbyAuthMessage(summary, 'Jellyfin cannot read the migration status. See the Jellyfin log.', true);
                 });
+            }
+
+            function clearEmbyAuthMigration() {
+                showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationSummary'), '', false);
+                showEmbyAuthMessage(document.querySelector('#EmbyAuthMigrationWarning'), '', false);
+                document.querySelector('#EmbyAuthMigrationUsers').replaceChildren();
             }
 
             document.querySelector('#EmbyAuthConfigPage')
                 .addEventListener('pageshow', function () {
+                    var status = document.querySelector('#EmbyAuthSettingsStatus');
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
+                        showEmbyAuthMessage(status, '', false);
                         document.querySelector('#EmbyServerUrl').value = config.EmbyServerUrl;
                         document.querySelector('#EmbyApiKey').value = config.EmbyApiKey;
                         document.querySelector('#MigrationMode').value = config.MigrationMode;
                         document.querySelector('#AccountAccess').value = config.AccountAccess;
+                        document.querySelector('.button-submit').disabled = false;
+                        currentPluginConfig = config;
                         return loadEmbyAuthMigration();
+                    }).then(function (status) {
+                        // An administrator can start the task from Dashboard > Advanced > Scheduled Tasks with no
+                        // Run click. Follow it the same way, with no start-window cap, since it has already begun.
+                        if (status && status.Task && status.Task.State !== 'Idle' && embyAuthMigrationPoll.timer === null) {
+                            startMigrationPolling({ seenRunning: true, baselineEndTime: status.Task.LastEndTimeUtc || null });
+                        }
+                    }).catch(function () {
+                        showEmbyAuthMessage(status, 'Jellyfin cannot load the plugin settings. Save is turned off until the settings load. See the Jellyfin log.', true);
+                        document.querySelector('.button-submit').disabled = true;
+                        currentPluginConfig = null;
+                        clearEmbyAuthMigration();
                     }).finally(function () {
                         Dashboard.hideLoadingMsg();
                     });
                 });
 
+            document.querySelector('#EmbyAuthConfigPage')
+                .addEventListener('pagehide', function () {
+                    stopMigrationPolling();
+                });
+
             document.querySelector('#EmbyAuthRunMigration')
                 .addEventListener('click', function () {
                     var summary = document.querySelector('#EmbyAuthMigrationSummary');
-                    ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('EmbyAuth/Migration/Run') }).then(function () {
-                        summary.textContent = 'The migration runs. This list updates in a few seconds.';
-                        setTimeout(loadEmbyAuthMigration, 3000);
+                    var targetSelect = document.querySelector('#EmbyAuthMigrationTarget');
+                    var pickedTarget = targetSelect.value;
+                    if (!pickedTarget) {
+                        showEmbyAuthMessage(summary, 'Pick a migration target before running the migration.', true);
+                        return;
+                    }
+
+                    // Defence in depth, per T-03-02: the dropdown itself only ever offers a known value, so
+                    // this only matters for a caller that bypasses the page. It is not the control -- the
+                    // server refuses the same value at save time.
+                    var isKnownTarget = pickedTarget === EMBY_AUTH_REMAIN_ON_EMBY_LOGIN_METHOD
+                        || Array.prototype.some.call(targetSelect.options, function (option) {
+                            return option.value === pickedTarget;
+                        });
+                    if (!isKnownTarget) {
+                        showEmbyAuthMessage(summary, 'Pick a migration target before running the migration.', true);
+                        return;
+                    }
+
+                    var baselineEndTime = lastObservedTaskEndTime;
+                    ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
+                        config.MigrationTarget = pickedTarget;
+                        return ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function () {
+                            currentPluginConfig = config;
+                            return ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('EmbyAuth/Migration/Run') });
+                        });
+                    }).then(function () {
+                        showEmbyAuthMessage(summary, 'The migration runs. This list updates until it finishes.', false);
+                        startMigrationPolling({ seenRunning: false, baselineEndTime: baselineEndTime });
                     }).catch(function () {
-                        summary.textContent = 'Jellyfin did not start the migration. See the Jellyfin log.';
+                        showEmbyAuthMessage(summary, 'Jellyfin did not start the migration. See the Jellyfin log.', true);
+                        stopMigrationPolling();
                     });
                 });
 
             document.querySelector('#EmbyAuthConfigForm')
                 .addEventListener('submit', function (e) {
+                    var status = document.querySelector('#EmbyAuthSettingsStatus');
+                    showEmbyAuthMessage(status, '', false);
+                    document.querySelector('.button-submit').disabled = true;
                     Dashboard.showLoadingMsg();
                     ApiClient.getPluginConfiguration(EmbyAuthConfig.pluginUniqueId).then(function (config) {
                         config.EmbyServerUrl = document.querySelector('#EmbyServerUrl').value;
                         config.EmbyApiKey = document.querySelector('#EmbyApiKey').value;
                         config.MigrationMode = document.querySelector('#MigrationMode').value;
+                        config.PasswordSetTarget = document.querySelector('#PasswordSetTarget').value;
                         config.AccountAccess = document.querySelector('#AccountAccess').value;
-                        ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
+                        return ApiClient.updatePluginConfiguration(EmbyAuthConfig.pluginUniqueId, config).then(function (result) {
                             Dashboard.processPluginConfigurationUpdateResult(result);
+                            document.querySelector('.button-submit').disabled = false;
                         });
+                    }).catch(function () {
+                        showEmbyAuthMessage(status, 'Jellyfin cannot save the plugin settings. See the Jellyfin log.', true);
+                    }).finally(function () {
+                        Dashboard.hideLoadingMsg();
                     });
 
                     e.preventDefault();
