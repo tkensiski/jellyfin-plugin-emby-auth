@@ -218,7 +218,7 @@ Plans:
   4. Version 0.9.0.0 (tag `v0.9.0.0`) goes through the release workflow as the rehearsal release. On a clean Jellyfin 12.1 server, an administrator adds the manifest URL and installs 0.9.0.0 from the catalog.
   5. After the Pages manifest exists, version 1.0.0.0 (tag `v1.0.0.0`, the `v<version>` form that `scripts/package.sh check-tag` requires) goes through the release workflow. The manifest then lists both versions, and the same server receives the update to 1.0.0.0 from the catalog.
 
-**Plans**: 1/5 plans executed
+**Plans**: 2/5 plans executed
 
 Plans:
 **Wave 1**
@@ -227,7 +227,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 06-02-PLAN.md — PUB-02: the rebuild from the Releases API, the post-deploy verify, the `manifest` mise task, and the separate Pages workflow
+- [x] 06-02-PLAN.md — PUB-02: the rebuild from the Releases API, the post-deploy verify, the `manifest` mise task, and the separate Pages workflow
 - [ ] 06-03-PLAN.md — DOCS-02 and DOCS-04: the manifest URL and the catalog install and update steps in the README, and the completed Jellyfin version bump pin list
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -252,4 +252,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
 | 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | Complete    | 2026-09-20 |
 | 5. Public Repository | 5/5 | In Progress|  |
-| 6. Catalog Install and First Public Release | 1/5 | In Progress|  |
+| 6. Catalog Install and First Public Release | 2/5 | In Progress|  |

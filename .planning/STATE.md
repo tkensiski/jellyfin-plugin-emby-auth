@@ -4,16 +4,16 @@ milestone: v0.9.0.0
 current_phase: 06
 current_phase_name: Catalog Install and First Public Release
 status: executing
-stopped_at: Completed 06-01-PLAN.md
-last_updated: "2026-09-22T05:30:50.361Z"
+stopped_at: Completed 06-02-PLAN.md
+last_updated: "2026-09-22T06:06:09.776Z"
 last_activity: 2026-09-21
 last_activity_desc: Phase 06 execution started
-state_head: 27be3e540de4e72c9f04a05f82e9e539ed275504
+state_head: b4d056cbd79730ff251ac3353a1b1ac3c5a32702
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 32
-  completed_plans: 28
+  completed_plans: 29
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-09-19)
 ## Current Position
 
 Phase: 06 (Catalog Install and First Public Release) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-09-21 — Phase 06 execution started
 
@@ -89,6 +89,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 05 P04 | 8min | 2 tasks | 1 files |
 | Phase 05 P05 | ~12min | 2 tasks | 2 files |
 | Phase 06 P01 | 44min | 3 tasks | 8 files |
+| Phase 06 P02 | 7min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,8 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05] PUB-03 is not marked complete by plan 05-05 — the repository is still PRIVATE; the plan stops at a blocking-human checkpoint handing the maintainer 'gh repo edit --visibility public --accept-visibility-change-consequences' to run personally (D-15)
 - [Phase 06]: Combined RED and GREEN into one commit each for Tasks 1 and 2, since prek's pre-commit test hook runs the full suite on any scripts/ or tests/scripts/ change and would block a failing-test-only commit; --no-verify is forbidden — Documented in SUMMARY.md's TDD Gate Compliance section; RED was still proven locally before implementing, per this repository's established skip-then-unskip convention for the same hook constraint
 - [Phase 06]: e2e/85-catalog-install.bats checks GET /Plugins's Status and dash-normalized guid to confirm the plugin loaded, and reads the true installed version from the container's on-disk meta.json, instead of asserting GET /Plugins's Version field against the fake PACKAGE_VERSION — Verified live: GET /Plugins's Version field reflects the compiled DLL's AssemblyVersion from Directory.Build.props, not meta.json's version, so it cannot distinguish the two PACKAGE_VERSION-labeled test builds
+- [Phase 06]: [Phase 06] Call merge() as a plain statement inside rebuild(), never if-! merge ...-then -- an if-condition suspends set -e for the whole command tree it tests, so a failure inside verify_checksum would print its message but let merge() finish and exit 0 anyway; found via Test W and fixed before committing (06-02-SUMMARY.md)
+- [Phase 06]: [Phase 06] Suppressed zizmor's dangerous-triggers finding on pages.yml's workflow_run with a written zizmor-ignore comment -- D-03 locks workflow_run as the only way to chain off a GITHUB_TOKEN-created Release run, and the upstream Release workflow triggers only on a maintainer-pushed v-star tag, never on pull_request or another fork-reachable event, so the pwn-request pattern the audit flags does not apply (06-02-SUMMARY.md)
 
 ### Pending Todos
 
@@ -182,6 +185,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-22T05:30:50.177Z
-Stopped at: Completed 06-01-PLAN.md
+Last session: 2026-09-22T06:06:09.599Z
+Stopped at: Completed 06-02-PLAN.md
 Resume file: None
