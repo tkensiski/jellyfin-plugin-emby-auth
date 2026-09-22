@@ -7,7 +7,7 @@ A Jellyfin plugin that moves users from Emby to Jellyfin without a password rese
 
 Your users log in to Jellyfin with the user name and password that they use on Emby. The plugin checks each password against your Emby server and saves it in Jellyfin. Then each user moves to the login method you choose — Jellyfin's **Default** login method out of the box — and that login method checks the password without Emby. When every user has moved off the Emby login method, you shut down Emby and remove the plugin.
 
-**Status:** tested only in local containers, with the Jellyfin `12.1.20260915-010956` and Emby `4.10.0.40` images. Not tested on a production server. Not published to a plugin repository. See [Compatibility](#compatibility).
+**Status:** tested only in local containers, with the Jellyfin `12.1.20260915-010956` and Emby `4.10.0.40` images. Not tested on a production server. See [Compatibility](#compatibility).
 
 ## Requirements
 
@@ -25,6 +25,25 @@ There is no upper bound in that value. A Jellyfin release newer than the tested 
 
 ## Install
 
+### Add the plugin repository
+
+1. In Jellyfin, open **Dashboard > Plugins > Repositories > Add Repository**.
+2. Give the repository a name of your choosing, and set its URL to `https://tkensiski.github.io/jellyfin-plugin-emby-auth/manifest.json`, exactly. Select **Save**.
+3. Open the **Catalog** tab, find **Emby Auth**, and install it.
+4. Restart Jellyfin.
+
+Continue with [Configure](#configure).
+
+Jellyfin downloads a repository manifest and its zips without GitHub credentials, so this URL works because the release files it names are files anyone can download without signing in to GitHub. See [Compatibility](#compatibility) for the Jellyfin and Emby versions this plugin was tested against.
+
+### Update
+
+Once the repository is added, Jellyfin's own **Plugins** page offers each newer version the manifest lists. Installing the offered version and restarting Jellyfin is the whole update. The repository is added once, at install; taking an update repeats none of those steps. Adding it a second time leaves two repository entries that point at the same manifest — remove one to fix it.
+
+### Download the zip
+
+Use this route only if your Jellyfin server cannot reach GitHub Pages.
+
 1. Get the zip `jellyfin-plugin-emby-auth_<version>.zip`:
    - From a GitHub release of this repository.
    - Or build it. The tools are pinned in `.mise.toml`:
@@ -37,8 +56,6 @@ There is no upper bound in that value. A Jellyfin release newer than the tested 
      The zip is in `artifacts/release/`.
 2. Unzip it into `<jellyfin config>/plugins/EmbyAuth_<version>/`. The zip holds the plugin DLL and `meta.json`.
 3. Restart Jellyfin.
-
-Each release also has `manifest.json`, a Jellyfin plugin repository manifest with the download URL and MD5 checksum of the zip. Jellyfin downloads a repository manifest and the zip without GitHub credentials, so a manifest URL only works for release files that anyone can download without signing in to GitHub.
 
 ## Configure
 
