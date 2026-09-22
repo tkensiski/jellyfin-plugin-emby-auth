@@ -11,6 +11,8 @@ set -euo pipefail
 #   PACKAGE_OUTPUT_DIR  Output folder. Default: artifacts/release.
 #   RELEASE_URL_BASE    Base of the zip download URL in the manifest. Default: this repository's GitHub releases.
 #   RELEASE_TIMESTAMP   UTC timestamp in the metadata. Default: now.
+#   PACKAGE_VERSION     Override the packaged version (test-only; the DLL's own AssemblyVersion still comes from Directory.Build.props). Default: the version in Directory.Build.props.
+#   CHANGELOG_PATH      Path to CHANGELOG.md. Default: CHANGELOG.md at the repository root.
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly REPO_ROOT
@@ -37,6 +39,36 @@ target_abi() {
 	echo "$controller.0"
 }
 
+# changelog_entry VERSION -> prints the CHANGELOG.md section body for VERSION, verbatim.
+# Refuses, naming VERSION, when the file has no dated section for it, when it has more than one
+# dated section for it, or when the section's body is empty or only blank lines.
+changelog_entry() {
+	local version="$1" changelog_path="${CHANGELOG_PATH:-$REPO_ROOT/CHANGELOG.md}"
+	local heading_count entry
+
+	heading_count="$(awk -v ver="$version" '$0 ~ "^## \\[" ver "\\] - " { count++ } END { print count + 0 }' "$changelog_path")"
+	if [[ "$heading_count" -gt 1 ]]; then
+		echo "CHANGELOG.md has more than one dated section for version $version. Keep exactly one \"## [$version] - <date>\" heading." >&2
+		return 1
+	fi
+	if [[ "$heading_count" -eq 0 ]]; then
+		echo "CHANGELOG.md has no dated section for version $version. Add \"## [$version] - <date>\" before building." >&2
+		return 1
+	fi
+
+	entry="$(awk -v ver="$version" '
+		$0 ~ "^## \\[" ver "\\] - " { found=1; next }
+		found && /^## / { exit }
+		found { print }
+	' "$changelog_path")"
+
+	if [[ -z "${entry//[$'\t\r\n ']/}" ]]; then
+		echo "CHANGELOG.md's dated section for version $version is empty. Add a body before building." >&2
+		return 1
+	fi
+	printf '%s' "$entry"
+}
+
 check_tag() {
 	local tag="$1" version
 	version="$(plugin_version)"
@@ -48,10 +80,12 @@ check_tag() {
 
 build() {
 	local version abi timestamp zip_name checksum
-	version="$(plugin_version)"
+	local changelog
+	version="${PACKAGE_VERSION:-$(plugin_version)}"
 	abi="$(target_abi)"
 	timestamp="${RELEASE_TIMESTAMP:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 	zip_name="jellyfin-plugin-emby-auth_$version.zip"
+	changelog="$(changelog_entry "$version")"
 
 	dotnet publish "$PROJECT" -c Release -o "$STAGE_DIR/publish" >&2
 
@@ -60,9 +94,10 @@ build() {
 	jq -n \
 		--arg guid "$PLUGIN_GUID" --arg name "$PLUGIN_NAME" --arg version "$version" \
 		--arg abi "$abi" --arg timestamp "$timestamp" --arg assembly "$ASSEMBLY" \
+		--arg changelog "$changelog" \
 		'{
 			category: "Authentication",
-			changelog: ("Release " + $version),
+			changelog: $changelog,
 			description: "Checks Jellyfin logins against an Emby server, saves the password in Jellyfin, and moves each user to the Default login method.",
 			guid: $guid,
 			name: $name,
