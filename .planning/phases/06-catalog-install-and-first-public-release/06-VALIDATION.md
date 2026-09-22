@@ -44,7 +44,7 @@ Task IDs are assigned when the planner writes PLAN.md. Each row below binds a ph
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | pending | pending | 0 | PUB-02 | T-06-01 | Every manifest value is written through `jq --arg`/`--argjson`, never interpolated into a JSON literal | script | `bats tests/scripts/manifest.bats` | ❌ W0 | ⬜ pending |
 | pending | pending | 0 | REL-04 | — | N/A | script | `bats tests/scripts/package.bats` | ✅ | ⬜ pending |
-| pending | pending | 0 | PUB-04 | T-06-02 | The installed zip's MD5 matches the manifest checksum, or the install is refused | e2e | `bats e2e/07-catalog-install.bats` | ❌ W0 | ⬜ pending |
+| pending | pending | 0 | PUB-04 | T-06-02 | The installed zip's MD5 matches the manifest checksum, or the install is refused | e2e | `bats e2e/85-catalog-install.bats` | ❌ W0 | ⬜ pending |
 | pending | pending | 1 | PUB-02 | T-06-03 | `pages.yml` carries a least-privilege `permissions:` block and no `contents: write` | script | `actionlint && zizmor --offline --persona=pedantic .github/workflows` | ✅ | ⬜ pending |
 | pending | pending | 1 | DOCS-02 | — | N/A | manual-only | — | n/a | ⬜ pending |
 | pending | pending | 1 | DOCS-04 | — | N/A | manual-only | — | n/a | ⬜ pending |
@@ -57,7 +57,7 @@ Task IDs are assigned when the planner writes PLAN.md. Each row below binds a ph
 ## Wave 0 Requirements
 
 - [ ] `tests/scripts/manifest.bats` — stubs for PUB-02, with a fake `gh` on `PATH` per the D-04 seam
-- [ ] `e2e/07-catalog-install.bats` — stubs for PUB-04, plus its `e2e/compose.yaml` additions (a manifest-serving nginx, a clean Jellyfin service)
+- [ ] `e2e/85-catalog-install.bats` — stubs for PUB-04, plus its `e2e/compose.yaml` additions (a manifest-serving nginx, a clean Jellyfin service)
 - [ ] `tests/scripts/package.bats` — new `@test` cases for REL-04's changelog wiring, D-09's refusal on an undated version, and D-17's `PACKAGE_VERSION` override
 - [ ] Framework install: none — bats, jq, gh, openssl, nginx, and Docker are all already available
 

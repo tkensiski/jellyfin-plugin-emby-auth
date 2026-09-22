@@ -218,7 +218,27 @@ Plans:
   4. Version 0.9.0.0 (tag `v0.9.0.0`) goes through the release workflow as the rehearsal release. On a clean Jellyfin 12.1 server, an administrator adds the manifest URL and installs 0.9.0.0 from the catalog.
   5. After the Pages manifest exists, version 1.0.0.0 (tag `v1.0.0.0`, the `v<version>` form that `scripts/package.sh check-tag` requires) goes through the release workflow. The manifest then lists both versions, and the same server receives the update to 1.0.0.0 from the catalog.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Tracer: the whole catalog path hermetically — a version's changelog into a real zip, two zips merged into one checksum-verified manifest, and a clean Jellyfin server installing from it and then updating
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 06-02-PLAN.md — PUB-02: the rebuild from the Releases API, the post-deploy verify, the `manifest` mise task, and the separate Pages workflow
+- [ ] 06-03-PLAN.md — DOCS-02 and DOCS-04: the manifest URL and the catalog install and update steps in the README, and the completed Jellyfin version bump pin list
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 06-04-PLAN.md — The `0.9.0.0` rehearsal: the dated first-release changelog, the version it names, the maintainer's Pages setting, and the maintainer's tag push
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 06-05-PLAN.md — PUB-05: `1.0.0.0`'s changelog written from what the rehearsal found, the maintainer's second tag push, and the update observed on the server that installed the first
+
+> **Sequencing note (planning, 2026-09-21).** Waves 3 and 4 are strictly sequential by decision, not only by file overlap. D-15 fixes the order — the manifest script, the Pages workflow, the changelog wiring and the catalog end-to-end test land and are proven first, then `v0.9.0.0`, then the catalog install and update are exercised, then `v1.0.0.0` — and `Directory.Build.props` makes a round trip from `1.0.0.0` down to `0.9.0.0` and back, which is two merges to `main` because `docs/development.md` requires the version change merged before the tag. Neither PUB-05 nor roadmap criteria 4 and 5 can be closed from inside an execution run: each release ends at a `blocking-human` checkpoint that hands the maintainer the tag push, and verification follows afterwards with `gh release list` and the live manifest (D-13). Two further external prerequisites sit outside this phase's reach — Phase 5's PUB-03 visibility change, and the one-time GitHub Pages build-type setting, which needs the Administration permission a workflow token cannot hold (RESEARCH.md Pitfall 4). The hermetic end-to-end test in Wave 1 is the one part of the phase that works regardless of either, which is why it leads.
 
 ## Progress
 
@@ -232,4 +252,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | 3. Migration Status and Target | 7/7 | Complete    | 2026-09-20 |
 | 4. The Fingerprint Store, and Emby Traffic Under Failure | 8/8 | Complete    | 2026-09-20 |
 | 5. Public Repository | 5/5 | In Progress|  |
-| 6. Catalog Install and First Public Release | 0/TBD | Not started | - |
+| 6. Catalog Install and First Public Release | 0/5 | Not started | - |
