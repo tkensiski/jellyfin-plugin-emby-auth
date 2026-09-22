@@ -86,13 +86,16 @@ setup_file() {
 		echo "- The second version this catalog test builds and updates to."
 	} >"$changelog_fixture"
 
+	# package.sh publishes the project, so it needs the same UseSharedCompilation=false that
+	# setup_suite.bash documents: the VBCSCompiler a real compile leaves behind inherits bats'
+	# output descriptors and blocks the suite for the rest of its ten-minute keep-alive.
 	local version
 	for version in "$LOWER_VERSION" "$HIGHER_VERSION"; do
 		PACKAGE_VERSION="$version" \
 			CHANGELOG_PATH="$changelog_fixture" \
 			PACKAGE_OUTPUT_DIR="$CATALOG_ARTIFACT_DIR/v$version" \
 			RELEASE_URL_BASE="http://catalog-manifest" \
-			"$REPO_ROOT/scripts/package.sh" build >&3
+			UseSharedCompilation=false "$REPO_ROOT/scripts/package.sh" build >&3
 	done
 
 	# scripts/manifest.sh merge is the same merge the Pages rebuild performs, so the document

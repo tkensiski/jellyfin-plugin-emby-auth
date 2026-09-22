@@ -9,7 +9,14 @@ setup_suite() {
 	# shellcheck source=e2e/helpers.bash
 	source "$(dirname "${BASH_SOURCE[0]}")/helpers.bash"
 
-	dotnet publish "$E2E_DIR/../src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj" -c Release -o "$E2E_DIR/../artifacts/plugin" >&3
+	# UseSharedCompilation=false stops Roslyn starting VBCSCompiler for this publish. A real compile
+	# otherwise leaves that server running for a ten-minute keep-alive, and it inherits the output
+	# descriptors bats opens for setup_suite. bats then never sees end of file on its own output
+	# stream, so the suite blocks until the server exits: measured at 603 seconds for 74 seconds of
+	# test work. This is the failure class of bats-core#419, which 60-concurrent-logins.bats guards
+	# against by closing fd 3; closing fd 3 is not enough here, because bats opens fd 4 on the same
+	# stream and the server holds that instead. Removing the server covers every descriptor.
+	UseSharedCompilation=false dotnet publish "$E2E_DIR/../src/Jellyfin.Plugin.EmbyAuth/Jellyfin.Plugin.EmbyAuth.csproj" -c Release -o "$E2E_DIR/../artifacts/plugin" >&3
 	"$E2E_DIR/../scripts/fetch-jellyfinsecurity.sh" fetch >&3
 	docker compose -f "$COMPOSE_FILE" down --volumes >&3 2>&1
 	docker compose -f "$COMPOSE_FILE" up -d >&3 2>&1
