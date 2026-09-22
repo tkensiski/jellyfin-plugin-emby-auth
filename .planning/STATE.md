@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v0.9.0.0
 current_phase: 06
 current_phase_name: Catalog Install and First Public Release
-status: verifying
-stopped_at: Phase 6 context gathered
-last_updated: "2026-09-22T01:41:50.633Z"
+status: executing
+stopped_at: Completed 06-01-PLAN.md
+last_updated: "2026-09-22T05:30:50.361Z"
 last_activity: 2026-09-21
-last_activity_desc: Phase 05 execution started
-state_head: 5942104e6a08be31dfd66359c705ab5ba87a77ff
+last_activity_desc: Phase 06 execution started
+state_head: 27be3e540de4e72c9f04a05f82e9e539ed275504
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 32
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-09-19)
 
 **Core value:** A user moves from Emby to Jellyfin without a password reset, and no password that Emby did not verify ever opens an account.
-**Current focus:** Phase 05 — Public Repository
+**Current focus:** Phase 06 — Catalog Install and First Public Release
 
 ## Current Position
 
-Phase: 06 (Catalog Install and First Public Release) — READY TO EXECUTE
-Plan: 5 of 5
-Status: All 5 plans complete. 4 of 5 roadmap success criteria verified against the codebase (05-VERIFICATION.md). Criterion 5 and PUB-03 need the repository made public, which decision D-15 reserves for the maintainer — held by choice, not blocked by any defect. The pre-publication audit is clean, so no further evidence is pending. Resume with `/gsd-verify-work 5` after publishing; see 05-UAT.md.
-Last activity: 2026-09-21 — Phase 05 verified (human_needed); maintainer holding off on the visibility change
+Phase: 06 (Catalog Install and First Public Release) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-09-21 — Phase 06 execution started
 
 Progress: [███░░░░░░░] 2/6 phases complete — 7 plans executed
 
@@ -88,6 +88,7 @@ Progress: [███░░░░░░░] 2/6 phases complete — 7 plans execu
 | Phase 05-public-repository P03 | 9min | 3 tasks | 5 files |
 | Phase 05 P04 | 8min | 2 tasks | 1 files |
 | Phase 05 P05 | ~12min | 2 tasks | 2 files |
+| Phase 06 P01 | 44min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -151,6 +152,8 @@ Recent decisions affecting current work:
 - [Phase 05]: [Phase 05] Compatibility section states only the measured Jellyfin 12.1.0 / Emby 4.10.0.40 combination and frames targetAbi as a floor with no ceiling, never an endorsement of untested newer versions — Jellyfin's InstallationManager filters the catalog with Version.Parse(targetAbi) <= appVer, so a newer server will install the plugin untested; the README must stop that from being read as support
 - [Phase 05]: [Phase 05] The pre-publication audit (scripts/pre-public-audit.sh) reuses mise run lint for its secret-scan verdict and read-only gh api/gh repo view calls for everything else; ran clean against the live repository (214 commits scanned, no leaks, all counts matching the measured surface)
 - [Phase 05]: [Phase 05] PUB-03 is not marked complete by plan 05-05 — the repository is still PRIVATE; the plan stops at a blocking-human checkpoint handing the maintainer 'gh repo edit --visibility public --accept-visibility-change-consequences' to run personally (D-15)
+- [Phase 06]: Combined RED and GREEN into one commit each for Tasks 1 and 2, since prek's pre-commit test hook runs the full suite on any scripts/ or tests/scripts/ change and would block a failing-test-only commit; --no-verify is forbidden — Documented in SUMMARY.md's TDD Gate Compliance section; RED was still proven locally before implementing, per this repository's established skip-then-unskip convention for the same hook constraint
+- [Phase 06]: e2e/85-catalog-install.bats checks GET /Plugins's Status and dash-normalized guid to confirm the plugin loaded, and reads the true installed version from the container's on-disk meta.json, instead of asserting GET /Plugins's Version field against the fake PACKAGE_VERSION — Verified live: GET /Plugins's Version field reflects the compiled DLL's AssemblyVersion from Directory.Build.props, not meta.json's version, so it cannot distinguish the two PACKAGE_VERSION-labeled test builds
 
 ### Pending Todos
 
@@ -179,6 +182,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-09-21T23:51:05.043Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-catalog-install-and-first-public-release/06-CONTEXT.md
+Last session: 2026-09-22T05:30:50.177Z
+Stopped at: Completed 06-01-PLAN.md
+Resume file: None
