@@ -4,23 +4,14 @@ All notable changes to this plugin are documented in this file.
 
 ## Unreleased
 
-### Added
+## [0.9.0.0] - 2026-09-22
 
-- Two settings, **Migration target** and **Password-set target**. Each picks the login method a move sends a user to, or the value that means no path moves a user off the Emby login method at all.
+A Jellyfin plugin that moves users from Emby to Jellyfin without a password reset. A user logs in to Jellyfin with their Emby user name and password; the plugin checks the password against the Emby server and saves it in Jellyfin, then moves the user to a login method that checks the saved password without Emby.
 
-### Removed
+An administrator gets:
 
-- The "Check the saved Jellyfin password first, then Emby" migration behavior. On the Emby login method, Emby now checks every login; the saved Jellyfin password hash never accepts a login on its own.
+- A settings page (Dashboard > Plugins > Emby Auth) for the Emby server URL, the Emby API key, the migration target, and the password-set target.
+- A migration list showing each user's readiness to move.
+- A migration task that moves every ready user at once.
 
-### Changed
-
-- A failure while creating or saving an account now refuses the login instead of returning a server error. A failed cleanup delete of a half-made account is logged with the account name.
-- The migration task's name changes to "Finish the Emby migration", and its scheduled-task key changes from `EmbyAuthMoveUsersToDefault` to `EmbyAuthMigration`. A server whose own scripts, or a stored trigger, reference the old key must be updated to the new one.
-- `GET /EmbyAuth/Migration` returns a different response. A `RecordsUnavailable` flag reports a failed read of the record of passwords Emby verified. Each user reports a `State` of `Ready`, `NeedsEmbyLogin`, `NoPassword`, or `Unknown` in place of a single ready/not-ready flag. The response also carries the migration task's own state, and the list of login methods available as a migration target.
-- The record of which password hashes Emby verified moves from a JSON file in the plugin configuration folder to a SQLite database in the plugin's own data folder. The first start after the upgrade imports the old JSON file once and leaves it in place. Each record now commits as it is written.
-
-### Upgrade note
-
-A server whose stored plugin settings still hold the removed migration-behavior value cannot load those settings. Jellyfin replaces the settings file with a default one, so the server loses its Emby server URL and its Emby API key and refuses every login on the Emby login method until an administrator enters them again in Dashboard > Plugins > Emby Auth. This affects only servers that had selected that behavior.
-
-A server that has started this version and then goes back to an earlier one keeps whatever the JSON file held but loses every record written after the upgrade. Each affected user logs in through Emby once more before they can move.
+See [Compatibility](README.md#compatibility) for the tested Jellyfin and Emby versions and the minimum Jellyfin version this build asks for.

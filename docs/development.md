@@ -36,7 +36,7 @@ The demo uses the same containers, on `127.0.0.1:18196` (Emby) and `127.0.0.1:28
 
 ## Releases
 
-1. Rename `CHANGELOG.md`'s `## Unreleased` heading to `## [<version>] - <YYYY-MM-DD>`, add a fresh empty `## Unreleased` above it, set `<Version>`, `<AssemblyVersion>`, and `<FileVersion>` in `Directory.Build.props`, and merge both changes in the same commit. `scripts/package.sh build` refuses a version with no dated `CHANGELOG.md` section, and `mise run test` runs `tests/scripts/package.bats`, which calls that build, so a version bump merged without its dated section fails the suite on `main`.
+1. Rename `CHANGELOG.md`'s `## Unreleased` heading to `## [<version>] - <YYYY-MM-DD>`, add a fresh empty `## Unreleased` above it, set `<Version>`, `<AssemblyVersion>`, and `<FileVersion>` in `Directory.Build.props`, and rename the plugin bind-mount folder in `e2e/compose.yaml` to match — Jellyfin reads a bind-mounted plugin's version from that folder name, since the mounted `dotnet publish` output has no `meta.json`. Merge all three changes in the same commit. `scripts/package.sh build` refuses a version with no dated `CHANGELOG.md` section, and `mise run test` runs `tests/scripts/package.bats`, which calls that build, so a version bump merged without its dated section fails the suite on `main`.
 2. Tag the merge commit `v<version>`, for example `v1.0.0.0`, and push the tag.
 3. `.github/workflows/release.yml` checks that the tag matches the version, then requires the tagged commit to carry a `ci-success` check run that completed with conclusion `success`, then runs `mise run test` and `mise run package`, and creates a GitHub release with the zip and `manifest.json`.
 

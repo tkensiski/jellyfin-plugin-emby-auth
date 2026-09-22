@@ -245,3 +245,13 @@ EOF
 	[ "$(jq -r '.[0].versions[0].version' "$OVERRIDE_MANIFEST")" = "$OVERRIDE_VERSION" ]
 	[[ "$(jq -r '.[0].versions[0].sourceUrl' "$OVERRIDE_MANIFEST")" == *"/v$OVERRIDE_VERSION/"* ]]
 }
+
+# Test AA: the repository's own CHANGELOG.md -- not the fixture, the real file at the repository
+# root -- holds exactly one dated section for the version in Directory.Build.props. Deliberately
+# does not route through CHANGELOG_PATH, unlike every other test in this file: this is the single
+# assertion about the real file, guarding against a version bump that forgets its changelog entry.
+@test "the repository's own CHANGELOG.md has exactly one dated section for the current version" {
+	local count
+	count="$(awk -v ver="$VERSION_FROM_PROPS" '$0 ~ "^## \\[" ver "\\] - " { count++ } END { print count + 0 }' "$REPO_ROOT/CHANGELOG.md")"
+	[ "$count" -eq 1 ]
+}

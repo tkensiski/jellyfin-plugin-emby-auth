@@ -22,7 +22,7 @@ services:
     ports:
       - "127.0.0.1:${JELLYFIN_PORT:-28096}:8096"
     volumes:
-      - ../artifacts/plugin:/config/plugins/EmbyAuth_1.0.0.0
+      - ../artifacts/plugin:/config/plugins/EmbyAuth_0.9.0.0
       # A second real login method for the migration hand-over test. scripts/fetch-jellyfinsecurity.sh
       # fetches and checksum-verifies it before the stack comes up, so Jellyfin loads it at start.
       - ../artifacts/jellyfinsecurity/TwoFactorAuth:/config/plugins/JellyfinSecurity_2.6.1.1
@@ -41,7 +41,7 @@ services:
 
   # A clean Jellyfin server for the catalog install/update test. Behind the `catalog` profile,
   # same as catalog-manifest. Deliberately has no volumes: the `jellyfin` service above
-  # bind-mounts a directory onto /config/plugins/EmbyAuth_1.0.0.0, and a catalog install writes
+  # bind-mounts a directory onto /config/plugins/EmbyAuth_0.9.0.0, and a catalog install writes
   # into /config/plugins/ itself, so this service must start with nothing already installed.
   # Do not add a plugin bind mount to this service.
   catalog-jellyfin:
