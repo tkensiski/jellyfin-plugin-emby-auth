@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 4
+open_count: 5
 waived_count: 0
 fixed_count: 2
-total_count: 6
-last_updated: 2026-09-20T23:07:53.975Z
+total_count: 7
+last_updated: 2026-09-22T06:14:40.884Z
 ---
 
 # Broken Windows Ledger
@@ -21,6 +21,7 @@ last_updated: 2026-09-20T23:07:53.975Z
 | 4 | 04 | todo | src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs | 61 | WR-01 (04-REVIEW.md): GetStatusAsync captures the cache-validity timestamp before the refresh call, so the effective snapshot lifetime is shorter than the documented 60s by the duration of the Emby request. Bounded today by the 5s HTTP timeout. | open |  | 2026-09-20T23:07:53.740Z |  |
 | 5 | 04 | todo | src/Jellyfin.Plugin.EmbyAuth/EmbyUserDirectory.cs | 100 | WR-02 (04-REVIEW.md): Dispose() disposes the refresh semaphore with no coordination against in-flight GetStatusAsync callers. A caller unblocked from WaitAsync after disposal throws ObjectDisposedException on Release(), which Jellyfin turns into an HTTP 500 rather than a refusal. Shutdown-only. | open |  | 2026-09-20T23:07:53.860Z |  |
 | 6 | 04 | todo | src/Jellyfin.Plugin.EmbyAuth/EmbyVerifiedPasswords.cs | 163 | WR-04 (04-REVIEW.md): EnsureInitialized catches only SqliteException, IOException and UnauthorizedAccessException. It runs inside DI singleton construction, so another exception such as ArgumentException from a malformed path takes down plugin registration instead of degrading as designed. | open |  | 2026-09-20T23:07:53.975Z |  |
+| 7 | 06 | deviation | CLAUDE.md |  | Task 2's automated acceptance check 'rg -c Jellyfin.Controller CLAUDE.md >= 2' cannot pass against the required one-line bullet, because rg -c counts matching lines not occurrences; substantive intent (3 occurrences) confirmed via rg -o \| wc -l | open |  | 2026-09-22T06:14:40.884Z |  |
 
 ````json
 [
@@ -94,6 +95,18 @@ last_updated: 2026-09-20T23:07:53.975Z
     "status": "open",
     "reason": "",
     "recorded_at": "2026-09-20T23:07:53.975Z",
+    "resolved_at": null
+  },
+  {
+    "id": 7,
+    "kind": "deviation",
+    "phase": "06",
+    "file": "CLAUDE.md",
+    "line": null,
+    "description": "Task 2's automated acceptance check 'rg -c Jellyfin.Controller CLAUDE.md >= 2' cannot pass against the required one-line bullet, because rg -c counts matching lines not occurrences; substantive intent (3 occurrences) confirmed via rg -o | wc -l",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-22T06:14:40.884Z",
     "resolved_at": null
   }
 ]
